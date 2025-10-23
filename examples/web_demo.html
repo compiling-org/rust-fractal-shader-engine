@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Rust Fractal Shader Engine - Web Demo</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #1a1a1a;
+            color: #ffffff;
+        }
+
+        #controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 1000;
+        }
+
+        #canvas {
+            display: block;
+            border: 2px solid #333;
+            border-radius: 10px;
+            background: #000;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+
+        input[type="range"] {
+            width: 200px;
+        }
+
+        .value {
+            display: inline-block;
+            width: 40px;
+            text-align: right;
+            font-family: monospace;
+        }
+
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        select {
+            background: #333;
+            color: white;
+            border: 1px solid #555;
+            padding: 5px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <h2>Fractal Shader Engine</h2>
+
+        <div class="control-group">
+            <label>Shader: <select id="shader-select">
+                <option value="dark fractal">Dark Fractal</option>
+                <option value="mandelbrot">Mandelbrot</option>
+                <option value="julia">Julia Set</option>
+            </select></label>
+        </div>
+
+        <div class="control-group">
+            <label>Speed: <span class="value" id="speed-value">1.0</span></label>
+            <input type="range" id="speed" min="0.1" max="5.0" step="0.1" value="1.0">
+        </div>
+
+        <div class="control-group">
+            <label>Zoom: <span class="value" id="zoom-value">1.0</span></label>
+            <input type="range" id="zoom" min="0.2" max="5.0" step="0.1" value="1.0">
+        </div>
+
+        <div class="control-group">
+            <label>Iterations: <span class="value" id="iterations-value">100</span></label>
+            <input type="range" id="iterations" min="10" max="500" step="10" value="100">
+        </div>
+
+        <div class="control-group">
+            <button id="reset">Reset</button>
+            <button id="randomize">Randomize</button>
+        </div>
+    </div>
+
+    <canvas id="canvas" width="800" height="600"></canvas>
+
+    <script type="module">
+        import init, { WebFractalShaderEngine } from './pkg/modular_fractal_shader.js';
+
+        let engine;
+        let animationId;
+        let lastTime = 0;
+
+        async function run() {
+            await init();
+
+            try {
+                engine = WebFractalShaderEngine.new('canvas');
+
+                // Load some basic shaders
+                await loadShader('dark fractal', `
+/*{
+  "CATEGORIES": ["Generator"],
+  "INPUTS": [
+    { "NAME": "speed", "TYPE": "float", "DEFAULT": 1.0, "MIN": 0.1, "MAX": 5.0 },
+    { "NAME": "zoom", "TYPE": "float", "DEFAULT": 1.0, "MIN": 0.2, "MAX": 5.0 }
+  ]
+}*/
+
+#define pi acos(-1.)
+#define tau (2.*pi)
+
+void main() {
+    vec2 uv = (gl_FragCoord.xy - 0.5 * RENDERSIZE.xy) / RENDERSIZE.y;
+    float t = TIME * speed;
+
+    uv *= zoom;
+
+    vec3 col = vec3(0.5 + 0.5 * sin(t + uv.x * 10.0),
+                   0.5 + 0.5 * cos(t + uv.y * 10.0),
+                   0.5 + 0.5 * sin(t + length(uv) * 5.0));
+
+    gl_FragColor = vec4(col, 1.0);
+}
+                `);
+
+                // Start animation loop
+                animate(0);
+
+            } catch (error) {
+                console.error('Failed to initialize fractal engine:', error);
+                document.body.innerHTML = '<h1>Error loading fractal engine</h1><p>' + error + '</p>';
+            }
+        }
+
+        async function loadShader(name, source) {
+            try {
+                await engine.load_isf_shader(name, source);
+                console.log('Loaded shader:', name);
+            } catch (error) {
+                console.error('Failed to load shader:', name, error);
+            }
+        }
+
+        function animate(currentTime) {
+            const deltaTime = (currentTime - lastTime) / 1000;
+            lastTime = currentTime;
+
+            if (engine) {
+                try {
+                    engine.render(deltaTime);
+                } catch (error) {
+                    console.error('Render error:', error);
+                }
+            }
+
+            animationId = requestAnimationFrame(animate);
+        }
+
+        // Control event listeners
+        document.getElementById('speed').addEventListener('input', function(e) {
+            const value = parseFloat(e.target.value);
+            document.getElementById('speed-value').textContent = value.toFixed(1);
+            if (engine) {
+                engine.set_parameter('dark fractal', 'speed', value);
+            }
+        });
+
+        document.getElementById('zoom').addEventListener('input', function(e) {
+            const value = parseFloat(e.target.value);
+            document.getElementById('zoom-value').textContent = value.toFixed(1);
+            if (engine) {
+                engine.set_parameter('dark fractal', 'zoom', value);
+            }
+        });
+
+        document.getElementById('iterations').addEventListener('input', function(e) {
+            const value = parseInt(e.target.value);
+            document.getElementById('iterations-value').textContent = value;
+            if (engine) {
+                engine.set_parameter('dark fractal', 'iterations', value);
+            }
+        });
+
+        document.getElementById('reset').addEventListener('click', function() {
+            document.getElementById('speed').value = 1.0;
+            document.getElementById('speed-value').textContent = '1.0';
+            document.getElementById('zoom').value = 1.0;
+            document.getElementById('zoom-value').textContent = '1.0';
+            document.getElementById('iterations').value = 100;
+            document.getElementById('iterations-value').textContent = '100';
+        });
+
+        document.getElementById('randomize').addEventListener('click', function() {
+            const speed = Math.random() * 4.9 + 0.1;
+            const zoom = Math.random() * 4.8 + 0.2;
+
+            document.getElementById('speed').value = speed;
+            document.getElementById('speed-value').textContent = speed.toFixed(1);
+            document.getElementById('zoom').value = zoom;
+            document.getElementById('zoom-value').textContent = zoom.toFixed(1);
+        });
+
+        // Start the application
+        run();
+    </script>
+</body>
+</html>
