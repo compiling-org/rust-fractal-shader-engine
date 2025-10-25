@@ -7,7 +7,7 @@ A comprehensive, modular fractal shader system built with Rust and Bevy. Feature
 ### **Current Status & Recent Updates**
 
 #### ✅ **Completed Features**
-- **ISF Shader Support**: 369 ISF shaders with multi-format conversion (ISF ↔ GLSL ↔ WGSL ↔ HLSL)
+- **ISF Shader Support**: ISF shaders with multi-format conversion (ISF ↔ GLSL ↔ WGSL ↔ HLSL)
 - **GPU Acceleration**: WebGPU/Vulkan/Metal/DX12 rendering with real-time performance
 - **Node-Based Editor**: Visual composition interface with drag-and-drop functionality
 - **Audio/MIDI Integration**: Real-time spectrum analysis and MIDI control mapping
@@ -38,7 +38,7 @@ A comprehensive, modular fractal shader system built with Rust and Bevy. Feature
 ## ✨ Features
 
 ### 🎨 **Shader Generation & Conversion**
-- **369 ISF Shaders** - Complete collection from Sleepless Monk's Rust shaders
+- ** ISF Shaders** - Complete collection from Sleepless Monk
 - **Multi-format Support** - ISF ↔ GLSL ↔ WGSL ↔ HLSL conversion
 - **Real-time Conversion** - Automatic shader format translation
 - **Custom Shader Support** - Load and convert user-created shaders
