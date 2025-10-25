@@ -2,6 +2,35 @@
 
 A comprehensive, modular fractal shader system built with Rust and Bevy. Features advanced GPU-accelerated fractal rendering, ISF shader support, real-time audio/MIDI control, and a visual node-based composition interface.
 
+## ⚠️ **WORK IN PROGRESS - Active Development & Integration**
+
+### **Current Status & Recent Updates**
+
+#### ✅ **Completed Features**
+- **ISF Shader Support**: 369 ISF shaders with multi-format conversion (ISF ↔ GLSL ↔ WGSL ↔ HLSL)
+- **GPU Acceleration**: WebGPU/Vulkan/Metal/DX12 rendering with real-time performance
+- **Node-Based Editor**: Visual composition interface with drag-and-drop functionality
+- **Audio/MIDI Integration**: Real-time spectrum analysis and MIDI control mapping
+- **Shader Conversion**: Automatic format translation between shader languages
+
+#### 🔄 **In Development**
+- **Web Deployment**: WASM/WebGPU support for browser-based editing
+- **NFT Integration**: Filecoin + NEAR blockchain minting capabilities
+- **Video Recording**: Export capabilities for fractal animations
+
+#### 🚧 **Known Issues**
+- **Web Deployment**: WASM compilation and WebGPU integration incomplete
+- **NFT Minting**: Blockchain integration needs completion
+- **Performance Optimization**: Memory usage with large shader collections
+- **Cross-Platform Testing**: Comprehensive testing across all target platforms
+
+#### 📈 **Next Development Phase**
+1. **Complete Web Deployment**: Finish WASM and WebGPU implementation
+2. **NFT Integration**: Implement Filecoin/NEAR minting functionality
+3. **Video Recording**: Add export capabilities for fractal animations
+4. **Advanced Editor**: Improve fractal editor interface
+5. **Performance Benchmarking**: Optimize for large shader collections
+
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange)](https://www.rust-lang.org/)
 [![Bevy](https://img.shields.io/badge/bevy-0.13-blue)](https://bevyengine.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -9,7 +38,7 @@ A comprehensive, modular fractal shader system built with Rust and Bevy. Feature
 ## ✨ Features
 
 ### 🎨 **Shader Generation & Conversion**
-- **369 ISF Shaders** - Complete collection from Magic directory
+- **369 ISF Shaders** - Complete collection from Sleepless Monk's Rust shaders
 - **Multi-format Support** - ISF ↔ GLSL ↔ WGSL ↔ HLSL conversion
 - **Real-time Conversion** - Automatic shader format translation
 - **Custom Shader Support** - Load and convert user-created shaders
@@ -215,6 +244,7 @@ The engine can load ISF shaders from your Magic installation directory. ISF (Int
 - GLSL to WGSL/HLSL conversion
 - Time-based animations
 - Texture sampling
+- Sleepless Monk fractal shader collection integration
 
 ## Shader Format Conversion
 
