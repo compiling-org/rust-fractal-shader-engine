@@ -53,10 +53,10 @@ pub fn update_fractal_shaders(
     midi_controller: Option<Res<crate::audio::MidiController>>,
     windows: Query<&Window>,
 ) {
-    let window = windows.single();
+    let window = windows.single().unwrap();
 
     // Update time and resolution
-    shader_uniforms.buffer.time = time.elapsed_seconds();
+    shader_uniforms.buffer.time = time.elapsed_secs();
     shader_uniforms.buffer.resolution = [window.width(), window.height()];
 
     // Update mouse position (normalized)
@@ -103,16 +103,13 @@ pub fn spawn_fractal_shader(
 
     // Create a basic material (in a real implementation, this would use custom shaders)
     let material = materials.add(StandardMaterial {
-        base_color: Color::WHITE,
+        base_color: Color::srgb(1.0, 1.0, 1.0),
         ..default()
     });
 
     commands.spawn((
-        PbrBundle {
-            mesh,
-            material,
-            ..default()
-        },
+        Mesh3d(mesh),
+        MeshMaterial3d(material),
         FractalShader {
             shader_name: "dark_fractal".to_string(),
             parameters: HashMap::from([
@@ -132,6 +129,28 @@ impl Plugin for FractalShaderPlugin {
         app
             .insert_resource(ShaderMaterials {
                 materials: HashMap::new(),
+            })
+            .insert_resource(ShaderUniforms {
+                buffer: FractalUniforms {
+                    time: 0.0,
+                    resolution: [800.0, 600.0],
+                    mouse: [0.0, 0.0],
+                    zoom: 1.0,
+                    iterations: 100.0,
+                    speed: 1.0,
+                    brightness: 1.0,
+                    contrast: 1.0,
+                    saturation: 1.0,
+                    hue_shift: 0.0,
+                    audio_bass: 0.0,
+                    audio_mid: 0.0,
+                    audio_treble: 0.0,
+                    audio_volume: 0.0,
+                    midi_cc1: 0.0,
+                    midi_cc2: 0.0,
+                    midi_cc3: 0.0,
+                    midi_cc4: 0.0,
+                },
             })
             .add_systems(Startup, spawn_fractal_shader)
             .add_systems(Update, update_fractal_shaders);

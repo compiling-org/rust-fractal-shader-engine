@@ -18,6 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Modular shader system for fractal generation
 - WebGPU/WebAssembly support preparation
 
+### Changed
+- **Bevy 0.17 Migration**: Updated all UI components, rendering systems, and API calls for Bevy 0.17 compatibility
+- **UI System Updates**: Migrated from NodeBundle/TextBundle to Node/Text components with separate styling
+- **Color API**: Updated Color::rgb/rgba usage to Color::srgb/srgba functions
+- **Window Query**: Fixed Window query handling to unwrap Result types
+- **Rendering**: Updated PbrBundle to Mesh3d/MeshMaterial3d components
+- **Camera**: Migrated Camera2dBundle to Camera2d component
+- **Math**: Replaced deprecated angle_between with angle_to method
+
 ### Features
 - **Shader Loading**: Automatic ISF shader discovery and loading
 - **Format Conversion**: Real-time shader format translation
@@ -27,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Cross-Platform**: Windows, macOS, Linux support
 
 ### Technical
-- Bevy 0.13 game engine integration
+- Bevy 0.17 game engine integration (migrated from 0.13)
 - WebGPU/Vulkan/Metal/DX12 rendering backends
 - Real-time audio spectrum analysis
 - MIDI CC parameter mapping

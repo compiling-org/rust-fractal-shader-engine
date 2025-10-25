@@ -85,7 +85,7 @@ fn setup_node_editor(
     mut node_graph: ResMut<NodeGraph>,
 ) {
     // Create camera for node editor
-    commands.spawn(Camera2dBundle::default());
+    commands.spawn(Camera2d::default());
 
     // Create sample composition
     create_sample_composition(&mut node_graph);
@@ -114,18 +114,15 @@ fn spawn_visual_node(
     let node_height = 150.0 + (node.inputs.len().max(node.outputs.len()) as f32 * 20.0);
 
     commands.spawn((
-        NodeBundle {
-            style: Style {
-                position_type: PositionType::Absolute,
-                left: Val::Px(node.position.x),
-                top: Val::Px(node.position.y),
-                width: Val::Px(node_width),
-                height: Val::Px(node_height),
-                ..default()
-            },
-            background_color: Color::rgb(0.2, 0.2, 0.3).into(),
+        Node {
+            position_type: PositionType::Absolute,
+            left: Val::Px(node.position.x),
+            top: Val::Px(node.position.y),
+            width: Val::Px(node_width),
+            height: Val::Px(node_height),
             ..default()
         },
+        BackgroundColor(Color::srgb(0.2, 0.2, 0.3)),
         VisualNode {
             node_id: *node_id,
             size: Vec2::new(node_width, node_height),
@@ -143,31 +140,28 @@ fn spawn_visual_node(
             NodeType::Output => "Output".to_string(),
         };
 
-        parent.spawn(TextBundle::from_section(
-            title,
-            TextStyle {
+        parent.spawn((
+            Text::new(title),
+            TextFont {
                 font_size: 16.0,
-                color: Color::WHITE,
                 ..default()
             },
+            TextColor(Color::WHITE),
         ));
 
         // Input sockets
         let mut y_offset = 40.0;
         for (input_name, input) in &node.inputs {
             parent.spawn((
-                NodeBundle {
-                    style: Style {
-                        position_type: PositionType::Absolute,
-                        left: Val::Px(-8.0),
-                        top: Val::Px(y_offset),
-                        width: Val::Px(16.0),
-                        height: Val::Px(16.0),
-                        ..default()
-                    },
-                    background_color: Color::rgb(0.8, 0.4, 0.4).into(),
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: Val::Px(-8.0),
+                    top: Val::Px(y_offset),
+                    width: Val::Px(16.0),
+                    height: Val::Px(16.0),
                     ..default()
                 },
+                BackgroundColor(Color::srgb(0.8, 0.4, 0.4)),
                 NodeInputSocket {
                     node_id: *node_id,
                     input_name: input_name.clone(),
@@ -175,19 +169,20 @@ fn spawn_visual_node(
                 },
             ));
 
-            parent.spawn(TextBundle::from_section(
-                input_name,
-                TextStyle {
+            parent.spawn((
+                Text::new(input_name),
+                TextFont {
                     font_size: 12.0,
-                    color: Color::WHITE,
                     ..default()
                 },
-            ).with_style(Style {
-                position_type: PositionType::Absolute,
-                left: Val::Px(20.0),
-                top: Val::Px(y_offset),
-                ..default()
-            }));
+                TextColor(Color::WHITE),
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: Val::Px(20.0),
+                    top: Val::Px(y_offset),
+                    ..default()
+                },
+            ));
 
             y_offset += 25.0;
         }
@@ -196,18 +191,15 @@ fn spawn_visual_node(
         y_offset = 40.0;
         for (output_name, output) in &node.outputs {
             parent.spawn((
-                NodeBundle {
-                    style: Style {
-                        position_type: PositionType::Absolute,
-                        right: Val::Px(-8.0),
-                        top: Val::Px(y_offset),
-                        width: Val::Px(16.0),
-                        height: Val::Px(16.0),
-                        ..default()
-                    },
-                    background_color: Color::rgb(0.4, 0.8, 0.4).into(),
+                Node {
+                    position_type: PositionType::Absolute,
+                    right: Val::Px(-8.0),
+                    top: Val::Px(y_offset),
+                    width: Val::Px(16.0),
+                    height: Val::Px(16.0),
                     ..default()
                 },
+                BackgroundColor(Color::srgb(0.4, 0.8, 0.4)),
                 NodeOutputSocket {
                     node_id: *node_id,
                     output_name: output_name.clone(),
@@ -215,19 +207,20 @@ fn spawn_visual_node(
                 },
             ));
 
-            parent.spawn(TextBundle::from_section(
-                output_name,
-                TextStyle {
+            parent.spawn((
+                Text::new(output_name),
+                TextFont {
                     font_size: 12.0,
-                    color: Color::WHITE,
                     ..default()
                 },
-            ).with_style(Style {
-                position_type: PositionType::Absolute,
-                right: Val::Px(25.0),
-                top: Val::Px(y_offset),
-                ..default()
-            }));
+                TextColor(Color::WHITE),
+                Node {
+                    position_type: PositionType::Absolute,
+                    right: Val::Px(25.0),
+                    top: Val::Px(y_offset),
+                    ..default()
+                },
+            ));
 
             y_offset += 25.0;
         }
@@ -241,11 +234,11 @@ fn handle_node_interactions(
     mut node_graph: ResMut<NodeGraph>,
     mouse_button_input: Res<ButtonInput<MouseButton>>,
     windows: Query<&Window>,
-    mut visual_nodes: Query<(Entity, &mut VisualNode, &mut Style)>,
+    mut visual_nodes: Query<(Entity, &mut VisualNode, &mut Node)>,
     input_sockets: Query<(Entity, &NodeInputSocket)>,
     output_sockets: Query<(Entity, &NodeOutputSocket)>,
 ) {
-    let window = windows.single();
+    let window = windows.single().unwrap();
     let cursor_pos = window.cursor_position().unwrap_or(Vec2::ZERO);
 
     // Handle mouse interactions
@@ -319,7 +312,7 @@ fn handle_node_interactions(
 /// Update visual node positions
 fn update_visual_nodes(
     node_graph: Res<NodeGraph>,
-    mut visual_nodes: Query<(&mut Style, &VisualNode)>,
+    mut visual_nodes: Query<(&mut Node, &VisualNode)>,
 ) {
     for (mut style, visual_node) in visual_nodes.iter_mut() {
         if let Some(node) = node_graph.nodes.get(&visual_node.node_id) {
@@ -358,16 +351,13 @@ fn draw_connection_lines(
                 let distance = from_pos.distance(to_pos);
 
                 commands.spawn((
-                    SpriteBundle {
-                        sprite: Sprite {
-                            color: Color::rgb(0.8, 0.8, 0.8),
-                            custom_size: Some(Vec2::new(distance, 2.0)),
-                            ..default()
-                        },
-                        transform: Transform::from_translation(mid_point.extend(0.0))
-                            .with_rotation(Quat::from_rotation_z((to_pos - from_pos).angle_between(Vec2::X))),
+                    Sprite {
+                        color: Color::srgb(0.8, 0.8, 0.8),
+                        custom_size: Some(Vec2::new(distance, 2.0)),
                         ..default()
                     },
+                    Transform::from_translation(mid_point.extend(0.0))
+                        .with_rotation(Quat::from_rotation_z((to_pos - from_pos).angle_to(Vec2::X))),
                     NodeConnectionLine {
                         from_node: connection.from_node,
                         to_node: connection.to_node,

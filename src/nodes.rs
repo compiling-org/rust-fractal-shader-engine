@@ -461,7 +461,7 @@ fn update_node_graph(
     // Update time-based parameters
     for node in node_graph.nodes.values_mut() {
         if let Some(time_param) = node.parameters.get_mut("time") {
-            *time_param = time.elapsed_seconds();
+            *time_param = time.elapsed_secs();
         }
     }
 }

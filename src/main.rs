@@ -52,7 +52,7 @@ void main() {
     }
 
     // Spawn a camera for the fractal rendering
-    commands.spawn(Camera2dBundle::default());
+    commands.spawn(Camera2d::default());
 }
 
 /// Update audio and MIDI systems
@@ -63,11 +63,11 @@ fn update_audio_midi(
 ) {
     // Generate some test audio data (in a real app, this would come from audio input)
     let sample_rate = 44100.0;
-    let num_samples = (sample_rate * time.delta_seconds()) as usize;
+    let num_samples = (sample_rate * time.delta_secs()) as usize;
     let mut samples = Vec::with_capacity(num_samples);
 
     for i in 0..num_samples {
-        let t = time.elapsed_seconds() + i as f32 / sample_rate;
+        let t = time.elapsed_secs() + i as f32 / sample_rate;
         // Generate a test signal with some harmonics
         let signal = (t * 440.0 * 2.0 * std::f32::consts::PI).sin() * 0.3
                    + (t * 880.0 * 2.0 * std::f32::consts::PI).sin() * 0.2
@@ -79,7 +79,7 @@ fn update_audio_midi(
     audio_midi.update_audio(&samples);
 
     // Simulate some MIDI input (in a real app, this would come from MIDI devices)
-    if time.elapsed_seconds() % 2.0 < time.delta_seconds() {
+    if time.elapsed_secs() % 2.0 < time.delta_secs() {
         audio_midi.midi_controller.process_midi_message(0, 1, 64); // Mod wheel
     }
 
