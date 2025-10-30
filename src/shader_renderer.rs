@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use bevy::render::render_resource::*;
 use std::collections::HashMap;
 
 /// Component for fractal shader entities

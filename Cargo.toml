@@ -14,6 +14,12 @@ categories = ["game-development", "graphics", "multimedia"]
 # Basic dependencies for a simple graphics library
 anyhow = "1.0"
 thiserror = "1.0"
+uuid = { version = "1.0", features = ["v4", "serde"] }
+
+# UI Framework - eframe + egui (standalone, more stable than bevy_egui)
+eframe = { version = "0.33", optional = true }
+egui = { version = "0.33", optional = true }
+egui_tiles = { version = "0.10", optional = true }
 
 # Bevy for game engine and GPU rendering
 bevy = "0.17"
@@ -42,7 +48,7 @@ bytemuck = { version = "1.13", features = ["derive"] }
 
 # LSP and editor integration (for future VS Code plugin)
 tower-lsp = "0.20"  # Language Server Protocol implementation
-tokio = { version = "1.0", features = ["full"] }  # Async runtime for LSP
+tokio = { version = "1.0", features = ["full"], optional = true }  # Async runtime for LSP
 
 # WebAssembly support (for web-based editor integration)
 wasm-bindgen = "0.2"
@@ -88,5 +94,7 @@ web-sys = { version = "0.3", features = [
 # near-jsonrpc-client = "0.6"  # NEAR JSON-RPC client
 
 [features]
-default = []
+default = ["ui"]
 bevy = []
+ui = ["eframe", "egui", "egui_tiles", "tokio"]
+eframe = ["dep:eframe"]

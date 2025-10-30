@@ -1,4 +1,4 @@
-# Changelog
+arr# Changelog
 
 All notable changes to the Rust Fractal Shader Engine will be documented in this file.
 

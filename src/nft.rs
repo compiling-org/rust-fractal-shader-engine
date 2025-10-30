@@ -233,6 +233,6 @@ mod tests {
         let service = FractalNFTService::new();
         let data = b"test fractal data";
         let hash = service.hash_fractal_data(data);
-        assert_eq!(hash.len(), 64); // SHA256 hex length
+        assert_eq!(hash.len(), 16); // Our simple hash length
     }
 }

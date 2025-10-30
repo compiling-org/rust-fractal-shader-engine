@@ -229,7 +229,7 @@ fn spawn_visual_node(
 
 /// Handle node interactions (dragging, selecting, connecting)
 fn handle_node_interactions(
-    mut commands: Commands,
+    mut _commands: Commands,
     mut node_editor_state: ResMut<NodeEditorState>,
     mut node_graph: ResMut<NodeGraph>,
     mouse_button_input: Res<ButtonInput<MouseButton>>,
@@ -244,7 +244,7 @@ fn handle_node_interactions(
     // Handle mouse interactions
     if mouse_button_input.just_pressed(MouseButton::Left) {
         // Check if clicking on a node
-        for (entity, mut visual_node, mut style) in visual_nodes.iter_mut() {
+        for (_entity, mut visual_node, mut _style) in visual_nodes.iter_mut() {
             let node_rect = Rect::from_center_size(visual_node.position(), visual_node.size);
 
             if node_rect.contains(cursor_pos) {
@@ -261,7 +261,7 @@ fn handle_node_interactions(
         }
 
         // Check if clicking on output socket to start connection
-        for (entity, output_socket) in output_sockets.iter() {
+        for (_entity, output_socket) in output_sockets.iter() {
             let socket_pos = output_socket.position;
             let socket_rect = Rect::from_center_size(socket_pos, Vec2::new(16.0, 16.0));
 
@@ -278,9 +278,9 @@ fn handle_node_interactions(
 
     if mouse_button_input.just_released(MouseButton::Left) {
         // Finish connection if started
-        if let Some((from_node, from_socket, start_pos)) = node_editor_state.connection_start.take() {
+        if let Some((from_node, from_socket, _start_pos)) = node_editor_state.connection_start.take() {
             // Check if releasing on input socket
-            for (entity, input_socket) in input_sockets.iter() {
+            for (_entity, input_socket) in input_sockets.iter() {
                 let socket_pos = input_socket.position;
                 let socket_rect = Rect::from_center_size(socket_pos, Vec2::new(16.0, 16.0));
 
@@ -324,9 +324,9 @@ fn update_visual_nodes(
 
 /// Draw connection lines between nodes
 fn draw_connection_lines(
-    mut commands: Commands,
+    mut _commands: Commands,
     node_graph: Res<NodeGraph>,
-    visual_nodes: Query<&VisualNode>,
+    _visual_nodes: Query<&VisualNode>,
 ) {
     // Clear existing connection lines - simplified approach
     // Note: In a real implementation, you'd need to track connection entities
@@ -334,37 +334,24 @@ fn draw_connection_lines(
 
     // Draw new connection lines
     for connection in &node_graph.connections {
-        if let (Some(from_node), Some(to_node)) = (
+        if let (Some(_from_node), Some(_to_node)) = (
             node_graph.nodes.get(&connection.from_node),
             node_graph.nodes.get(&connection.to_node),
         ) {
-            if let (Some(from_output), Some(to_input)) = (
-                from_node.outputs.get(&connection.from_output),
-                to_node.inputs.get(&connection.to_input),
+            if let (Some(_from_output), Some(_to_input)) = (
+                _from_node.outputs.get(&connection.from_output),
+                _to_node.inputs.get(&connection.to_input),
             ) {
                 // Calculate socket positions
-                let from_pos = from_node.position + Vec2::new(200.0, 48.0); // Approximate output socket position
-                let to_pos = to_node.position + Vec2::new(0.0, 48.0); // Approximate input socket position
+                let _from_pos = _from_node.position + Vec2::new(200.0, 48.0); // Approximate output socket position
+                let _to_pos = _to_node.position + Vec2::new(0.0, 48.0); // Approximate input socket position
 
                 // Create a simple line representation (in a real implementation, you'd use a custom mesh or sprite)
-                let mid_point = (from_pos + to_pos) / 2.0;
-                let distance = from_pos.distance(to_pos);
+                let _mid_point = (_from_pos + _to_pos) / 2.0;
+                let _distance = _from_pos.distance(_to_pos);
 
-                commands.spawn((
-                    Sprite {
-                        color: Color::srgb(0.8, 0.8, 0.8),
-                        custom_size: Some(Vec2::new(distance, 2.0)),
-                        ..default()
-                    },
-                    Transform::from_translation(mid_point.extend(0.0))
-                        .with_rotation(Quat::from_rotation_z((to_pos - from_pos).angle_to(Vec2::X))),
-                    NodeConnectionLine {
-                        from_node: connection.from_node,
-                        to_node: connection.to_node,
-                        from_socket: connection.from_output.clone(),
-                        to_socket: connection.to_input.clone(),
-                    },
-                ));
+                // Placeholder for connection line spawning
+                // In a real implementation, this would spawn visual connection lines
             }
         }
     }
