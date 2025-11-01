@@ -1,0 +1,631 @@
+//! Node-Based Editor for Fractal Composition
+//!
+//! This module provides a comprehensive node-based visual programming interface
+//! for creating complex fractal compositions, adapted from TouchDesigner and Unreal Engine.
+
+use crate::fractal::types::*;
+use egui::{Color32, Pos2, Vec2, Rect, Ui, Response, Painter, Stroke, FontId, RichText};
+use std::collections::HashMap;
+
+/// Main node editor state
+pub struct NodeEditor {
+    pub nodes: Vec<Node>,
+    pub connections: Vec<NodeConnection>,
+    pub selected_nodes: Vec<NodeId>,
+    pub dragged_node: Option<NodeId>,
+    pub drag_offset: Vec2,
+    pub pan_offset: Vec2,
+    pub zoom: f32,
+    pub show_grid: bool,
+    pub grid_size: f32,
+    pub pending_connection: Option<PendingConnection>,
+    pub node_library: NodeLibrary,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct NodeId(pub usize);
+
+#[derive(Debug, Clone)]
+pub struct Node {
+    pub id: NodeId,
+    pub position: Pos2,
+    pub size: Vec2,
+    pub node_type: NodeType,
+    pub title: String,
+    pub inputs: Vec<NodePin>,
+    pub outputs: Vec<NodePin>,
+    pub parameters: HashMap<String, NodeParameter>,
+    pub color: Color32,
+}
+
+#[derive(Debug, Clone)]
+pub struct NodePin {
+    pub id: PinId,
+    pub name: String,
+    pub pin_type: PinType,
+    pub position: Pos2,
+    pub connected: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct PinId(pub usize);
+
+#[derive(Debug, Clone)]
+pub enum PinType {
+    Geometry,
+    Color,
+    Numeric,
+    Vector,
+    Texture,
+    Material,
+    Light,
+    Camera,
+    Animation,
+}
+
+#[derive(Debug, Clone)]
+pub struct NodeConnection {
+    pub from_node: NodeId,
+    pub from_pin: PinId,
+    pub to_node: NodeId,
+    pub to_pin: PinId,
+}
+
+#[derive(Debug, Clone)]
+pub struct PendingConnection {
+    pub from_node: NodeId,
+    pub from_pin: PinId,
+    pub from_pos: Pos2,
+    pub to_pos: Pos2,
+}
+
+#[derive(Debug, Clone)]
+pub enum NodeType {
+    // Fractal Generation
+    Mandelbulb,
+    Mandelbox,
+    IFS,
+    QuaternionJulia,
+    Mandelbrott,
+    CustomFormula,
+
+    // Mathematical Operations
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Power,
+    Sin,
+    Cos,
+    Tan,
+    Sqrt,
+    Abs,
+
+    // Vector Operations
+    VectorAdd,
+    VectorSubtract,
+    VectorMultiply,
+    VectorDot,
+    VectorCross,
+    VectorNormalize,
+    VectorLength,
+
+    // Transformations
+    Translate,
+    Rotate,
+    Scale,
+    TransformMatrix,
+
+    // Color Operations
+    ColorMix,
+    ColorAdjust,
+    ColorGradient,
+    ColorRamp,
+
+    // Material Properties
+    PBRMaterial,
+    Metallic,
+    Roughness,
+    Emission,
+    NormalMap,
+
+    // Lighting
+    DirectionalLight,
+    PointLight,
+    SpotLight,
+    EnvironmentLight,
+
+    // Camera
+    Camera,
+    CameraController,
+
+    // Animation
+    Time,
+    LFO,
+    Noise,
+    Keyframe,
+
+    // Post Processing
+    Bloom,
+    DepthOfField,
+    Vignette,
+    ColorGrading,
+
+    // Utility
+    Constant,
+    Variable,
+    Switch,
+    Merge,
+    Split,
+}
+
+#[derive(Debug, Clone)]
+pub enum NodeParameter {
+    Float(f32),
+    Int(i32),
+    Bool(bool),
+    Vec2([f32; 2]),
+    Vec3([f32; 3]),
+    Vec4([f32; 4]),
+    Color([f32; 4]),
+    String(String),
+}
+
+pub struct NodeLibrary {
+    pub categories: Vec<NodeCategory>,
+}
+
+pub struct NodeCategory {
+    pub name: String,
+    pub nodes: Vec<NodeTemplate>,
+}
+
+pub struct NodeTemplate {
+    pub name: String,
+    pub description: String,
+    pub node_type: NodeType,
+    pub color: Color32,
+}
+
+impl NodeEditor {
+    pub fn new() -> Self {
+        Self {
+            nodes: Vec::new(),
+            connections: Vec::new(),
+            selected_nodes: Vec::new(),
+            dragged_node: None,
+            drag_offset: Vec2::ZERO,
+            pan_offset: Vec2::ZERO,
+            zoom: 1.0,
+            show_grid: true,
+            grid_size: 20.0,
+            pending_connection: None,
+            node_library: Self::create_node_library(),
+        }
+    }
+
+    pub fn show(&mut self, ui: &mut Ui, size: Vec2) {
+        let (rect, response) = ui.allocate_exact_size(size, egui::Sense::click_and_drag());
+
+        // Handle input
+        self.handle_input(ui, &response);
+
+        // Draw background
+        self.draw_background(ui, rect);
+
+        // Draw grid
+        if self.show_grid {
+            self.draw_grid(ui, rect);
+        }
+
+        // Draw connections
+        self.draw_connections(ui, rect);
+
+        // Draw pending connection
+        if let Some(pending) = &self.pending_connection {
+            self.draw_pending_connection(ui, pending);
+        }
+
+        // Draw nodes
+        for node in &self.nodes {
+            self.draw_node(ui, node, rect);
+        }
+
+        // Draw node library panel
+        self.draw_node_library(ui, rect);
+    }
+
+    fn handle_input(&mut self, ui: &Ui, response: &Response) {
+        let input = ui.input(|i| i.clone());
+
+        // Pan with middle mouse
+        if response.dragged_by(egui::PointerButton::Middle) {
+            self.pan_offset += response.drag_delta();
+        }
+
+        // Zoom with mouse wheel
+        if let Some(mouse_pos) = response.hover_pos() {
+            let zoom_delta = input.scroll_delta.y * 0.001;
+            if zoom_delta != 0.0 {
+                let old_zoom = self.zoom;
+                self.zoom = (self.zoom * (1.0 + zoom_delta)).clamp(0.1, 5.0);
+
+                // Zoom towards mouse position
+                let zoom_factor = self.zoom / old_zoom;
+                let mouse_world = (mouse_pos - self.pan_offset) / old_zoom;
+                let new_mouse_world = mouse_world * zoom_factor;
+                self.pan_offset += (mouse_world - new_mouse_world) * old_zoom;
+            }
+        }
+
+        // Handle node selection and dragging
+        if response.clicked() && !input.modifiers.shift {
+            self.selected_nodes.clear();
+        }
+
+        // Handle pending connections
+        if response.clicked() && self.pending_connection.is_some() {
+            self.pending_connection = None;
+        }
+    }
+
+    fn draw_background(&self, ui: &Ui, rect: Rect) {
+        ui.painter().rect_filled(
+            rect,
+            0.0,
+            Color32::from_rgb(25, 28, 35),
+        );
+    }
+
+    fn draw_grid(&self, ui: &Ui, rect: Rect) {
+        let painter = ui.painter();
+        let grid_color = Color32::from_rgb(45, 50, 60);
+        let grid_size = self.grid_size * self.zoom;
+
+        let start_x = (rect.left() + self.pan_offset.x) % grid_size;
+        let start_y = (rect.top() + self.pan_offset.y) % grid_size;
+
+        // Vertical lines
+        for x in (0..((rect.width() / grid_size) as i32 + 2)).map(|i| start_x + i as f32 * grid_size) {
+            painter.line_segment(
+                [Pos2::new(x, rect.top()), Pos2::new(x, rect.bottom())],
+                Stroke::new(1.0, grid_color),
+            );
+        }
+
+        // Horizontal lines
+        for y in (0..((rect.height() / grid_size) as i32 + 2)).map(|i| start_y + i as f32 * grid_size) {
+            painter.line_segment(
+                [Pos2::new(rect.left(), y), Pos2::new(rect.right(), y)],
+                Stroke::new(1.0, grid_color),
+            );
+        }
+    }
+
+    fn draw_connections(&self, ui: &Ui, rect: Rect) {
+        let painter = ui.painter();
+
+        for connection in &self.connections {
+            if let (Some(from_node), Some(to_node)) = (
+                self.nodes.iter().find(|n| n.id == connection.from_node),
+                self.nodes.iter().find(|n| n.id == connection.to_node),
+            ) {
+                if let (Some(from_pin), Some(to_pin)) = (
+                    from_node.outputs.iter().find(|p| p.id == connection.from_pin),
+                    to_node.inputs.iter().find(|p| p.id == connection.to_pin),
+                ) {
+                    let from_pos = self.world_to_screen(from_pin.position, rect);
+                    let to_pos = self.world_to_screen(to_pin.position, rect);
+
+                    // Draw bezier curve
+                    self.draw_connection_curve(painter, from_pos, to_pos, Color32::from_rgb(100, 150, 255));
+                }
+            }
+        }
+    }
+
+    fn draw_pending_connection(&self, ui: &Ui, pending: &PendingConnection) {
+        if let Some(from_node) = self.nodes.iter().find(|n| n.id == pending.from_node) {
+            if let Some(from_pin) = from_node.outputs.iter().find(|p| p.id == pending.from_pin) {
+                let painter = ui.painter();
+                let from_pos = from_pin.position;
+                let to_pos = pending.to_pos;
+
+                self.draw_connection_curve(painter, from_pos, to_pos, Color32::from_rgb(255, 200, 100));
+            }
+        }
+    }
+
+    fn draw_connection_curve(&self, painter: &Painter, from: Pos2, to: Pos2, color: Color32) {
+        let control_point_1 = Pos2::new(from.x + 50.0, from.y);
+        let control_point_2 = Pos2::new(to.x - 50.0, to.y);
+
+        // Simple bezier curve approximation
+        let steps = 20;
+        let mut points = Vec::new();
+
+        for i in 0..=steps {
+            let t = i as f32 / steps as f32;
+            let x = (1.0 - t).powi(3) * from.x +
+                   3.0 * (1.0 - t).powi(2) * t * control_point_1.x +
+                   3.0 * (1.0 - t) * t.powi(2) * control_point_2.x +
+                   t.powi(3) * to.x;
+            let y = (1.0 - t).powi(3) * from.y +
+                   3.0 * (1.0 - t).powi(2) * t * control_point_1.y +
+                   3.0 * (1.0 - t) * t.powi(2) * control_point_2.y +
+                   t.powi(3) * to.y;
+            points.push(Pos2::new(x, y));
+        }
+
+        painter.add(egui::Shape::line(points, Stroke::new(2.0, color)));
+    }
+
+    fn draw_node(&mut self, ui: &Ui, node: &Node, canvas_rect: Rect) {
+        let node_rect = Rect::from_min_size(
+            self.world_to_screen(node.position, canvas_rect),
+            node.size * self.zoom,
+        );
+
+        let painter = ui.painter();
+        let is_selected = self.selected_nodes.contains(&node.id);
+
+        // Node background
+        let bg_color = if is_selected {
+            Color32::from_rgb(80, 120, 180)
+        } else {
+            node.color
+        };
+
+        painter.rect_filled(node_rect, 8.0, bg_color);
+        painter.rect_stroke(node_rect, 8.0, Stroke::new(2.0, Color32::from_rgb(60, 70, 85)));
+
+        // Node title
+        painter.text(
+            node_rect.min + Vec2::new(8.0, 8.0),
+            egui::Align2::LEFT_TOP,
+            &node.title,
+            FontId::proportional(14.0),
+            Color32::WHITE,
+        );
+
+        // Draw pins
+        for input in &node.inputs {
+            self.draw_pin(painter, input, node_rect.min, true);
+        }
+
+        for output in &node.outputs {
+            self.draw_pin(painter, output, node_rect.min, false);
+        }
+
+        // Handle node interaction
+        let response = ui.interact(node_rect, egui::Id::new(node.id), egui::Sense::click_and_drag());
+
+        if response.clicked() {
+            if ui.input(|i| i.modifiers.shift) {
+                if let Some(pos) = self.selected_nodes.iter().position(|&id| id == node.id) {
+                    self.selected_nodes.remove(pos);
+                } else {
+                    self.selected_nodes.push(node.id);
+                }
+            } else {
+                self.selected_nodes = vec![node.id];
+            }
+        }
+
+        if response.dragged() && !self.selected_nodes.is_empty() {
+            let delta = response.drag_delta() / self.zoom;
+            for &node_id in &self.selected_nodes {
+                if let Some(node) = self.nodes.iter_mut().find(|n| n.id == node_id) {
+                    node.position += delta;
+                }
+            }
+        }
+    }
+
+    fn draw_pin(&self, painter: &Painter, pin: &NodePin, node_pos: Pos2, is_input: bool) {
+        let pin_color = match pin.pin_type {
+            PinType::Geometry => Color32::from_rgb(100, 200, 100),
+            PinType::Color => Color32::from_rgb(200, 150, 100),
+            PinType::Numeric => Color32::from_rgb(150, 150, 200),
+            PinType::Vector => Color32::from_rgb(200, 100, 150),
+            PinType::Texture => Color32::from_rgb(150, 200, 200),
+            _ => Color32::from_rgb(180, 180, 180),
+        };
+
+        let pin_pos = if is_input {
+            node_pos + Vec2::new(0.0, pin.position.y)
+        } else {
+            node_pos + Vec2::new(pin.position.x, pin.position.y)
+        };
+
+        painter.circle_filled(pin_pos, 6.0, pin_color);
+        painter.circle_stroke(pin_pos, 6.0, Stroke::new(2.0, Color32::WHITE));
+
+        // Pin label
+        let label_pos = if is_input {
+            pin_pos + Vec2::new(12.0, -4.0)
+        } else {
+            pin_pos + Vec2::new(-12.0 - painter.fonts(|f| f.layout(&pin.name, FontId::default(), Color32::WHITE, f32::INFINITY).size().x), -4.0)
+        };
+
+        painter.text(
+            label_pos,
+            if is_input { egui::Align2::LEFT_CENTER } else { egui::Align2::RIGHT_CENTER },
+            &pin.name,
+            FontId::proportional(10.0),
+            Color32::WHITE,
+        );
+    }
+
+    fn draw_node_library(&mut self, ui: &Ui, canvas_rect: Rect) {
+        let library_rect = Rect::from_min_size(
+            canvas_rect.right_top() - Vec2::new(200.0, 0.0),
+            Vec2::new(200.0, canvas_rect.height()),
+        );
+
+        // Semi-transparent background
+        ui.painter().rect_filled(
+            library_rect,
+            0.0,
+            Color32::from_rgba_premultiplied(30, 35, 45, 200),
+        );
+
+        ui.allocate_ui_at_rect(library_rect, |ui| {
+            ui.set_min_width(180.0);
+
+            ui.label(RichText::new("🎨 Node Library").size(14.0));
+            ui.separator();
+
+            egui::ScrollArea::vertical().show(ui, |ui| {
+                for category in &self.node_library.categories {
+                    ui.collapsing(RichText::new(&category.name).size(12.0), |ui| {
+                        for template in &category.nodes {
+                            let response = ui.add(
+                                egui::Button::new(&template.name)
+                                    .fill(template.color.linear_multiply(0.8))
+                                    .stroke(Stroke::new(1.0, template.color))
+                            );
+
+                            if response.clicked() {
+                                self.add_node_from_template(template, canvas_rect.center());
+                            }
+
+                            response.on_hover_text(&template.description);
+                        }
+                    });
+                }
+            });
+        });
+    }
+
+    fn add_node_from_template(&mut self, template: &NodeTemplate, position: Pos2) {
+        let node_id = NodeId(self.nodes.len());
+
+        let node = Node {
+            id: node_id,
+            position,
+            size: Vec2::new(150.0, 100.0),
+            node_type: template.node_type.clone(),
+            title: template.name.clone(),
+            inputs: self.create_node_inputs(&template.node_type),
+            outputs: self.create_node_outputs(&template.node_type),
+            parameters: HashMap::new(),
+            color: template.color,
+        };
+
+        self.nodes.push(node);
+    }
+
+    fn create_node_inputs(&self, node_type: &NodeType) -> Vec<NodePin> {
+        match node_type {
+            NodeType::Mandelbulb => vec![
+                NodePin {
+                    id: PinId(0),
+                    name: "Power".to_string(),
+                    pin_type: PinType::Numeric,
+                    position: Pos2::new(0.0, 30.0),
+                    connected: false,
+                },
+                NodePin {
+                    id: PinId(1),
+                    name: "Iterations".to_string(),
+                    pin_type: PinType::Numeric,
+                    position: Pos2::new(0.0, 50.0),
+                    connected: false,
+                },
+            ],
+            NodeType::Add => vec![
+                NodePin {
+                    id: PinId(0),
+                    name: "A".to_string(),
+                    pin_type: PinType::Numeric,
+                    position: Pos2::new(0.0, 30.0),
+                    connected: false,
+                },
+                NodePin {
+                    id: PinId(1),
+                    name: "B".to_string(),
+                    pin_type: PinType::Numeric,
+                    position: Pos2::new(0.0, 50.0),
+                    connected: false,
+                },
+            ],
+            _ => vec![],
+        }
+    }
+
+    fn create_node_outputs(&self, node_type: &NodeType) -> Vec<NodePin> {
+        match node_type {
+            NodeType::Mandelbulb => vec![
+                NodePin {
+                    id: PinId(0),
+                    name: "Geometry".to_string(),
+                    pin_type: PinType::Geometry,
+                    position: Pos2::new(150.0, 40.0),
+                    connected: false,
+                },
+            ],
+            NodeType::Add => vec![
+                NodePin {
+                    id: PinId(0),
+                    name: "Result".to_string(),
+                    pin_type: PinType::Numeric,
+                    position: Pos2::new(150.0, 40.0),
+                    connected: false,
+                },
+            ],
+            _ => vec![],
+        }
+    }
+
+    fn world_to_screen(&self, world_pos: Pos2, canvas_rect: Rect) -> Pos2 {
+        canvas_rect.min + (world_pos + self.pan_offset) * self.zoom
+    }
+
+    fn create_node_library() -> NodeLibrary {
+        NodeLibrary {
+            categories: vec![
+                NodeCategory {
+                    name: "Fractals".to_string(),
+                    nodes: vec![
+                        NodeTemplate {
+                            name: "Mandelbulb".to_string(),
+                            description: "3D Mandelbrot fractal".to_string(),
+                            node_type: NodeType::Mandelbulb,
+                            color: Color32::from_rgb(100, 150, 200),
+                        },
+                        NodeTemplate {
+                            name: "Mandelbox".to_string(),
+                            description: "Box folding fractal".to_string(),
+                            node_type: NodeType::Mandelbox,
+                            color: Color32::from_rgb(150, 100, 200),
+                        },
+                        NodeTemplate {
+                            name: "IFS".to_string(),
+                            description: "Iterated function system".to_string(),
+                            node_type: NodeType::IFS,
+                            color: Color32::from_rgb(200, 150, 100),
+                        },
+                    ],
+                },
+                NodeCategory {
+                    name: "Math".to_string(),
+                    nodes: vec![
+                        NodeTemplate {
+                            name: "Add".to_string(),
+                            description: "Add two values".to_string(),
+                            node_type: NodeType::Add,
+                            color: Color32::from_rgb(100, 200, 100),
+                        },
+                        NodeTemplate {
+                            name: "Sin".to_string(),
+                            description: "Sine function".to_string(),
+                            node_type: NodeType::Sin,
+                            color: Color32::from_rgb(200, 100, 100),
+                        },
+                    ],
+                },
+            ],
+        }
+    }
+}

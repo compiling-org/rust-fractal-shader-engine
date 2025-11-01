@@ -1,100 +1,84 @@
 [package]
-name = "rust-fractal-shader-engine"
+name = "modular-fractal-shader"
 version = "0.1.0"
 edition = "2021"
-description = "Modular fractal shader system using Bevy and Shadplay"
-authors = ["Kapil"]
-license = "MIT"
-repository = "https://github.com/compiling-org/rust-fractal-shader-engine"
-homepage = "https://github.com/compiling-org/rust-fractal-shader-engine"
-keywords = ["bevy", "shader", "fractal", "gpu", "graphics"]
-categories = ["game-development", "graphics", "multimedia"]
+description = "Professional fractal generator and 3D editor/animator with node-based interface"
+authors = ["Fractal Generator Team"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/compiling-org/modular-fractal-shader"
+homepage = "https://github.com/compiling-org/modular-fractal-shader"
+keywords = ["fractal", "3d", "graphics", "wgpu", "gui", "animation", "export"]
+categories = ["graphics", "multimedia", "mathematics", "gui"]
+
+[[bin]]
+name = "fractal-generator"
+path = "src/main.rs"
+
+[lib]
+name = "fractal_generator"
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-# Basic dependencies for a simple graphics library
-anyhow = "1.0"
-thiserror = "1.0"
-uuid = { version = "1.0", features = ["v4", "serde"] }
+# GUI framework
+eframe = { version = "0.33.0", optional = true }
+egui = { version = "0.33.0", optional = true }
 
-# UI Framework - eframe + egui (standalone, more stable than bevy_egui)
-eframe = { version = "0.33", optional = true }
-egui = { version = "0.33", optional = true }
-egui_tiles = { version = "0.10", optional = true }
+# Graphics and compute
+wgpu = "27.0.1"
+winit = "0.30.12"
+bytemuck = { version = "1.15", features = ["derive"] }
 
-# Bevy for game engine and GPU rendering
-bevy = "0.17"
+# Math and utilities
+nalgebra = "0.32"
+uuid = { version = "1.0", features = ["v4"] }
+rand = "0.8"
+noise = "0.8"
 
-# Shadplay for shader development (if available as crate, otherwise integrate manually)
-# Note: Shadplay might need to be added as a git dependency or local path
-
-# ISF shader parsing
-isf = "0.1"
-
-# Additional dependencies for shader handling
+# File I/O and serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-wgpu = "26.0"  # For direct GPU access if needed
+ron = "0.8"
+bincode = "1.3"
 
-# Shader compilation and conversion
-naga = "26.0"  # For shader AST manipulation and conversion
-spirv-tools = "0.10"  # For SPIR-V handling
-# HLSL support via naga
+# Audio processing (optional)
+cpal = { version = "0.15", optional = true }
+rustfft = { version = "6.4", optional = true }
 
-# File system operations
-walkdir = "2.0"  # For traversing directories to find ISF files
+# Image processing
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "exr"] }
 
-# GPU buffer utilities for shader uniforms
-bytemuck = { version = "1.13", features = ["derive"] }
+# Logging and utilities
+log = "0.4"
+env_logger = "0.10"
+anyhow = "1.0"
+thiserror = "1.0"
+parking_lot = "0.12"
+tokio = { version = "1.0", features = ["full"] }
+pollster = "0.4.0"
 
-# LSP and editor integration (for future VS Code plugin)
-tower-lsp = "0.20"  # Language Server Protocol implementation
-tokio = { version = "1.0", features = ["full"], optional = true }  # Async runtime for LSP
+# File dialogs
+rfd = "0.15.4"
 
-# WebAssembly support (for web-based editor integration)
-wasm-bindgen = "0.2"
-web-sys = "0.3"
-
-# Web deployment and WASM
-wasm-bindgen-futures = "0.4"
-js-sys = "0.3"
-console_error_panic_hook = "0.1"
-console_log = "1"
-
-# Web-specific features
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-wasm-bindgen = "0.2"
-web-sys = { version = "0.3", features = [
-  "console",
-  "Window",
-  "Document",
-  "Element",
-  "HtmlElement",
-  "HtmlCanvasElement",
-  "WebGlRenderingContext",
-  "WebGl2RenderingContext",
-  "WebGlProgram",
-  "WebGlShader",
-  "WebGlBuffer",
-  "WebGlUniformLocation",
-  "WebGlTexture",
-  "KeyboardEvent",
-  "MouseEvent",
-  "WheelEvent",
-  "TouchEvent",
-  "TouchList",
-  "Touch",
-] }
-
-# NFT and blockchain dependencies (optional features)
-# sha2 = "0.10"  # For hashing fractal data
-# hex = "0.4"    # For hex encoding
-# tokio = { version = "1.0", features = ["full"] }  # For async operations
-# Note: NEAR SDK dependencies commented out due to version conflicts
-# near-sdk = "4.1"  # NEAR blockchain SDK
-# near-jsonrpc-client = "0.6"  # NEAR JSON-RPC client
+# Time handling
+chrono = { version = "0.4", features = ["serde"] }
+walkdir = "2.5.0"
+bevy = "0.17.2"
 
 [features]
-default = ["ui"]
-bevy = []
-ui = ["eframe", "egui", "egui_tiles", "tokio"]
-eframe = ["dep:eframe"]
+default = ["gui"]
+gui = ["dep:eframe", "dep:egui"]
+audio = ["dep:cpal", "dep:rustfft"]
+midi = ["audio"]
+
+[profile.release]
+opt-level = 3
+debug = false
+strip = true
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[profile.dev]
+opt-level = 0
+debug = true
+overflow-checks = true

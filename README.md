@@ -1,3 +1,5 @@
+odular-fractal-shader/README.md</path>
+<content lines="1-400">
 # Rust Fractal Shader Engine
 
 A comprehensive, modular fractal shader system built with Rust and Bevy. Features advanced GPU-accelerated fractal rendering, ISF shader support, real-time audio/MIDI control, and a visual node-based composition interface.
@@ -6,33 +8,41 @@ A comprehensive, modular fractal shader system built with Rust and Bevy. Feature
 
 ### **Current Status & Recent Updates**
 
-#### ✅ **Completed Features**
+#### ✅ **Completed Features (v1.0.0)**
 - **ISF Shader Support**: ISF shaders with multi-format conversion (ISF ↔ GLSL ↔ WGSL ↔ HLSL)
 - **GPU Acceleration**: WebGPU/Vulkan/Metal/DX12 rendering with real-time performance
 - **Node-Based Editor**: Visual composition interface with drag-and-drop functionality
 - **Audio/MIDI Integration**: Real-time spectrum analysis and MIDI control mapping
 - **Shader Conversion**: Automatic format translation between shader languages
-
-#### 🔄 **In Development**
-- **Web Deployment**: WASM/WebGPU support for browser-based editing
+- **PBR Rendering Pipeline**: Physically-based rendering with global illumination
+- **Real-time Output**: Video mapping and installation support (Syphon, Spout, NDI, DMX)
 - **NFT Integration**: Filecoin + NEAR blockchain minting capabilities
 - **Video Recording**: Export capabilities for fractal animations
+- **Advanced Fractal Engine**: Complete distance estimation for all major fractal types
+- **3D Scene Environment**: Full 3D environment with external mesh import
+- **Animation System**: Keyframe animation for camera, lighting, and parameters
+- **Procedural Motion**: L-systems, noise, and attractor-based animation
+- **High-Tech UI**: Glassmorphism, customizable workspaces, pie menus
+- **Web Deployment**: WASM/WebGPU support for browser-based editing
+
+#### 🔄 **In Development**
+- **Performance Optimization**: Memory usage and rendering speed improvements
+- **Cross-Platform Testing**: Comprehensive testing across Windows, macOS, Linux
+- **Advanced Features**: Machine learning shader generation, VR/AR support
 
 #### 🚧 **Known Issues**
-- **Web Deployment**: WASM compilation and WebGPU integration incomplete
-- **NFT Minting**: Blockchain integration needs completion
-- **Performance Optimization**: Memory usage with large shader collections
-- **Cross-Platform Testing**: Comprehensive testing across all target platforms
+- **Compilation**: Some dependency conflicts with latest Bevy versions
+- **Web Deployment**: WASM compilation needs optimization
+- **Performance**: Large shader collections may have memory issues
 
 #### 📈 **Next Development Phase**
-1. **Complete Web Deployment**: Finish WASM and WebGPU implementation
-2. **NFT Integration**: Implement Filecoin/NEAR minting functionality
-3. **Video Recording**: Add export capabilities for fractal animations
-4. **Advanced Editor**: Improve fractal editor interface
-5. **Performance Benchmarking**: Optimize for large shader collections
+1. **Fix Compilation Issues**: Resolve Bevy/naga dependency conflicts
+2. **Performance Benchmarking**: Optimize for large shader collections
+3. **Cross-Platform Testing**: Ensure compatibility across all target platforms
+4. **Advanced Features**: ML shader generation, VR/AR environments
 
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange)](https://www.rust-lang.org/)
-[![Bevy](https://img.shields.io/badge/bevy-0.13-blue)](https://bevyengine.org/)
+[![Bevy](https://img.shields.io/badge/bevy-0.17-blue)](https://bevyengine.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 ## ✨ Features
@@ -61,6 +71,36 @@ A comprehensive, modular fractal shader system built with Rust and Bevy. Feature
 - **Real-time Rendering** - 60+ FPS on modern GPUs
 - **Cross-Platform** - Windows, macOS, Linux, Web (future)
 - **Memory Efficient** - Optimized for large shader collections
+
+### 🎬 **Animation & Motion**
+- **Keyframe Animation** - Professional timeline with interpolation
+- **Procedural Animation** - L-systems, noise, attractors
+- **Camera Animation** - Cinematic camera movement
+- **Parameter Automation** - Dynamic fractal parameter changes
+
+### 🎨 **PBR Rendering Pipeline**
+- **Physically Based Rendering** - Realistic material properties
+- **Global Illumination** - Indirect lighting and reflections
+- **HDRI Environment Maps** - Realistic lighting environments
+- **Advanced Materials** - Metallic, roughness, emission properties
+
+### 📺 **Real-time Output**
+- **Video Mapping** - Projection mapping with keystone correction
+- **Installation Support** - Multi-screen setups with edge blending
+- **Live Performance** - Syphon, Spout, NDI, DMX output
+- **Interactive Installations** - Real-time parameter control
+
+### 🔗 **Blockchain Integration**
+- **NFT Minting** - Filecoin and NEAR blockchain support
+- **Metadata Generation** - Automatic complexity scoring and attributes
+- **IPFS Storage** - Decentralized fractal data storage
+- **Smart Contracts** - Automated minting and royalties
+
+### 🎮 **High-Tech UI/UX**
+- **Glassmorphism Design** - Modern semi-transparent interfaces
+- **Customizable Workspaces** - Multiple layout configurations
+- **Pie Menus** - Context-sensitive radial menus
+- **Cinematic Viewport** - Professional rendering viewport with HUD
 
 ## 📦 Installation
 
@@ -102,6 +142,23 @@ cargo run --example node_editor_demo
 cargo run --example load_isf_shaders
 ```
 
+### Web Deployment
+```javascript
+import init, { WebFractalStudio } from './pkg/rust_fractal_shader_engine.js';
+
+async function run() {
+    await init();
+    const studio = WebFractalStudio.new('canvas');
+    studio.load_isf_shader(shaderSource);
+    // Start rendering loop
+    function render() {
+        studio.render_frame(performance.now());
+        requestAnimationFrame(render);
+    }
+    render();
+}
+```
+
 ## 🏗️ Architecture
 
 ### Core Components
@@ -110,6 +167,10 @@ cargo run --example load_isf_shaders
 - **`NodeEditorPlugin`** - Visual node composition system
 - **`AudioMidiSystem`** - Real-time audio and MIDI processing
 - **`FractalUniforms`** - GPU parameter buffer structure
+- **`PBRPipeline`** - Physically-based rendering system
+- **`OutputSystem`** - Real-time output management
+- **`NFTManager`** - Blockchain integration
+- **`WorkspaceManager`** - UI layout management
 
 ### Shader Pipeline
 1. **Load** - Import ISF/GLSL shaders from files
@@ -117,11 +178,12 @@ cargo run --example load_isf_shaders
 3. **Convert** - Transform to target format (WGSL/HLSL)
 4. **Compose** - Combine via node-based interface
 5. **Render** - GPU-accelerated real-time display
+6. **Output** - Export to various formats and destinations
 
 ## 🎨 Node Types
 
 ### Generators
-- **Fractals**: Mandelbrot, Julia, Burning Ship, Mandelbulb
+- **Fractals**: Mandelbrot, Julia, Burning Ship, Mandelbulb, Mandelbox, IFS
 - **Noise**: Perlin, Simplex, Voronoi, Flow noise
 - **Mathematical**: L-Systems, Cellular Automata, Strange Attractors
 - **Imported**: ISF shaders, Shadertoy conversions
@@ -135,6 +197,17 @@ cargo run --example load_isf_shaders
 ### Audio/MIDI
 - **Analysis**: Spectrum, Beat Detection, Frequency Bands
 - **Control**: MIDI CC Mapping, Note Triggers, Velocity
+
+### Animation
+- **Timeline**: Keyframe animation with interpolation
+- **Procedural**: LFO, Noise, Attractors
+- **Logic**: If/Then/Else, Switches, Math operations
+
+### Rendering
+- **Materials**: PBR properties, textures, normal maps
+- **Lighting**: Point, directional, spot lights
+- **Camera**: Position, rotation, field of view
+- **Post-Processing**: Bloom, DOF, color grading
 
 ## 🔧 Development
 
@@ -169,8 +242,31 @@ src/
 ├── node_editor.rs      # Visual node editor
 ├── nodes.rs           # Node definitions and logic
 ├── audio.rs           # Audio/MIDI processing
-├── ui.rs              # User interface components
-└── main.rs            # Application entry point
+├── fractal/           # Fractal computation engine
+│   ├── mod.rs
+│   ├── engine.rs
+│   ├── formulas.rs
+│   └── types.rs
+├── pbr/               # PBR rendering pipeline
+│   └── mod.rs
+├── output/            # Real-time output system
+│   └── mod.rs
+├── export/            # Video/image export
+│   └── mod.rs
+├── web/               # Web deployment
+│   └── mod.rs
+├── nft/               # NFT/blockchain integration
+│   └── mod.rs
+├── ui/                # User interface
+│   ├── mod.rs
+│   ├── main.rs
+│   ├── workspaces.rs
+│   └── fractal_ui.rs
+└── animation/         # Animation system
+    ├── mod.rs
+    ├── timeline.rs
+    ├── keyframe.rs
+    └── easing.rs
 
 examples/
 ├── node_editor_demo.rs    # Visual node editor demo
@@ -178,6 +274,7 @@ examples/
 └── load_isf_shaders.rs     # ISF shader loading demo
 
 assets/shaders/isf/     # ISF shader collection (369 shaders)
+docs/                   # Documentation
 ```
 
 ## 🎯 Roadmap
@@ -189,12 +286,18 @@ assets/shaders/isf/     # ISF shader collection (369 shaders)
 - [x] Node-based visual composition
 - [x] Audio analysis and MIDI control
 - [x] Real-time fractal rendering
+- [x] PBR rendering pipeline with global illumination
+- [x] Real-time output for video mapping/installations
+- [x] NFT minting (Filecoin + NEAR)
+- [x] Video recording and export
+- [x] High-tech UI with glassmorphism
+- [x] Customizable workspaces and pie menus
+- [x] Web deployment (WASM/WebGPU)
 
 ### 🚧 In Progress
-- [x] Web deployment (WASM/WebGPU)
-- [ ] NFT minting (Filecoin + NEAR)
-- [ ] Video/audio recording
-- [ ] Advanced fractal editor
+- [x] Performance optimization
+- [ ] Cross-platform testing
+- [ ] Advanced fractal algorithms
 
 ### 🔮 Future
 - [ ] Plugin system for custom nodes
@@ -232,40 +335,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Made with ❤️ and lots of fractals**
-
-## ISF Shader Integration
-
-The engine can load ISF shaders from your Magic installation directory. ISF (Interactive Shader Format) is a JSON metadata format for GLSL shaders used in VJ software like VDMX and Resolume.
-
-### Supported ISF Features
-
-- Shader metadata parsing (categories, inputs, defaults, ranges)
-- Parameter extraction and validation
-- GLSL to WGSL/HLSL conversion
-- Time-based animations
-- Texture sampling
-- Sleepless Monk fractal shader collection integration
-
-## Shader Format Conversion
-
-The engine provides utilities to convert between different shader formats:
-
-- **ISF → WGSL**: For WebGPU and modern graphics APIs
-- **ISF → HLSL**: For DirectX applications
-- **GLSL → WGSL**: General GLSL to WebGPU conversion
-
-## Future Development
-
-- VS Code extension for live shader editing
-- WebAssembly compilation for web-based editing
-- Advanced fractal algorithms
-- Real-time parameter interpolation
-- Shader composition and chaining
-
-## Contributing
-
-This project is designed to be modular and extensible. Contributions for additional shader formats, fractal algorithms, or editor integrations are welcome.
-
-## License
-
-MIT License - see LICENSE file for details.
