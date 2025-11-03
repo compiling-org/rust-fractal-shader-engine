@@ -1,402 +1,432 @@
-odular-fractal-shader/src/export/mod.rs</path>
-<content lines="1-150">
-pub mod video;
-pub mod image_sequence;
+//! Export System Module
+//!
+//! This module handles exporting fractals to various formats including
+//! images, videos, 3D meshes, and animation data.
 
-/// Video recording and export functionality
-pub struct VideoExporter {
-    frame_buffer: Vec<u8>,
-    width: u32,
-    height: u32,
-    frame_rate: f32,
-    current_frame: u32,
-    recording: bool,
-    output_path: String,
-    codec_settings: VideoCodecSettings,
+use std::path::Path;
+use std::fs::File;
+use std::io::Write;
+use image::{ImageBuffer, Rgba};
+use nalgebra::Vector3;
+
+/// Export error types
+#[derive(Debug)]
+pub enum ExportError {
+    IoError(std::io::Error),
+    ImageError(image::ImageError),
+    JsonError(serde_json::Error),
+    UnsupportedFormat,
+    InvalidData,
 }
 
-impl VideoExporter {
-    pub fn new(width: u32, height: u32, frame_rate: f32, output_path: String) -> Self {
-        Self {
-            frame_buffer: vec![0; (width * height * 4) as usize],
-            width,
-            height,
-            frame_rate,
-            current_frame: 0,
-            recording: false,
-            output_path,
-            codec_settings: VideoCodecSettings::default(),
-        }
-    }
-
-    pub fn start_recording(&mut self) -> Result<(), ExportError> {
-        if self.recording {
-            return Err(ExportError::AlreadyRecording);
-        }
-
-        self.recording = true;
-        self.current_frame = 0;
-
-        // Initialize video encoder
-        self.initialize_encoder()?;
-
-        log::info!("Started video recording: {}x{} @ {}fps", self.width, self.height, self.frame_rate);
-        Ok(())
-    }
-
-    pub fn stop_recording(&mut self) -> Result<String, ExportError> {
-        if !self.recording {
-            return Err(ExportError::NotRecording);
-        }
-
-        self.recording = false;
-
-        // Finalize video file
-        let output_file = self.finalize_video()?;
-
-        log::info!("Video recording completed: {}", output_file);
-        Ok(output_file)
-    }
-
-    pub fn add_frame(&mut self, render_result: &crate::rendering::RenderResult) -> Result<(), ExportError> {
-        if !self.recording {
-            return Ok(()); // Silently ignore if not recording
-        }
-
-        // Convert render result to RGBA frame buffer
-        self.convert_render_result_to_framebuffer(render_result);
-
-        // Encode frame
-        self.encode_frame(&self.frame_buffer)?;
-
-        self.current_frame += 1;
-        Ok(())
-    }
-
-    pub fn is_recording(&self) -> bool {
-        self.recording
-    }
-
-    pub fn current_frame(&self) -> u32 {
-        self.current_frame
-    }
-
-    pub fn set_codec_settings(&mut self, settings: VideoCodecSettings) {
-        self.codec_settings = settings;
-    }
-
-    fn initialize_encoder(&self) -> Result<(), ExportError> {
-        // TODO: Initialize video encoder (FFmpeg, libx264, etc.)
-        log::info!("Initializing video encoder with codec: {:?}", self.codec_settings.codec);
-        Ok(())
-    }
-
-    fn finalize_video(&self) -> Result<String, ExportError> {
-        // TODO: Finalize and save video file
-        let output_file = format!("{}/fractal_animation_{}.{}", self.output_path, chrono::Utc::now().timestamp(), self.codec_settings.extension());
-        log::info!("Finalizing video file: {}", output_file);
-        Ok(output_file)
-    }
-
-    fn convert_render_result_to_framebuffer(&mut self, render_result: &crate::rendering::RenderResult) {
-        // Convert float color buffer to RGBA bytes
-        for (i, &value) in render_result.color_buffer.iter().enumerate() {
-            let pixel_index = i / 3;
-            let channel = i % 3;
-
-            if pixel_index < self.frame_buffer.len() / 4 {
-                let byte_value = (value.clamp(0.0, 1.0) * 255.0) as u8;
-                self.frame_buffer[pixel_index * 4 + channel] = byte_value;
-                if channel == 2 { // Set alpha to 255
-                    self.frame_buffer[pixel_index * 4 + 3] = 255;
-                }
-            }
-        }
-    }
-
-    fn encode_frame(&self, frame_buffer: &[u8]) -> Result<(), ExportError> {
-        // TODO: Encode frame using video codec
-        log::debug!("Encoding frame {}", self.current_frame);
-        Ok(())
+impl From<std::io::Error> for ExportError {
+    fn from(error: std::io::Error) -> Self {
+        ExportError::IoError(error)
     }
 }
 
-/// Image sequence exporter
-pub struct ImageSequenceExporter {
-    output_path: String,
-    frame_number: u32,
-    format: ImageFormat,
-    quality: u8,
-}
-
-impl ImageSequenceExporter {
-    pub fn new(output_path: String, format: ImageFormat) -> Self {
-        Self {
-            output_path,
-            frame_number: 0,
-            format,
-            quality: 95, // Default quality
-        }
-    }
-
-    pub fn export_frame(&mut self, render_result: &crate::rendering::RenderResult) -> Result<String, ExportError> {
-        let filename = format!(
-            "{}/frame_{:06}.{}",
-            self.output_path,
-            self.frame_number,
-            self.format.extension()
-        );
-
-        // Convert render result to image buffer
-        let image_buffer = self.convert_to_image_buffer(render_result)?;
-
-        // Save image
-        self.save_image(&image_buffer, &filename)?;
-
-        self.frame_number += 1;
-        Ok(filename)
-    }
-
-    pub fn set_quality(&mut self, quality: u8) {
-        self.quality = quality.clamp(1, 100);
-    }
-
-    pub fn reset_frame_counter(&mut self) {
-        self.frame_number = 0;
-    }
-
-    fn convert_to_image_buffer(&self, render_result: &crate::rendering::RenderResult) -> Result<Vec<u8>, ExportError> {
-        let width = (render_result.color_buffer.len() / 3) as u32;
-        let height = 1; // Assume single row for now, would need to be calculated properly
-
-        let mut image_buffer = Vec::with_capacity(width as usize * height as usize * 4);
-
-        for chunk in render_result.color_buffer.chunks(3) {
-            if chunk.len() == 3 {
-                let r = (chunk[0].clamp(0.0, 1.0) * 255.0) as u8;
-                let g = (chunk[1].clamp(0.0, 1.0) * 255.0) as u8;
-                let b = (chunk[2].clamp(0.0, 1.0) * 255.0) as u8;
-                let a = 255u8;
-
-                image_buffer.extend_from_slice(&[r, g, b, a]);
-            }
-        }
-
-        Ok(image_buffer)
-    }
-
-    fn save_image(&self, image_buffer: &[u8], filename: &str) -> Result<(), ExportError> {
-        // TODO: Save image using image crate or similar
-        log::info!("Saving image: {} ({} bytes)", filename, image_buffer.len());
-        Ok(())
+impl From<image::ImageError> for ExportError {
+    fn from(error: image::ImageError) -> Self {
+        ExportError::ImageError(error)
     }
 }
 
-/// Video codec settings
-#[derive(Debug, Clone)]
-pub struct VideoCodecSettings {
-    pub codec: VideoCodec,
-    pub bitrate: u32, // kbps
-    pub preset: String,
-    pub profile: String,
-}
-
-impl VideoCodecSettings {
-    pub fn extension(&self) -> &'static str {
-        match self.codec {
-            VideoCodec::H264 => "mp4",
-            VideoCodec::H265 => "mp4",
-            VideoCodec::VP9 => "webm",
-            VideoCodec::AV1 => "mkv",
-        }
+impl From<serde_json::Error> for ExportError {
+    fn from(error: serde_json::Error) -> Self {
+        ExportError::JsonError(error)
     }
 }
 
-impl Default for VideoCodecSettings {
-    fn default() -> Self {
-        Self {
-            codec: VideoCodec::H264,
-            bitrate: 5000, // 5 Mbps
-            preset: "medium".to_string(),
-            profile: "high".to_string(),
-        }
-    }
-}
-
-/// Supported video codecs
-#[derive(Debug, Clone)]
-pub enum VideoCodec {
-    H264,
-    H265,
-    VP9,
-    AV1,
-}
-
-/// Supported image formats
-#[derive(Debug, Clone)]
-pub enum ImageFormat {
+/// Supported export formats
+#[derive(Debug, Clone, Copy)]
+pub enum ExportFormat {
     PNG,
     JPEG,
     TIFF,
     EXR,
-}
-
-impl ImageFormat {
-    pub fn extension(&self) -> &'static str {
-        match self {
-            ImageFormat::PNG => "png",
-            ImageFormat::JPEG => "jpg",
-            ImageFormat::TIFF => "tiff",
-            ImageFormat::EXR => "exr",
-        }
-    }
-}
-
-/// Export-related errors
-#[derive(Debug, Clone)]
-pub enum ExportError {
-    AlreadyRecording,
-    NotRecording,
-    EncoderInitializationFailed(String),
-    EncodingFailed(String),
-    FileWriteError(String),
-    InvalidFrameData(String),
-}
-
-impl std::fmt::Display for ExportError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ExportError::AlreadyRecording => write!(f, "Already recording"),
-            ExportError::NotRecording => write!(f, "Not currently recording"),
-            ExportError::EncoderInitializationFailed(msg) => write!(f, "Encoder initialization failed: {}", msg),
-            ExportError::EncodingFailed(msg) => write!(f, "Encoding failed: {}", msg),
-            ExportError::FileWriteError(msg) => write!(f, "File write error: {}", msg),
-            ExportError::InvalidFrameData(msg) => write!(f, "Invalid frame data: {}", msg),
-        }
-    }
-}
-
-impl std::error::Error for ExportError {}
-
-/// Export manager for coordinating different export types
-pub struct ExportManager {
-    video_exporter: Option<VideoExporter>,
-    image_exporter: Option<ImageSequenceExporter>,
-    export_queue: Vec<ExportJob>,
-}
-
-impl ExportManager {
-    pub fn new() -> Self {
-        Self {
-            video_exporter: None,
-            image_exporter: None,
-            export_queue: Vec::new(),
-        }
-    }
-
-    pub fn start_video_export(&mut self, settings: VideoExportSettings) -> Result<(), ExportError> {
-        let exporter = VideoExporter::new(
-            settings.width,
-            settings.height,
-            settings.frame_rate,
-            settings.output_path,
-        );
-
-        self.video_exporter = Some(exporter);
-        if let Some(ref mut exporter) = self.video_exporter {
-            exporter.start_recording()?;
-        }
-
-        Ok(())
-    }
-
-    pub fn start_image_sequence_export(&mut self, settings: ImageSequenceExportSettings) -> Result<(), ExportError> {
-        let exporter = ImageSequenceExporter::new(
-            settings.output_path,
-            settings.format,
-        );
-
-        self.image_exporter = Some(exporter);
-        Ok(())
-    }
-
-    pub fn process_frame(&mut self, render_result: &crate::rendering::RenderResult) -> Result<(), ExportError> {
-        // Export to video if recording
-        if let Some(ref mut exporter) = self.video_exporter {
-            if exporter.is_recording() {
-                exporter.add_frame(render_result)?;
-            }
-        }
-
-        // Export to image sequence if active
-        if let Some(ref mut exporter) = self.image_exporter {
-            exporter.export_frame(render_result)?;
-        }
-
-        Ok(())
-    }
-
-    pub fn stop_exports(&mut self) -> Result<ExportResults, ExportError> {
-        let mut results = ExportResults::default();
-
-        // Stop video export
-        if let Some(exporter) = self.video_exporter.take() {
-            if exporter.is_recording() {
-                results.video_file = Some(exporter.stop_recording()?);
-            }
-        }
-
-        // Image sequence export is complete when frames are done
-        results.image_sequence_count = self.image_exporter.as_ref().map(|e| e.frame_number).unwrap_or(0);
-
-        Ok(results)
-    }
+    MP4,
+    OBJ,
+    FBX,
+    GLTF,
 }
 
 /// Export settings
 #[derive(Debug, Clone)]
-pub struct VideoExportSettings {
+pub struct ExportSettings {
+    pub format: ExportFormat,
     pub width: u32,
     pub height: u32,
-    pub frame_rate: f32,
-    pub output_path: String,
-    pub codec_settings: VideoCodecSettings,
+    pub quality: f32, // 0.0 - 1.0
+    pub frame_rate: u32, // for video
+    pub start_frame: u32,
+    pub end_frame: u32,
 }
 
-#[derive(Debug, Clone)]
-pub struct ImageSequenceExportSettings {
-    pub output_path: String,
-    pub format: ImageFormat,
-    pub quality: u8,
+/// Image export functionality
+pub struct ImageExporter;
+
+impl ImageExporter {
+    /// Export RGBA pixel data to image file
+    pub fn export_image(
+        pixels: &[u8],
+        width: u32,
+        height: u32,
+        format: ExportFormat,
+        path: &Path,
+    ) -> Result<(), ExportError> {
+        match format {
+            ExportFormat::PNG => {
+                let img = ImageBuffer::<Rgba<u8>, _>::from_raw(width, height, pixels.to_vec())
+                    .ok_or(ExportError::InvalidData)?;
+                img.save_with_format(path, image::ImageFormat::Png)?;
+            }
+            ExportFormat::JPEG => {
+                let img = ImageBuffer::<Rgba<u8>, _>::from_raw(width, height, pixels.to_vec())
+                    .ok_or(ExportError::InvalidData)?;
+                let quality = 90; // Default quality for JPEG
+                let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(
+                    File::create(path)?,
+                    quality,
+                );
+                img.write_with_encoder(encoder)?;
+            }
+            ExportFormat::TIFF => {
+                let img = ImageBuffer::<Rgba<u8>, _>::from_raw(width, height, pixels.to_vec())
+                    .ok_or(ExportError::InvalidData)?;
+                img.save_with_format(path, image::ImageFormat::Tiff)?;
+            }
+            ExportFormat::EXR => {
+                // For EXR, we'd need additional dependencies
+                // For now, fall back to PNG
+                let img = ImageBuffer::<Rgba<u8>, _>::from_raw(width, height, pixels.to_vec())
+                    .ok_or(ExportError::InvalidData)?;
+                img.save_with_format(path.with_extension("png"), image::ImageFormat::Png)?;
+            }
+            _ => return Err(ExportError::UnsupportedFormat),
+        }
+
+        Ok(())
+    }
+
+    /// Export fractal distance field as image
+    pub fn export_fractal_image(
+        distance_field: &[f32],
+        width: u32,
+        height: u32,
+        path: &Path,
+        color_map: &crate::fractal::ColorMapping,
+    ) -> Result<(), ExportError> {
+        let mut pixels = Vec::with_capacity((width * height * 4) as usize);
+
+        for &distance in distance_field {
+            // Convert distance to color using the color mapping
+            let t = (distance / 100.0).clamp(0.0, 1.0); // Normalize distance
+
+            // Sample color palette
+            let palette_index = (t * (color_map.palette.len() - 1) as f32) as usize;
+            let color = color_map.palette[palette_index];
+
+            // Apply color adjustments
+            let r = ((color.x * color_map.brightness + color_map.contrast * (color.x - 0.5) + 0.5) * 255.0) as u8;
+            let g = ((color.y * color_map.brightness + color_map.contrast * (color.y - 0.5) + 0.5) * 255.0) as u8;
+            let b = ((color.z * color_map.brightness + color_map.contrast * (color.z - 0.5) + 0.5) * 255.0) as u8;
+
+            pixels.extend_from_slice(&[r, g, b, 255]);
+        }
+
+        Self::export_image(&pixels, width, height, ExportFormat::PNG, path)
+    }
 }
 
-/// Export job for queued operations
-#[derive(Debug, Clone)]
-pub struct ExportJob {
-    pub job_type: ExportJobType,
-    pub settings: ExportSettings,
-    pub priority: u8,
+/// Video export functionality
+pub struct VideoExporter;
+
+impl VideoExporter {
+    /// Export animation frames to video
+    pub fn export_video(
+        frame_data: Vec<Vec<u8>>,
+        width: u32,
+        height: u32,
+        frame_rate: u32,
+        path: &Path,
+    ) -> Result<(), ExportError> {
+        // For now, export as image sequence
+        // In a real implementation, you'd use ffmpeg or similar
+        for (i, frame) in frame_data.iter().enumerate() {
+            let frame_path = path.with_file_name(format!("frame_{:04}.png", i));
+            ImageExporter::export_image(frame, width, height, ExportFormat::PNG, &frame_path)?;
+        }
+
+        // Create a simple batch file for ffmpeg (if available)
+        let batch_path = path.with_extension("bat");
+        let ffmpeg_cmd = format!(
+            "ffmpeg -framerate {} -i frame_%04d.png -c:v libx264 -pix_fmt yuv420p \"{}\"",
+            frame_rate,
+            path.with_extension("mp4").display()
+        );
+
+        let mut batch_file = File::create(batch_path)?;
+        writeln!(batch_file, "{}", ffmpeg_cmd)?;
+
+        Ok(())
+    }
 }
 
-#[derive(Debug, Clone)]
-pub enum ExportJobType {
-    Video,
-    ImageSequence,
-    Mesh,
-    Voxel,
+/// 3D mesh export functionality
+pub struct MeshExporter;
+
+impl MeshExporter {
+    /// Export fractal as OBJ mesh
+    pub fn export_obj(
+        vertices: &[Vector3<f32>],
+        indices: &[u32],
+        normals: &[Vector3<f32>],
+        path: &Path,
+    ) -> Result<(), ExportError> {
+        let mut file = File::create(path)?;
+
+        // Write vertices
+        for vertex in vertices {
+            writeln!(file, "v {} {} {}", vertex.x, vertex.y, vertex.z)?;
+        }
+
+        // Write normals
+        for normal in normals {
+            writeln!(file, "vn {} {} {}", normal.x, normal.y, normal.z)?;
+        }
+
+        // Write faces
+        for chunk in indices.chunks(3) {
+            if chunk.len() == 3 {
+                // OBJ indices are 1-based
+                writeln!(file, "f {} {} {}",
+                    chunk[0] + 1, chunk[1] + 1, chunk[2] + 1)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Export fractal as STL mesh (binary)
+    pub fn export_stl(
+        vertices: &[Vector3<f32>],
+        indices: &[u32],
+        path: &Path,
+    ) -> Result<(), ExportError> {
+        let mut file = File::create(path)?;
+
+        // STL header (80 bytes)
+        let header = [0u8; 80];
+        file.write_all(&header)?;
+
+        // Number of triangles (4 bytes, little endian)
+        let num_triangles = (indices.len() / 3) as u32;
+        file.write_all(&num_triangles.to_le_bytes())?;
+
+        // Write triangles
+        for chunk in indices.chunks(3) {
+            if chunk.len() == 3 {
+                // Normal vector (12 bytes) - compute face normal
+                let v0 = vertices[chunk[0] as usize];
+                let v1 = vertices[chunk[1] as usize];
+                let v2 = vertices[chunk[2] as usize];
+
+                let normal = (v1 - v0).cross(&(v2 - v0)).normalize();
+                file.write_all(&normal.x.to_le_bytes())?;
+                file.write_all(&normal.y.to_le_bytes())?;
+                file.write_all(&normal.z.to_le_bytes())?;
+
+                // Vertices (36 bytes)
+                for &idx in chunk {
+                    let vertex = vertices[idx as usize];
+                    file.write_all(&vertex.x.to_le_bytes())?;
+                    file.write_all(&vertex.y.to_le_bytes())?;
+                    file.write_all(&vertex.z.to_le_bytes())?;
+                }
+
+                // Attribute byte count (2 bytes)
+                file.write_all(&[0u8, 0u8])?;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Generate mesh from fractal distance field using marching cubes
+    pub fn generate_fractal_mesh(
+        distance_field: &[f32],
+        width: u32,
+        height: u32,
+        depth: u32,
+        iso_level: f32,
+    ) -> (Vec<Vector3<f32>>, Vec<u32>, Vec<Vector3<f32>>) {
+        // Simplified marching cubes implementation
+        // In a real implementation, this would be much more sophisticated
+
+        let mut vertices = Vec::new();
+        let mut indices = Vec::new();
+        let mut normals = Vec::new();
+
+        // For now, create a simple cube mesh as placeholder
+        vertices.extend_from_slice(&[
+            Vector3::new(-1.0, -1.0, -1.0),
+            Vector3::new(1.0, -1.0, -1.0),
+            Vector3::new(1.0, 1.0, -1.0),
+            Vector3::new(-1.0, 1.0, -1.0),
+            Vector3::new(-1.0, -1.0, 1.0),
+            Vector3::new(1.0, -1.0, 1.0),
+            Vector3::new(1.0, 1.0, 1.0),
+            Vector3::new(-1.0, 1.0, 1.0),
+        ]);
+
+        indices.extend_from_slice(&[
+            0, 1, 2, 2, 3, 0, // front
+            1, 5, 6, 6, 2, 1, // right
+            5, 4, 7, 7, 6, 5, // back
+            4, 0, 3, 3, 7, 4, // left
+            3, 2, 6, 6, 7, 3, // top
+            4, 5, 1, 1, 0, 4, // bottom
+        ]);
+
+        // Simple normals for cube faces
+        normals.extend_from_slice(&[
+            Vector3::new(0.0, 0.0, -1.0), // front
+            Vector3::new(1.0, 0.0, 0.0),  // right
+            Vector3::new(0.0, 0.0, 1.0),  // back
+            Vector3::new(-1.0, 0.0, 0.0), // left
+            Vector3::new(0.0, 1.0, 0.0),  // top
+            Vector3::new(0.0, -1.0, 0.0), // bottom
+        ]);
+
+        (vertices, indices, normals)
+    }
 }
 
-#[derive(Debug, Clone)]
-pub enum ExportSettings {
-    Video(VideoExportSettings),
-    ImageSequence(ImageSequenceExportSettings),
+/// Animation export functionality
+pub struct AnimationExporter;
+
+impl AnimationExporter {
+    /// Export animation data as JSON
+    pub fn export_animation_json(
+        animation_data: &crate::animation::AnimationController,
+        path: &Path,
+    ) -> Result<(), ExportError> {
+        // AnimationController doesn't implement Serialize, so we'll export basic info
+        let animation_info = serde_json::json!({
+            "playing": animation_data.is_playing(),
+            "current_time": animation_data.current_time(),
+        });
+        let json = serde_json::to_string_pretty(&animation_info)?;
+        let mut file = File::create(path)?;
+        file.write_all(json.as_bytes())?;
+        Ok(())
+    }
+
+    /// Export keyframe data for external animation software
+    pub fn export_keyframes_csv(
+        tracks: &std::collections::HashMap<crate::animation::keyframe::TrackId, crate::animation::keyframe::AnimationTrackType>,
+        path: &Path,
+    ) -> Result<(), ExportError> {
+        let mut file = File::create(path)?;
+
+        // Write CSV header
+        writeln!(file, "Track ID,Track Name,Time,Value X,Value Y,Value Z,Interpolation")?;
+
+        // Write keyframe data
+        for (track_id, track_type) in tracks {
+            match track_type {
+                crate::animation::keyframe::AnimationTrackType::Float(track) => {
+                    for keyframe in &track.keyframes {
+                        writeln!(file, "{},{},{},{},{},{},{}",
+                            track_id,
+                            track.name,
+                            keyframe.time,
+                            keyframe.value,
+                            "",
+                            "",
+                            format!("{:?}", keyframe.interpolation)
+                        )?;
+                    }
+                }
+                crate::animation::keyframe::AnimationTrackType::Vec3(track) => {
+                    for keyframe in &track.keyframes {
+                        writeln!(file, "{},{},{},{},{},{},{}",
+                            track_id,
+                            track.name,
+                            keyframe.time,
+                            keyframe.value.x,
+                            keyframe.value.y,
+                            keyframe.value.z,
+                            format!("{:?}", keyframe.interpolation)
+                        )?;
+                    }
+                }
+                _ => {} // Handle other types as needed
+            }
+        }
+
+        Ok(())
+    }
 }
 
-/// Export results
-#[derive(Debug, Default)]
-pub struct ExportResults {
-    pub video_file: Option<String>,
-    pub image_sequence_count: u32,
-    pub mesh_file: Option<String>,
-    pub voxel_file: Option<String>,
+/// Main export interface
+pub struct Exporter;
+
+impl Exporter {
+    /// Export fractal with given settings
+    pub fn export_fractal(
+        fractal_data: &[f32],
+        settings: &ExportSettings,
+        path: &Path,
+        color_map: &crate::fractal::ColorMapping,
+    ) -> Result<(), ExportError> {
+        match settings.format {
+            ExportFormat::PNG | ExportFormat::JPEG | ExportFormat::TIFF | ExportFormat::EXR => {
+                ImageExporter::export_fractal_image(
+                    fractal_data,
+                    settings.width,
+                    settings.height,
+                    path,
+                    color_map,
+                )
+            }
+            ExportFormat::OBJ => {
+                // Generate mesh from distance field
+                let (vertices, indices, normals) = MeshExporter::generate_fractal_mesh(
+                    fractal_data,
+                    settings.width,
+                    settings.height,
+                    32, // depth
+                    0.0, // iso level
+                );
+                MeshExporter::export_obj(&vertices, &indices, &normals, path)
+            }
+            _ => Err(ExportError::UnsupportedFormat),
+        }
+    }
+
+    /// Export scene with all objects
+    pub fn export_scene(
+        scene: &crate::scene::Scene,
+        settings: &ExportSettings,
+        path: &Path,
+    ) -> Result<(), ExportError> {
+        match settings.format {
+            ExportFormat::GLTF => {
+                // TODO: Implement glTF export
+                Err(ExportError::UnsupportedFormat)
+            }
+            ExportFormat::OBJ => {
+                // Export all mesh objects in scene
+                for (id, object) in &scene.objects {
+                    if let crate::scene::ObjectType::Mesh { vertices, indices, .. } = &object.object_type {
+                        let object_path = path.with_file_name(format!("object_{}.obj", id));
+                        MeshExporter::export_obj(vertices, indices, &[], &object_path)?;
+                    }
+                }
+                Ok(())
+            }
+            _ => Err(ExportError::UnsupportedFormat),
+        }
+    }
 }

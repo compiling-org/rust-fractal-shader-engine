@@ -1,175 +1,325 @@
 //! Keyframe Animation System
 //!
-//! This module provides keyframe-based animation capabilities for smooth parameter transitions.
+//! This module provides keyframe-based animation for fractal parameters,
+//! scene objects, and material properties.
 
-use crate::fractal::types::FractalParameters;
-use nalgebra::Vector3;
+use std::collections::HashMap;
+use nalgebra::{Vector3, Vector4, Scalar};
+use serde::{Deserialize, Serialize};
 
-/// Single keyframe in an animation track
-#[derive(Debug, Clone)]
+/// Unique identifier for animation tracks
+pub type TrackId = u64;
+
+/// Animation keyframe with time and value
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Keyframe<T> {
     pub time: f32,
     pub value: T,
-    pub easing: EasingFunction,
+    pub interpolation: InterpolationMode,
 }
 
-/// Animation track that interpolates between keyframes
+/// Interpolation modes for keyframes
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum InterpolationMode {
+    Linear,
+    Smooth,
+    Step,
+    EaseIn,
+    EaseOut,
+    EaseInOut,
+}
+
+/// Animation track containing keyframes for a specific property
 #[derive(Debug, Clone)]
-pub struct AnimationTrack<T: Clone> {
-    name: String,
-    keyframes: Vec<Keyframe<T>>,
+pub struct AnimationTrack<T> {
+    pub id: TrackId,
+    pub name: String,
+    pub target_path: String, // e.g., "fractal.power", "transform.position.x"
+    pub keyframes: Vec<Keyframe<T>>,
+    pub enabled: bool,
 }
 
-impl<T: Clone> AnimationTrack<T> {
-    pub fn new(name: &str) -> Self {
+/// Animation controller managing multiple tracks
+#[derive(Debug, Clone)]
+pub struct AnimationController {
+    pub tracks: HashMap<TrackId, AnimationTrackType>,
+    pub current_time: f32,
+    pub duration: f32,
+    pub playing: bool,
+    pub loop_animation: bool,
+}
+
+#[derive(Debug, Clone)]
+pub enum AnimationTrackType {
+    Float(AnimationTrack<f32>),
+    Vec3(AnimationTrack<Vector3<f32>>),
+    Vec4(AnimationTrack<Vector4<f32>>),
+    Color(AnimationTrack<Vector3<f32>>),
+}
+
+impl AnimationController {
+    /// Create new animation controller
+    pub fn new() -> Self {
         Self {
-            name: name.to_string(),
-            keyframes: Vec::new(),
+            tracks: HashMap::new(),
+            current_time: 0.0,
+            duration: 10.0,
+            playing: false,
+            loop_animation: true,
         }
     }
 
-    /// Add a keyframe to the track
-    pub fn add_keyframe(&mut self, time: f32, value: T, easing: EasingFunction) {
-        // Insert keyframe in order
-        let position = self.keyframes.iter()
-            .position(|kf| kf.time > time)
-            .unwrap_or(self.keyframes.len());
-        
-        self.keyframes.insert(position, Keyframe { time, value, easing });
+    /// Add float track
+    pub fn add_float_track(&mut self, name: &str, target_path: &str) -> TrackId {
+        let track_id = generate_track_id();
+        let track = AnimationTrack {
+            id: track_id,
+            name: name.to_string(),
+            target_path: target_path.to_string(),
+            keyframes: Vec::new(),
+            enabled: true,
+        };
+        self.tracks.insert(track_id, AnimationTrackType::Float(track));
+        track_id
     }
 
-    /// Get interpolated value at given time
-    pub fn get_value(&self, time: f32) -> Option<&T> {
-        if self.keyframes.is_empty() {
+    /// Add vector3 track
+    pub fn add_vec3_track(&mut self, name: &str, target_path: &str) -> TrackId {
+        let track_id = generate_track_id();
+        let track = AnimationTrack {
+            id: track_id,
+            name: name.to_string(),
+            target_path: target_path.to_string(),
+            keyframes: Vec::new(),
+            enabled: true,
+        };
+        self.tracks.insert(track_id, AnimationTrackType::Vec3(track));
+        track_id
+    }
+
+    /// Add keyframe to track
+    pub fn add_keyframe(&mut self, track_id: TrackId, time: f32, value: AnimationValue, interpolation: InterpolationMode) {
+        if let Some(track_type) = self.tracks.get_mut(&track_id) {
+            match (track_type, value) {
+                (AnimationTrackType::Float(track), AnimationValue::Float(val)) => {
+                    track.keyframes.push(Keyframe { time, value: val, interpolation });
+                    track.keyframes.sort_by(|a, b| a.time.partial_cmp(&b.time).unwrap());
+                }
+                (AnimationTrackType::Vec3(track), AnimationValue::Vec3(val)) => {
+                    track.keyframes.push(Keyframe { time, value: val, interpolation });
+                    track.keyframes.sort_by(|a, b| a.time.partial_cmp(&b.time).unwrap());
+                }
+                (AnimationTrackType::Vec4(track), AnimationValue::Vec4(val)) => {
+                    track.keyframes.push(Keyframe { time, value: val, interpolation });
+                    track.keyframes.sort_by(|a, b| a.time.partial_cmp(&b.time).unwrap());
+                }
+                (AnimationTrackType::Color(track), AnimationValue::Color(val)) => {
+                    track.keyframes.push(Keyframe { time, value: val, interpolation });
+                    track.keyframes.sort_by(|a, b| a.time.partial_cmp(&b.time).unwrap());
+                }
+                _ => {} // Type mismatch, ignore
+            }
+        }
+    }
+
+    /// Evaluate track at current time
+    pub fn evaluate_track(&self, track_id: TrackId) -> Option<AnimationValue> {
+        self.tracks.get(&track_id).and_then(|track_type| {
+            match track_type {
+                AnimationTrackType::Float(track) => {
+                    self.evaluate_float_track(track).map(AnimationValue::Float)
+                }
+                AnimationTrackType::Vec3(track) => {
+                    self.evaluate_vec3_track(track).map(AnimationValue::Vec3)
+                }
+                AnimationTrackType::Vec4(track) => {
+                    self.evaluate_vec4_track(track).map(AnimationValue::Vec4)
+                }
+                AnimationTrackType::Color(track) => {
+                    self.evaluate_vec3_track(track).map(AnimationValue::Color)
+                }
+            }
+        })
+    }
+
+    /// Evaluate float track
+    fn evaluate_float_track(&self, track: &AnimationTrack<f32>) -> Option<f32> {
+        if track.keyframes.is_empty() {
             return None;
         }
 
-        // Find the two keyframes surrounding the given time
-        let mut prev_keyframe: Option<&Keyframe<T>> = None;
-        let mut next_keyframe: Option<&Keyframe<T>> = None;
+        // Find keyframes around current time
+        let current_time = if self.loop_animation {
+            self.current_time % self.duration
+        } else {
+            self.current_time.min(self.duration)
+        };
 
-        for keyframe in &self.keyframes {
-            if keyframe.time <= time {
-                prev_keyframe = Some(keyframe);
-            } else {
-                next_keyframe = Some(keyframe);
+        // Find the two keyframes that bound current time
+        let mut before_idx = None;
+        let mut after_idx = None;
+
+        for (i, keyframe) in track.keyframes.iter().enumerate() {
+            if keyframe.time <= current_time {
+                before_idx = Some(i);
+            }
+            if keyframe.time >= current_time {
+                after_idx = Some(i);
                 break;
             }
         }
 
-        match (prev_keyframe, next_keyframe) {
-            (Some(prev), Some(next)) => {
-                let t = (time - prev.time) / (next.time - prev.time);
-                let t = prev.easing.apply(t);
-                
-                // Note: This is a simplified version. Real interpolation would
-                // require implementing interpolation for each specific type.
-                Some(&prev.value)
+        match (before_idx, after_idx) {
+            (Some(before), Some(after)) if before == after => {
+                // Exactly on a keyframe
+                Some(track.keyframes[before].value)
             }
-            (Some(prev), None) => Some(&prev.value), // After last keyframe
-            (None, Some(next)) => Some(&next.value), // Before first keyframe
-            (None, None) => None, // No keyframes
+            (Some(before), Some(after)) => {
+                // Interpolate between keyframes
+                let before_key = &track.keyframes[before];
+                let after_key = &track.keyframes[after];
+
+                let t = (current_time - before_key.time) / (after_key.time - before_key.time);
+                let interpolated_t = self.interpolate(t, before_key.interpolation);
+
+                Some(before_key.value + (after_key.value - before_key.value) * interpolated_t)
+            }
+            (Some(before), None) => {
+                // Past the last keyframe
+                Some(track.keyframes[before].value)
+            }
+            (None, Some(after)) => {
+                // Before the first keyframe
+                Some(track.keyframes[after].value)
+            }
+            _ => None,
         }
     }
 
-    /// Get the name of this track
-    pub fn name(&self) -> &str {
-        &self.name
-    }
+    /// Evaluate vec3 track
+    fn evaluate_vec3_track(&self, track: &AnimationTrack<Vector3<f32>>) -> Option<Vector3<f32>> {
+        if track.keyframes.is_empty() {
+            return None;
+        }
 
-    /// Get all keyframes
-    pub fn keyframes(&self) -> &[Keyframe<T>] {
-        &self.keyframes
-    }
+        let current_time = if self.loop_animation {
+            self.current_time % self.duration
+        } else {
+            self.current_time.min(self.duration)
+        };
 
-    /// Remove all keyframes
-    pub fn clear(&mut self) {
-        self.keyframes.clear();
-    }
-}
+        let mut before_idx = None;
+        let mut after_idx = None;
 
-/// Animation controller that manages multiple tracks
-pub struct AnimationController {
-    tracks: Vec<AnimationTrack<f32>>,
-    fractal_tracks: Vec<AnimationTrack<FractalParameters>>,
-    vector_tracks: Vec<AnimationTrack<Vector3<f32>>>,
-    current_time: f32,
-    duration: f32,
-    playing: bool,
-    loop_animation: bool,
-}
+        for (i, keyframe) in track.keyframes.iter().enumerate() {
+            if keyframe.time <= current_time {
+                before_idx = Some(i);
+            }
+            if keyframe.time >= current_time {
+                after_idx = Some(i);
+                break;
+            }
+        }
 
-impl AnimationController {
-    pub fn new() -> Self {
-        Self {
-            tracks: Vec::new(),
-            fractal_tracks: Vec::new(),
-            vector_tracks: Vec::new(),
-            current_time: 0.0,
-            duration: 0.0,
-            playing: false,
-            loop_animation: false,
+        match (before_idx, after_idx) {
+            (Some(before), Some(after)) if before == after => {
+                Some(track.keyframes[before].value)
+            }
+            (Some(before), Some(after)) => {
+                let before_key = &track.keyframes[before];
+                let after_key = &track.keyframes[after];
+
+                let t = (current_time - before_key.time) / (after_key.time - before_key.time);
+                let interpolated_t = self.interpolate(t, before_key.interpolation);
+
+                Some(before_key.value.lerp(&after_key.value, interpolated_t))
+            }
+            (Some(before), None) => Some(track.keyframes[before].value),
+            (None, Some(after)) => Some(track.keyframes[after].value),
+            _ => None,
         }
     }
 
-    /// Add a float parameter track
-    pub fn add_float_track(&mut self, track: AnimationTrack<f32>) {
-        self.tracks.push(track);
-        self.update_duration();
+    /// Evaluate vec4 track
+    fn evaluate_vec4_track(&self, track: &AnimationTrack<Vector4<f32>>) -> Option<Vector4<f32>> {
+        if track.keyframes.is_empty() {
+            return None;
+        }
+
+        let current_time = if self.loop_animation {
+            self.current_time % self.duration
+        } else {
+            self.current_time.min(self.duration)
+        };
+
+        let mut before_idx = None;
+        let mut after_idx = None;
+
+        for (i, keyframe) in track.keyframes.iter().enumerate() {
+            if keyframe.time <= current_time {
+                before_idx = Some(i);
+            }
+            if keyframe.time >= current_time {
+                after_idx = Some(i);
+                break;
+            }
+        }
+
+        match (before_idx, after_idx) {
+            (Some(before), Some(after)) if before == after => {
+                Some(track.keyframes[before].value)
+            }
+            (Some(before), Some(after)) => {
+                let before_key = &track.keyframes[before];
+                let after_key = &track.keyframes[after];
+
+                let t = (current_time - before_key.time) / (after_key.time - before_key.time);
+                let interpolated_t = self.interpolate(t, before_key.interpolation);
+
+                Some(before_key.value.lerp(&after_key.value, interpolated_t))
+            }
+            (Some(before), None) => Some(track.keyframes[before].value),
+            (None, Some(after)) => Some(track.keyframes[after].value),
+            _ => None,
+        }
     }
 
-    /// Add a fractal parameters track
-    pub fn add_fractal_track(&mut self, track: AnimationTrack<FractalParameters>) {
-        self.fractal_tracks.push(track);
-        self.update_duration();
+    /// Apply interpolation curve
+    fn interpolate(&self, t: f32, mode: InterpolationMode) -> f32 {
+        match mode {
+            InterpolationMode::Linear => t,
+            InterpolationMode::Step => if t < 1.0 { 0.0 } else { 1.0 },
+            InterpolationMode::EaseIn => t * t,
+            InterpolationMode::EaseOut => 1.0 - (1.0 - t) * (1.0 - t),
+            InterpolationMode::EaseInOut => {
+                if t < 0.5 {
+                    2.0 * t * t
+                } else {
+                    1.0 - (-2.0 * t + 2.0).powi(2) / 2.0
+                }
+            }
+            InterpolationMode::Smooth => {
+                // Smoothstep function
+                t * t * (3.0 - 2.0 * t)
+            }
+        }
     }
 
-    /// Add a vector parameter track
-    pub fn add_vector_track(&mut self, track: AnimationTrack<Vector3<f32>>) {
-        self.vector_tracks.push(track);
-        self.update_duration();
+    /// Update animation time
+    pub fn update(&mut self, delta_time: f32) {
+        if self.playing {
+            self.current_time += delta_time;
+
+            if self.loop_animation && self.current_time >= self.duration {
+                self.current_time = self.current_time % self.duration;
+            } else if !self.loop_animation && self.current_time >= self.duration {
+                self.current_time = self.duration;
+                self.playing = false;
+            }
+        }
     }
 
-    /// Get value from a float track at current time
-    pub fn get_float_value(&self, track_name: &str) -> Option<f32> {
-        self.tracks.iter()
-            .find(|track| track.name() == track_name)
-            .and_then(|track| track.get_value(self.current_time))
-            .cloned()
-    }
-
-    /// Get value from a fractal track at current time
-    pub fn get_fractal_value(&self, track_name: &str) -> Option<FractalParameters> {
-        self.fractal_tracks.iter()
-            .find(|track| track.name() == track_name)
-            .and_then(|track| track.get_value(self.current_time))
-            .cloned()
-    }
-
-    /// Get value from a vector track at current time
-    pub fn get_vector_value(&self, track_name: &str) -> Option<Vector3<f32>> {
-        self.vector_tracks.iter()
-            .find(|track| track.name() == track_name)
-            .and_then(|track| track.get_value(self.current_time))
-            .cloned()
-    }
-
-    /// Set animation time
-    pub fn set_time(&mut self, time: f32) {
-        self.current_time = time.clamp(0.0, self.duration);
-    }
-
-    /// Get current time
-    pub fn time(&self) -> f32 {
-        self.current_time
-    }
-
-    /// Get animation duration
-    pub fn duration(&self) -> f32 {
-        self.duration
-    }
-
-    /// Start animation playback
+    /// Play animation
     pub fn play(&mut self) {
         self.playing = true;
     }
@@ -185,114 +335,24 @@ impl AnimationController {
         self.current_time = 0.0;
     }
 
-    /// Check if animation is playing
-    pub fn is_playing(&self) -> bool {
-        self.playing
-    }
-
-    /// Set loop mode
-    pub fn set_loop(&mut self, loop_enabled: bool) {
-        self.loop_animation = loop_enabled;
-    }
-
-    /// Check if animation is looping
-    pub fn is_looping(&self) -> bool {
-        self.loop_animation
-    }
-
-    /// Update animation time based on delta time
-    pub fn update(&mut self, delta_time: f32) {
-        if !self.playing {
-            return;
-        }
-
-        self.current_time += delta_time;
-
-        if self.current_time > self.duration {
-            if self.loop_animation {
-                self.current_time = 0.0;
-            } else {
-                self.current_time = self.duration;
-                self.playing = false;
-            }
-        }
-    }
-
-    /// Update the total duration based on keyframes
-    fn update_duration(&mut self) {
-        self.duration = 0.0;
-
-        // Check all track types for maximum keyframe time
-        for track in &self.tracks {
-            if let Some(last_keyframe) = track.keyframes().last() {
-                self.duration = self.duration.max(last_keyframe.time);
-            }
-        }
-
-        for track in &self.fractal_tracks {
-            if let Some(last_keyframe) = track.keyframes().last() {
-                self.duration = self.duration.max(last_keyframe.time);
-            }
-        }
-
-        for track in &self.vector_tracks {
-            if let Some(last_keyframe) = track.keyframes().last() {
-                self.duration = self.duration.max(last_keyframe.time);
-            }
-        }
+    /// Seek to specific time
+    pub fn seek(&mut self, time: f32) {
+        self.current_time = time.clamp(0.0, self.duration);
     }
 }
 
-impl Default for AnimationController {
-    fn default() -> Self {
-        Self::new()
-    }
+/// Animation value types
+#[derive(Debug, Clone)]
+pub enum AnimationValue {
+    Float(f32),
+    Vec3(Vector3<f32>),
+    Vec4(Vector4<f32>),
+    Color(Vector3<f32>),
 }
 
-/// Convenience functions for creating common animation tracks
-pub fn create_fractal_zoom_animation() -> AnimationTrack<FractalParameters> {
-    let mut track = AnimationTrack::new("fractal_zoom");
-    
-    let mut params1 = FractalParameters::default();
-    params1.scale = 1.0;
-    
-    let mut params2 = FractalParameters::default();
-    params2.scale = 0.1;
-    
-    let mut params3 = FractalParameters::default();
-    params3.scale = 10.0;
-    
-    track.add_keyframe(0.0, params1, EasingFunction::Smooth);
-    track.add_keyframe(2.0, params2, EasingFunction::Smooth);
-    track.add_keyframe(4.0, params3, EasingFunction::Smooth);
-    
-    track
-}
-
-pub fn create_rotation_animation(axis: Vector3<f32>) -> AnimationTrack<Vector3<f32>> {
-    let mut track = AnimationTrack::new("rotation");
-    
-    track.add_keyframe(0.0, Vector3::zeros(), EasingFunction::Linear);
-    track.add_keyframe(10.0, axis * std::f32::consts::TAU, EasingFunction::Linear);
-    
-    track
-}
-
-pub fn create_color_transition_animation() -> AnimationTrack<FractalParameters> {
-    let mut track = AnimationTrack::new("color_transition");
-    
-    let mut params1 = FractalParameters::default();
-    params1.color_map.palette[0] = Vector3::new(0.0, 0.0, 0.0); // Black
-    
-    let mut params2 = FractalParameters::default();
-    params2.color_map.palette[0] = Vector3::new(1.0, 0.0, 0.0); // Red
-    
-    let mut params3 = FractalParameters::default();
-    params3.color_map.palette[0] = Vector3::new(0.0, 1.0, 0.0); // Green
-    
-    track.add_keyframe(0.0, params1, EasingFunction::Smooth);
-    track.add_keyframe(2.0, params2, EasingFunction::Smooth);
-    track.add_keyframe(4.0, params3, EasingFunction::Smooth);
-    
-    track
+/// Generate unique track ID
+fn generate_track_id() -> TrackId {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static COUNTER: AtomicU64 = AtomicU64::new(1);
+    COUNTER.fetch_add(1, Ordering::Relaxed)
 }

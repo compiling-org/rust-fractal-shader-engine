@@ -3,9 +3,12 @@
 //! This module provides a comprehensive node-based visual programming interface
 //! for creating complex fractal compositions, adapted from TouchDesigner and Unreal Engine.
 
-use crate::fractal::types::*;
-use egui::{Color32, Pos2, Vec2, Rect, Ui, Response, Painter, Stroke, FontId, RichText};
+// use crate::fractal::types::*;
+use egui::{Color32, Pos2, Vec2, Rect, Ui, Response, Painter, Stroke, FontId, RichText, FontFamily};
 use std::collections::HashMap;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct NodeId(pub usize);
 
 /// Main node editor state
 pub struct NodeEditor {
@@ -22,14 +25,11 @@ pub struct NodeEditor {
     pub node_library: NodeLibrary,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct NodeId(pub usize);
-
 #[derive(Debug, Clone)]
 pub struct Node {
     pub id: NodeId,
     pub position: Pos2,
-    pub size: Vec2,
+    pub size: egui::Vec2,
     pub node_type: NodeType,
     pub title: String,
     pub inputs: Vec<NodePin>,
@@ -175,11 +175,13 @@ pub struct NodeLibrary {
     pub categories: Vec<NodeCategory>,
 }
 
+#[derive(Clone)]
 pub struct NodeCategory {
     pub name: String,
     pub nodes: Vec<NodeTemplate>,
 }
 
+#[derive(Clone)]
 pub struct NodeTemplate {
     pub name: String,
     pub description: String,
@@ -194,8 +196,8 @@ impl NodeEditor {
             connections: Vec::new(),
             selected_nodes: Vec::new(),
             dragged_node: None,
-            drag_offset: Vec2::ZERO,
-            pan_offset: Vec2::ZERO,
+            drag_offset: egui::Vec2::ZERO,
+            pan_offset: egui::Vec2::ZERO,
             zoom: 1.0,
             show_grid: true,
             grid_size: 20.0,
@@ -227,7 +229,8 @@ impl NodeEditor {
         }
 
         // Draw nodes
-        for node in &self.nodes {
+        let nodes_to_draw = self.nodes.clone();
+        for node in &nodes_to_draw {
             self.draw_node(ui, node, rect);
         }
 
@@ -245,7 +248,7 @@ impl NodeEditor {
 
         // Zoom with mouse wheel
         if let Some(mouse_pos) = response.hover_pos() {
-            let zoom_delta = input.scroll_delta.y * 0.001;
+            let zoom_delta = input.raw_scroll_delta.y * 0.001;
             if zoom_delta != 0.0 {
                 let old_zoom = self.zoom;
                 self.zoom = (self.zoom * (1.0 + zoom_delta)).clamp(0.1, 5.0);
@@ -361,6 +364,7 @@ impl NodeEditor {
     }
 
     fn draw_node(&mut self, ui: &Ui, node: &Node, canvas_rect: Rect) {
+        let node = node.clone();
         let node_rect = Rect::from_min_size(
             self.world_to_screen(node.position, canvas_rect),
             node.size * self.zoom,
@@ -377,11 +381,11 @@ impl NodeEditor {
         };
 
         painter.rect_filled(node_rect, 8.0, bg_color);
-        painter.rect_stroke(node_rect, 8.0, Stroke::new(2.0, Color32::from_rgb(60, 70, 85)));
+        painter.rect_stroke(node_rect, 8.0, Stroke::new(2.0, Color32::from_rgb(60, 70, 85)), egui::StrokeKind::Middle);
 
         // Node title
         painter.text(
-            node_rect.min + Vec2::new(8.0, 8.0),
+            node_rect.min + egui::Vec2::new(8.0, 8.0),
             egui::Align2::LEFT_TOP,
             &node.title,
             FontId::proportional(14.0),
@@ -433,9 +437,9 @@ impl NodeEditor {
         };
 
         let pin_pos = if is_input {
-            node_pos + Vec2::new(0.0, pin.position.y)
+            node_pos + egui::Vec2::new(0.0, pin.position.y)
         } else {
-            node_pos + Vec2::new(pin.position.x, pin.position.y)
+            node_pos + egui::Vec2::new(pin.position.x, pin.position.y)
         };
 
         painter.circle_filled(pin_pos, 6.0, pin_color);
@@ -443,9 +447,9 @@ impl NodeEditor {
 
         // Pin label
         let label_pos = if is_input {
-            pin_pos + Vec2::new(12.0, -4.0)
+            pin_pos + egui::Vec2::new(12.0, -4.0)
         } else {
-            pin_pos + Vec2::new(-12.0 - painter.fonts(|f| f.layout(&pin.name, FontId::default(), Color32::WHITE, f32::INFINITY).size().x), -4.0)
+            pin_pos + egui::Vec2::new(-12.0 - 50.0, -4.0) // Simplified to avoid font layout issues
         };
 
         painter.text(
@@ -457,10 +461,10 @@ impl NodeEditor {
         );
     }
 
-    fn draw_node_library(&mut self, ui: &Ui, canvas_rect: Rect) {
+    fn draw_node_library(&mut self, ui: &mut Ui, canvas_rect: Rect) {
         let library_rect = Rect::from_min_size(
-            canvas_rect.right_top() - Vec2::new(200.0, 0.0),
-            Vec2::new(200.0, canvas_rect.height()),
+            canvas_rect.right_top() - egui::Vec2::new(200.0, 0.0),
+            egui::Vec2::new(200.0, canvas_rect.height()),
         );
 
         // Semi-transparent background
@@ -470,14 +474,15 @@ impl NodeEditor {
             Color32::from_rgba_premultiplied(30, 35, 45, 200),
         );
 
-        ui.allocate_ui_at_rect(library_rect, |ui| {
+        ui.scope_builder(egui::UiBuilder::new().max_rect(library_rect), |ui| {
             ui.set_min_width(180.0);
 
             ui.label(RichText::new("🎨 Node Library").size(14.0));
             ui.separator();
 
             egui::ScrollArea::vertical().show(ui, |ui| {
-                for category in &self.node_library.categories {
+                let categories = self.node_library.categories.clone();
+                for category in &categories {
                     ui.collapsing(RichText::new(&category.name).size(12.0), |ui| {
                         for template in &category.nodes {
                             let response = ui.add(
@@ -504,7 +509,7 @@ impl NodeEditor {
         let node = Node {
             id: node_id,
             position,
-            size: Vec2::new(150.0, 100.0),
+            size: egui::Vec2::new(150.0, 100.0),
             node_type: template.node_type.clone(),
             title: template.name.clone(),
             inputs: self.create_node_inputs(&template.node_type),
@@ -579,7 +584,7 @@ impl NodeEditor {
     }
 
     fn world_to_screen(&self, world_pos: Pos2, canvas_rect: Rect) -> Pos2 {
-        canvas_rect.min + (world_pos + self.pan_offset) * self.zoom
+        canvas_rect.min + (world_pos.to_vec2() + self.pan_offset) * self.zoom
     }
 
     fn create_node_library() -> NodeLibrary {

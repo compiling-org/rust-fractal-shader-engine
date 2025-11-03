@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fractal Shader Studio - Web Edition</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #1a1a26;
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+
+        #container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        #toolbar {
+            background: #2a2a3a;
+            padding: 10px;
+            border-bottom: 1px solid #4a4a5a;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        #main-content {
+            flex: 1;
+            display: flex;
+        }
+
+        #sidebar {
+            width: 300px;
+            background: #2a2a3a;
+            border-right: 1px solid #4a4a5a;
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        #viewport-container {
+            flex: 1;
+            position: relative;
+            background: #000000;
+        }
+
+        #fractal-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            cursor: crosshair;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        .control-group h3 {
+            margin: 0 0 10px 0;
+            color: #00ffff;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .slider-container label {
+            width: 80px;
+            font-size: 12px;
+            color: #cccccc;
+        }
+
+        .slider-container input[type="range"] {
+            flex: 1;
+            margin: 0 10px;
+        }
+
+        .slider-container span {
+            width: 40px;
+            font-size: 12px;
+            color: #00ffff;
+            text-align: right;
+        }
+
+        .select-container {
+            margin-bottom: 10px;
+        }
+
+        .select-container label {
+            display: block;
+            font-size: 12px;
+            color: #cccccc;
+            margin-bottom: 5px;
+        }
+
+        .select-container select {
+            width: 100%;
+            padding: 5px;
+            background: #3a3a4a;
+            border: 1px solid #4a4a5a;
+            color: #ffffff;
+            border-radius: 3px;
+        }
+
+        .button {
+            background: #00ffff;
+            color: #1a1a26;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+
+        .button:hover {
+            background: #00cccc;
+        }
+
+        .button.secondary {
+            background: #4a4a5a;
+            color: #ffffff;
+        }
+
+        .button.secondary:hover {
+            background: #5a5a6a;
+        }
+
+        #status {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: #00ffff;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-family: monospace;
+        }
+
+        .glass-panel {
+            background: rgba(42, 42, 58, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(74, 74, 90, 0.5);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #1a1a26;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .loading-text {
+            color: #00ffff;
+            font-size: 18px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading" class="loading">
+        <div class="loading-text">Loading Fractal Shader Studio...</div>
+    </div>
+
+    <div id="container" style="display: none;">
+        <div id="toolbar">
+            <button class="button" onclick="startAnimation()">▶️ Play</button>
+            <button class="button secondary" onclick="stopAnimation()">⏹️ Stop</button>
+            <button class="button secondary" onclick="exportImage()">📷 Export</button>
+            <span id="fps">FPS: --</span>
+        </div>
+
+        <div id="main-content">
+            <div id="sidebar">
+                <div class="glass-panel">
+                    <div class="control-group">
+                        <h3>Fractal Type</h3>
+                        <div class="select-container">
+                            <select id="fractal-type" onchange="changeFractalType()">
+                                <option value="mandelbrot">Mandelbrot</option>
+                                <option value="julia">Julia</option>
+                                <option value="mandelbulb">Mandelbulb</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <h3>Common Parameters</h3>
+                        <div class="slider-container">
+                            <label>Zoom:</label>
+                            <input type="range" id="zoom" min="0.1" max="10" step="0.1" value="1">
+                            <span id="zoom-value">1.0</span>
+                        </div>
+                        <div class="slider-container">
+                            <label>Iterations:</label>
+                            <input type="range" id="iterations" min="10" max="500" step="10" value="100">
+                            <span id="iterations-value">100</span>
+                        </div>
+                    </div>
+
+                    <div class="control-group" id="mandelbulb-controls" style="display: none;">
+                        <h3>Mandelbulb</h3>
+                        <div class="slider-container">
+                            <label>Power:</label>
+                            <input type="range" id="power" min="2" max="16" step="0.1" value="8">
+                            <span id="power-value">8.0</span>
+                        </div>
+                    </div>
+
+                    <div class="control-group" id="julia-controls" style="display: none;">
+                        <h3>Julia Set</h3>
+                        <div class="slider-container">
+                            <label>C Real:</label>
+                            <input type="range" id="julia-real" min="-2" max="2" step="0.01" value="-0.7">
+                            <span id="julia-real-value">-0.7</span>
+                        </div>
+                        <div class="slider-container">
+                            <label>C Imag:</label>
+                            <input type="range" id="julia-imag" min="-2" max="2" step="0.01" value="0.27">
+                            <span id="julia-imag-value">0.27</span>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <h3>Color</h3>
+                        <div class="slider-container">
+                            <label>Cycle:</label>
+                            <input type="range" id="color-cycle" min="0" max="1" step="0.01" value="0.5">
+                            <span id="color-cycle-value">0.5</span>
+                        </div>
+                        <div class="slider-container">
+                            <label>Brightness:</label>
+                            <input type="range" id="brightness" min="0" max="2" step="0.1" value="1">
+                            <span id="brightness-value">1.0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="viewport-container">
+                <canvas id="fractal-canvas" width="1920" height="1080"></canvas>
+                <div id="status">Ready</div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import init, { WebFractalStudio, web_hello } from './pkg/fractal_studio.js';
+
+        let studio;
+        let animationId;
+        let lastTime = 0;
+
+        async function initialize() {
+            try {
+                await init();
+
+                console.log(web_hello());
+
+                studio = new WebFractalStudio('fractal-canvas');
+
+                // Set up event listeners
+                setupControls();
+
+                // Initial render
+                studio.render_frame();
+
+                // Hide loading screen
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('container').style.display = 'flex';
+
+                console.log('Fractal Shader Studio Web initialized successfully');
+
+            } catch (error) {
+                console.error('Failed to initialize:', error);
+                document.querySelector('.loading-text').textContent = 'Failed to load. Check console for details.';
+            }
+        }
+
+        function setupControls() {
+            // Fractal type selector
+            document.getElementById('fractal-type').addEventListener('change', changeFractalType);
+
+            // Sliders
+            const sliders = [
+                'zoom', 'iterations', 'power', 'julia-real', 'julia-imag',
+                'color-cycle', 'brightness'
+            ];
+
+            sliders.forEach(id => {
+                const slider = document.getElementById(id);
+                const valueSpan = document.getElementById(id + '-value');
+
+                slider.addEventListener('input', (e) => {
+                    valueSpan.textContent = e.target.value;
+                    updateParameter(id, parseFloat(e.target.value));
+                });
+            });
+
+            // Initial control visibility
+            updateControlVisibility();
+        }
+
+        function changeFractalType() {
+            const fractalType = document.getElementById('fractal-type').value;
+            studio.set_fractal_type(fractalType);
+            updateControlVisibility();
+            studio.render_frame();
+        }
+
+        function updateControlVisibility() {
+            const fractalType = document.getElementById('fractal-type').value;
+
+            document.getElementById('mandelbulb-controls').style.display =
+                fractalType === 'mandelbulb' ? 'block' : 'none';
+            document.getElementById('julia-controls').style.display =
+                fractalType === 'julia' ? 'block' : 'none';
+        }
+
+        function updateParameter(param, value) {
+            switch(param) {
+                case 'zoom':
+                    studio.set_parameter('zoom', value);
+                    break;
+                case 'iterations':
+                    studio.set_parameter('iterations', value);
+                    break;
+                case 'power':
+                    studio.set_parameter('power', value);
+                    break;
+            }
+            studio.render_frame();
+        }
+
+        function startAnimation() {
+            if (animationId) return;
+
+            function animate(currentTime) {
+                const deltaTime = currentTime - lastTime;
+                lastTime = currentTime;
+
+                // Update FPS display
+                const fps = Math.round(1000 / deltaTime);
+                document.getElementById('fps').textContent = `FPS: ${fps}`;
+
+                studio.render_frame();
+                animationId = requestAnimationFrame(animate);
+            }
+
+            animationId = requestAnimationFrame(animate);
+        }
+
+        function stopAnimation() {
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+                document.getElementById('fps').textContent = 'FPS: --';
+            }
+        }
+
+        function exportImage() {
+            const canvas = document.getElementById('fractal-canvas');
+            const link = document.createElement('a');
+            link.download = `fractal_${Date.now()}.png`;
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+
+        // Global functions for buttons
+        window.startAnimation = startAnimation;
+        window.stopAnimation = stopAnimation;
+        window.exportImage = exportImage;
+        window.changeFractalType = changeFractalType;
+
+        // Initialize when page loads
+        window.addEventListener('load', initialize);
+    </script>
+</body>
+</html>

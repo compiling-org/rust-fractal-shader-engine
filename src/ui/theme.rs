@@ -3,7 +3,7 @@
 //! This module provides a comprehensive theme system for the fractal shader studio
 //! with professional dark themes, glassmorphism effects, and customizable color schemes.
 
-use egui::{Color32, Vec2, Rounding, Stroke, Style, Visuals, Margin, FontId};
+use egui::{Color32, Vec2, Rounding, Stroke, Style, Visuals, Margin, FontId, FontFamily};
 use egui::epaint::{Shadow, Primitive, Rgba};
 use std::collections::HashMap;
 
@@ -73,7 +73,7 @@ pub struct ThemeColors {
 /// Typography configuration
 #[derive(Debug, Clone)]
 pub struct ThemeTypography {
-    pub font_family: String,
+    pub font_family: FontFamily,
     pub base_size: f32,
     pub small_size: f32,
     pub large_size: f32,
@@ -245,7 +245,6 @@ impl ProfessionalThemes {
                 
                 node_background: Color32::from_rgb(30, 35, 45),
                 node_selected: Color32::from_rgb(80, 120, 180),
-                node_hover: Color32::from_rgb(40, 45, 60),
                 node_wire: Color32::from_rgb(120, 130, 150),
                 node_wire_hover: Color32::from_rgb(150, 160, 180),
                 node_wire_selected: Color32::from_rgb(100, 140, 200),
@@ -255,7 +254,7 @@ impl ProfessionalThemes {
                 fractal_timeline: Color32::from_rgb(20, 25, 30),
             },
             typography: ThemeTypography {
-                font_family: "Inter, Segoe UI, sans-serif".to_string(),
+                font_family: FontFamily::Proportional,
                 base_size: 14.0,
                 small_size: 11.0,
                 large_size: 16.0,
@@ -304,7 +303,7 @@ impl ProfessionalThemes {
                         spread: 0,
                         color: Color32::from_black_alpha(60),
                     },
-                    padding: Margin::same(12.0),
+                    padding: Margin::same(12),
                 },
                 card: CardStyle {
                     background: Color32::from_rgb(22, 26, 32),
@@ -544,25 +543,25 @@ impl ThemeManager {
             egui::TextStyle::Small,
             FontId::new(typography.small_size, typography.font_family.clone()),
         );
-        
+
         style.text_styles.insert(
             egui::TextStyle::Body,
             FontId::new(typography.base_size, typography.font_family.clone()),
         );
-        
+
         style.text_styles.insert(
             egui::TextStyle::Heading,
             FontId::new(typography.heading_size, typography.font_family.clone()),
         );
-        
+
         style.text_styles.insert(
             egui::TextStyle::Name("Heading".into()),
             FontId::new(typography.title_size, typography.font_family.clone()),
         );
-        
+
         style.text_styles.insert(
             egui::TextStyle::Monospace,
-            FontId::new(typography.monospace_size, "JetBrains Mono, Fira Code, monospace".to_string()),
+            FontId::new(typography.monospace_size, FontFamily::Monospace),
         );
     }
 
@@ -570,25 +569,30 @@ impl ThemeManager {
     fn apply_spacing(&self, style: &mut Style, theme: &Theme) {
         let spacing = &theme.spacing;
         
-        style.spacing.window_margin = Margin::same(spacing.md);
-        style.spacing.panel_margin = Margin::same(spacing.panel_padding);
+        style.spacing.window_margin = Margin::same(spacing.md as i8);
         style.spacing.item_spacing = Vec2::new(spacing.element_spacing, spacing.element_spacing);
         style.spacing.button_padding = Vec2::new(spacing.sm, spacing.sm);
-        style.spacing.text_edit_padding = Vec2::new(spacing.sm, spacing.sm);
     }
 
     /// Create glassmorphism effect
     pub fn create_glassmorphism_paint(&self, theme: &Theme) -> egui::PaintCallback {
         if !theme.effects.glassmorphism.enabled {
-            return egui::PaintCallback::Nothing;
+            return egui::PaintCallback {
+                rect: egui::Rect::ZERO,
+                callback: std::sync::Arc::new(|_info: &egui::PaintCallbackInfo, _add_contents: &mut egui::Painter, _user_data: &egui::epaint::PaintCallback| {
+                    // Glassmorphism implementation would go here
+                }),
+            };
         }
 
         let config = &theme.effects.glassmorphism;
-        
-        egui::PaintCallback::new(move |_ctx, _rect, _clip_rect| {
-            // This would implement the actual glassmorphism rendering
-            // using egui's paint callback system
-        })
+
+        egui::PaintCallback {
+            rect: egui::Rect::ZERO,
+            callback: std::sync::Arc::new(|_info: &egui::PaintCallbackInfo, _add_contents: &mut egui::Painter, _user_data: &egui::epaint::PaintCallback| {
+                // Glassmorphism implementation would go here
+            }),
+        }
     }
 
     /// Get theme color with fallback

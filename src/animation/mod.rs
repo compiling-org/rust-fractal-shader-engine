@@ -1,5 +1,7 @@
-odular-fractal-shader/src/animation/mod.rs</path>
-<content lines="1-100">
+//! Animation System Module
+//!
+//! This module provides keyframe animation, procedural animation,
+//! and timeline-based control for fractal parameters and scene objects.
 pub mod easing;
 pub mod keyframe;
 pub mod timeline;
@@ -110,13 +112,13 @@ impl TimelineProject {
         self.frame_rate = frame_rate.max(1.0);
     }
 
-    pub fn current_frame(&self) -> u32 {
-        (self.current_time * self.frame_rate) as u32
-    }
-
     pub fn current_time(&self) -> f32 {
         // This would be set by the controller
         0.0
+    }
+
+    pub fn current_frame(&self) -> u32 {
+        (self.current_time() * self.frame_rate) as u32
     }
 }
 

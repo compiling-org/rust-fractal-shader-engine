@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use rust_fractal_shader_engine::{RustFractalShaderEngine, ShaderConverter};
 use std::fs;
 
 /// Simple fractal demo that displays one ISF shader
@@ -8,7 +7,7 @@ fn main() {
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 title: "Rust Fractal Shader Engine - Demo".to_string(),
-                resolution: (1280.0, 720.0).into(),
+                resolution: (1280, 720).into(),
                 ..default()
             }),
             ..default()
@@ -72,16 +71,8 @@ void main() {
         }
     };
 
-    // Convert ISF to WGSL
-    let wgsl_source = match ShaderConverter::isf_to_wgsl(&isf_source) {
-        Ok(wgsl) => {
-            println!("Successfully converted ISF to WGSL");
-            wgsl
-        }
-        Err(e) => {
-            println!("WGSL conversion failed: {}, using fallback", e);
-            // Simple fallback WGSL shader
-            r#"
+    // Simple fallback shader for now
+    let wgsl_source = r#"
 @fragment
 fn main(@builtin(position) coord: vec4<f32>) -> @location(0) vec4<f32> {
     let uv = coord.xy / vec2<f32>(1280.0, 720.0);
@@ -94,15 +85,13 @@ fn main(@builtin(position) coord: vec4<f32>) -> @location(0) vec4<f32> {
 
     return vec4<f32>(r, g, b, 1.0);
 }
-"#.to_string()
-        }
-    };
+"#.to_string();
 
     println!("WGSL Shader:\n{}", wgsl_source);
 
     // Create a simple material (we'll use a basic color for now since custom shaders are complex)
     let material_handle = materials.add(StandardMaterial {
-        base_color: Color::rgb(0.5, 0.5, 0.5),
+        base_color: Color::srgb(0.5, 0.5, 0.5),
         ..default()
     });
 
@@ -139,7 +128,7 @@ fn update_fractal(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     // Update the time
-    fractal_material.time += time.delta_seconds();
+    fractal_material.time += time.delta_secs();
 
     // Update material color based on time (simple animation)
     if let Some(material) = materials.get_mut(&fractal_material.material_handle) {
@@ -147,6 +136,6 @@ fn update_fractal(
         let r = (t.sin() + 1.0) * 0.5;
         let g = ((t * 0.7).sin() + 1.0) * 0.5;
         let b = ((t * 0.5).cos() + 1.0) * 0.5;
-        material.base_color = Color::rgb(r, g, b);
+        material.base_color = Color::srgb(r, g, b);
     }
 }

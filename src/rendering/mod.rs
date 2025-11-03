@@ -1,426 +1,302 @@
-odular-fractal-shader/src/rendering/mod.rs</path>
-<content lines="1-200">
-pub mod volumetric;
-pub mod compositing;
-pub mod pbr;
+//! GPU Rendering Module
+//!
+//! This module provides GPU-accelerated rendering capabilities for fractal visualization,
+//! including compute shaders for distance estimation and real-time rendering pipelines.
 
-/// Rendering system for fractal visualization
-pub struct RenderingEngine {
-    volumetric_renderer: VolumetricRenderer,
-    compositing_engine: CompositingEngine,
-    pbr_renderer: PBRRenderer,
+use wgpu::{self, util::DeviceExt};
+use nalgebra::Vector3;
+
+/// GPU rendering context for fractal visualization
+pub struct GPURenderer {
+    device: wgpu::Device,
+    queue: wgpu::Queue,
+    surface: wgpu::Surface<'static>,
+    surface_config: wgpu::SurfaceConfiguration,
+    fractal_pipeline: wgpu::ComputePipeline,
+    render_pipeline: wgpu::RenderPipeline,
+    fractal_bind_group: wgpu::BindGroup,
+    render_bind_group: wgpu::BindGroup,
+    distance_buffer: wgpu::Buffer,
+    color_buffer: wgpu::Buffer,
+    uniform_buffer: wgpu::Buffer,
+    output_texture: wgpu::Texture,
+    output_texture_view: wgpu::TextureView,
 }
 
-impl RenderingEngine {
-    pub fn new() -> Self {
-        Self {
-            volumetric_renderer: VolumetricRenderer::new(),
-            compositing_engine: CompositingEngine::new(),
-            pbr_renderer: PBRRenderer::new(),
-        }
-    }
+impl GPURenderer {
+    /// Create a new GPU renderer with the given surface
+    pub async fn new(surface: wgpu::Surface<'static>) -> Result<Self, Box<dyn std::error::Error>> {
+        // Create adapter and device
+        let adapter = surface.get_adapter().await.unwrap();
+        let (device, queue) = adapter.request_device(
+            &wgpu::DeviceDescriptor {
+                label: Some("Fractal GPU Device"),
+                required_features: wgpu::Features::empty(),
+                required_limits: wgpu::Limits::default(),
+            },
+            None,
+        ).await?;
 
-    pub fn render_frame(&mut self, scene: &crate::scene::SceneManager, camera: &crate::scene::Camera) -> RenderResult {
-        // Render volumetric effects
-        let volumetric_output = self.volumetric_renderer.render(scene, camera);
-
-        // Render PBR surfaces
-        let pbr_output = self.pbr_renderer.render(scene, camera);
-
-        // Composite all layers
-        let final_output = self.compositing_engine.composite(&[volumetric_output, pbr_output]);
-
-        RenderResult {
-            color_buffer: final_output,
-            depth_buffer: vec![], // TODO: Implement depth
-            performance_stats: PerformanceStats::default(),
-        }
-    }
-}
-
-/// Volumetric rendering for fog, god rays, and density effects
-pub struct VolumetricRenderer {
-    density_grid: Vec<f32>,
-    scattering_coefficients: Vec<f32>,
-    absorption_coefficients: Vec<f32>,
-}
-
-impl VolumetricRenderer {
-    pub fn new() -> Self {
-        Self {
-            density_grid: Vec::new(),
-            scattering_coefficients: Vec::new(),
-            absorption_coefficients: Vec::new(),
-        }
-    }
-
-    pub fn render(&self, scene: &crate::scene::SceneManager, camera: &crate::scene::Camera) -> RenderLayer {
-        // Sample volumetric data along camera rays
-        let mut volumetric_data = Vec::new();
-
-        // For each pixel in viewport
-        for y in 0..camera.viewport_height {
-            for x in 0..camera.viewport_width {
-                let ray = self.generate_camera_ray(camera, x, y);
-                let density = self.sample_density_along_ray(&ray, scene);
-                volumetric_data.push(density);
-            }
-        }
-
-        RenderLayer {
-            data: volumetric_data,
-            blend_mode: BlendMode::Additive,
-            opacity: 0.7,
-        }
-    }
-
-    fn generate_camera_ray(&self, camera: &crate::scene::Camera, x: u32, y: u32) -> Ray {
-        // Convert screen coordinates to world space ray
-        let ndc_x = (2.0 * x as f32 / camera.viewport_width as f32) - 1.0;
-        let ndc_y = 1.0 - (2.0 * y as f32 / camera.viewport_height as f32);
-
-        // Create ray in camera space
-        let ray_direction = nalgebra::Vector3::new(
-            ndc_x * (camera.fov * camera.aspect_ratio).tan(),
-            ndc_y * camera.fov.tan(),
-            -1.0,
-        ).normalize();
-
-        // Transform to world space
-        let world_direction = camera.view_matrix() * ray_direction;
-
-        Ray {
-            origin: camera.position,
-            direction: world_direction,
-        }
-    }
-
-    fn sample_density_along_ray(&self, ray: &Ray, scene: &crate::scene::SceneManager) -> f32 {
-        let mut total_density = 0.0;
-        let step_size = 0.1;
-        let max_distance = 100.0;
-
-        let mut distance = 0.0;
-        while distance < max_distance {
-            let sample_point = ray.origin + ray.direction * distance;
-
-            // Sample density from all volumetric objects in scene
-            for object in scene.objects() {
-                if let crate::scene::ObjectType::FractalObject { .. } = &object.object_type {
-                    // Sample fractal density
-                    let fractal_density = self.sample_fractal_density(&sample_point, object);
-                    total_density += fractal_density * step_size;
-                }
-            }
-
-            distance += step_size;
-        }
-
-        total_density
-    }
-
-    fn sample_fractal_density(&self, point: &nalgebra::Vector3<f32>, object: &crate::scene::SceneObject) -> f32 {
-        // Convert to fractal space
-        let local_point = object.transform.inverse() * *point;
-
-        // Sample distance field
-        let distance = match &object.object_type {
-            crate::scene::ObjectType::FractalObject { formula, .. } => {
-                // Use fractal engine to compute distance
-                let engine = crate::fractal::engine::FractalEngine::new();
-                engine.distance_estimate(local_point).distance
-            }
-            _ => 0.0,
+        // Configure surface
+        let surface_caps = surface.get_capabilities(&adapter);
+        let surface_format = surface_caps.formats[0];
+        let size = wgpu::Extent3d {
+            width: 1920,
+            height: 1080,
+            depth_or_array_layers: 1,
         };
 
-        // Convert distance to density (negative distance = inside fractal)
-        if distance < 0.0 {
-            // Density based on distance from surface
-            (-distance).min(1.0)
-        } else {
-            0.0
+        let surface_config = wgpu::SurfaceConfiguration {
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            format: surface_format,
+            width: size.width,
+            height: size.height,
+            present_mode: wgpu::PresentMode::Fifo,
+            alpha_mode: wgpu::CompositeAlphaMode::Auto,
+            view_formats: vec![],
+        };
+        surface.configure(&device, &surface_config);
+
+        // Create compute shader for fractal distance estimation
+        let fractal_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Fractal Compute Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("shaders/fractal_compute.wgsl").into()),
+        });
+
+        // Create render shader
+        let render_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Fractal Render Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("shaders/fractal_render.wgsl").into()),
+        });
+
+        // Create compute pipeline
+        let fractal_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: Some("Fractal Compute Pipeline"),
+            layout: None,
+            module: &fractal_shader,
+            entry_point: "main",
+        });
+
+        // Create render pipeline
+        let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("Render Pipeline Layout"),
+            bind_group_layouts: &[],
+            push_constant_ranges: &[],
+        });
+
+        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Fractal Render Pipeline"),
+            layout: Some(&render_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &render_shader,
+                entry_point: "vs_main",
+                buffers: &[],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &render_shader,
+                entry_point: "fs_main",
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: surface_format,
+                    blend: Some(wgpu::BlendState::REPLACE),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: Some(wgpu::Face::Back),
+                polygon_mode: wgpu::PolygonMode::Fill,
+                unclipped_depth: false,
+                conservative: false,
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState {
+                count: 1,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
+            multiview: None,
+        });
+
+        // Create buffers
+        let distance_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Distance Buffer"),
+            size: (size.width * size.height * std::mem::size_of::<f32>() as u32) as wgpu::BufferAddress,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        let color_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Color Buffer"),
+            size: (size.width * size.height * std::mem::size_of::<[f32; 4]>() as u32) as wgpu::BufferAddress,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
+            mapped_at_creation: false,
+        });
+
+        let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Uniform Buffer"),
+            size: std::mem::size_of::<FractalUniforms>() as wgpu::BufferAddress,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        // Create output texture
+        let output_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Output Texture"),
+            size,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
+        let output_texture_view = output_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        // Create bind groups
+        let fractal_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Fractal Bind Group"),
+            layout: &fractal_pipeline.get_bind_group_layout(0),
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                        buffer: &distance_buffer,
+                        offset: 0,
+                        size: None,
+                    }),
+                },
+            ],
+        });
+
+        let render_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Render Bind Group"),
+            layout: &render_pipeline.get_bind_group_layout(0),
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&output_texture_view),
+                },
+            ],
+        });
+
+        Ok(Self {
+            device,
+            queue,
+            surface,
+            surface_config,
+            fractal_pipeline,
+            render_pipeline,
+            fractal_bind_group,
+            render_bind_group,
+            distance_buffer,
+            color_buffer,
+            uniform_buffer,
+            output_texture,
+            output_texture_view,
+        })
+    }
+
+    /// Update fractal parameters
+    pub fn update_uniforms(&mut self, uniforms: &FractalUniforms) {
+        self.queue.write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[*uniforms]));
+    }
+
+    /// Render a frame
+    pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
+        let output = self.surface.get_current_texture()?;
+        let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Render Encoder"),
+        });
+
+        // Compute pass for fractal distance estimation
+        {
+            let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("Fractal Compute Pass"),
+            });
+            compute_pass.set_pipeline(&self.fractal_pipeline);
+            compute_pass.set_bind_group(0, &self.fractal_bind_group, &[]);
+            compute_pass.dispatch_workgroups(self.surface_config.width / 8, self.surface_config.height / 8, 1);
         }
+
+        // Render pass
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Fractal Render Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                occlusion_query_set: None,
+                timestamp_writes: None,
+            });
+
+            render_pass.set_pipeline(&self.render_pipeline);
+            render_pass.set_bind_group(0, &self.render_bind_group, &[]);
+            render_pass.draw(0..6, 0..1);
+        }
+
+        self.queue.submit(std::iter::once(encoder.finish()));
+        output.present();
+
+        Ok(())
+    }
+
+    /// Resize the surface
+    pub fn resize(&mut self, new_size: wgpu::Extent3d) {
+        self.surface_config.width = new_size.width;
+        self.surface_config.height = new_size.height;
+        self.surface.configure(&self.device, &self.surface_config);
     }
 }
 
-/// Compositing engine for layering multiple render passes
-pub struct CompositingEngine {
-    layers: Vec<RenderLayer>,
+/// Uniform data for fractal computation
+#[repr(C)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct FractalUniforms {
+    pub resolution: [f32; 2],
+    pub time: f32,
+    pub zoom: f32,
+    pub offset: [f32; 2],
+    pub power: f32,
+    pub bailout: f32,
+    pub julia_c: [f32; 2],
+    pub fractal_type: u32,
+    pub max_iterations: u32,
+    pub color_cycle: f32,
+    pub brightness: f32,
+    pub contrast: f32,
+    pub saturation: f32,
 }
 
-impl CompositingEngine {
-    pub fn new() -> Self {
-        Self {
-            layers: Vec::new(),
-        }
-    }
-
-    pub fn composite(&self, layers: &[RenderLayer]) -> Vec<f32> {
-        let mut result = vec![0.0; layers.first().map(|l| l.data.len()).unwrap_or(0)];
-
-        for layer in layers {
-            match layer.blend_mode {
-                BlendMode::Normal => self.blend_normal(&mut result, &layer.data, layer.opacity),
-                BlendMode::Additive => self.blend_additive(&mut result, &layer.data, layer.opacity),
-                BlendMode::Multiply => self.blend_multiply(&mut result, &layer.data, layer.opacity),
-                BlendMode::Screen => self.blend_screen(&mut result, &layer.data, layer.opacity),
-            }
-        }
-
-        result
-    }
-
-    fn blend_normal(&self, result: &mut [f32], layer: &[f32], opacity: f32) {
-        for (i, &value) in layer.iter().enumerate() {
-            if i < result.len() {
-                result[i] = result[i] * (1.0 - opacity) + value * opacity;
-            }
-        }
-    }
-
-    fn blend_additive(&self, result: &mut [f32], layer: &[f32], opacity: f32) {
-        for (i, &value) in layer.iter().enumerate() {
-            if i < result.len() {
-                result[i] += value * opacity;
-            }
-        }
-    }
-
-    fn blend_multiply(&self, result: &mut [f32], layer: &[f32], opacity: f32) {
-        for (i, &value) in layer.iter().enumerate() {
-            if i < result.len() {
-                result[i] = result[i] * (value * opacity + (1.0 - opacity));
-            }
-        }
-    }
-
-    fn blend_screen(&self, result: &mut [f32], layer: &[f32], opacity: f32) {
-        for (i, &value) in layer.iter().enumerate() {
-            if i < result.len() {
-                result[i] = 1.0 - (1.0 - result[i]) * (1.0 - value * opacity);
-            }
-        }
-    }
-}
-
-/// PBR rendering with global illumination
-pub struct PBRRenderer {
-    irradiance_map: Vec<f32>,
-    reflection_map: Vec<f32>,
-}
-
-impl PBRRenderer {
-    pub fn new() -> Self {
-        Self {
-            irradiance_map: Vec::new(),
-            reflection_map: Vec::new(),
-        }
-    }
-
-    pub fn render(&self, scene: &crate::scene::SceneManager, camera: &crate::scene::Camera) -> RenderLayer {
-        let mut pbr_data = Vec::new();
-
-        // Render all PBR surfaces
-        for y in 0..camera.viewport_height {
-            for x in 0..camera.viewport_width {
-                let color = self.sample_pbr_surface(scene, camera, x, y);
-                pbr_data.push(color.x);
-                pbr_data.push(color.y);
-                pbr_data.push(color.z);
-            }
-        }
-
-        RenderLayer {
-            data: pbr_data,
-            blend_mode: BlendMode::Normal,
-            opacity: 1.0,
-        }
-    }
-
-    fn sample_pbr_surface(&self, scene: &crate::scene::SceneManager, camera: &crate::scene::Camera, x: u32, y: u32) -> nalgebra::Vector3<f32> {
-        let ray = self.generate_camera_ray(camera, x, y);
-
-        // Find closest intersection with scene geometry
-        let mut closest_hit = None;
-        let mut min_distance = f32::INFINITY;
-
-        for object in scene.objects() {
-            if let Some(hit) = self.ray_object_intersection(&ray, object) {
-                if hit.distance < min_distance {
-                    min_distance = hit.distance;
-                    closest_hit = Some(hit);
-                }
-            }
-        }
-
-        if let Some(hit) = closest_hit {
-            // Compute PBR shading
-            self.compute_pbr_shading(&hit, scene)
-        } else {
-            // Background color
-            nalgebra::Vector3::new(0.1, 0.1, 0.15)
-        }
-    }
-
-    fn generate_camera_ray(&self, camera: &crate::scene::Camera, x: u32, y: u32) -> Ray {
-        // Similar to volumetric renderer
-        let ndc_x = (2.0 * x as f32 / camera.viewport_width as f32) - 1.0;
-        let ndc_y = 1.0 - (2.0 * y as f32 / camera.viewport_height as f32);
-
-        let ray_direction = nalgebra::Vector3::new(
-            ndc_x * (camera.fov * camera.aspect_ratio).tan(),
-            ndc_y * camera.fov.tan(),
-            -1.0,
-        ).normalize();
-
-        Ray {
-            origin: camera.position,
-            direction: camera.view_matrix() * ray_direction,
-        }
-    }
-
-    fn ray_object_intersection(&self, ray: &Ray, object: &crate::scene::SceneObject) -> Option<RayHit> {
-        match &object.object_type {
-            crate::scene::ObjectType::FractalObject { formula, .. } => {
-                // Ray marching for fractal intersection
-                self.ray_march_fractal(ray, object, formula)
-            }
-            crate::scene::ObjectType::MeshObject { .. } => {
-                // TODO: Implement mesh intersection
-                None
-            }
-            _ => None,
-        }
-    }
-
-    fn ray_march_fractal(&self, ray: &Ray, object: &crate::scene::SceneObject, formula: &crate::fractal::types::FractalFormula) -> Option<RayHit> {
-        let mut distance = 0.0;
-        let max_distance = 100.0;
-        let min_distance = 0.001;
-
-        for _ in 0..1000 { // Max steps
-            let current_pos = ray.origin + ray.direction * distance;
-            let local_pos = object.transform.inverse() * current_pos;
-
-            let engine = crate::fractal::engine::FractalEngine::new();
-            let dist = engine.distance_estimate(local_pos).distance;
-
-            if dist < min_distance {
-                // Hit!
-                let normal = self.compute_normal(local_pos, formula);
-                return Some(RayHit {
-                    distance,
-                    position: current_pos,
-                    normal: object.transform.transform_vector(&normal),
-                    material_id: 0, // TODO
-                });
-            }
-
-            distance += dist;
-
-            if distance > max_distance {
-                break;
-            }
-        }
-
-        None
-    }
-
-    fn compute_normal(&self, pos: nalgebra::Vector3<f32>, formula: &crate::fractal::types::FractalFormula) -> nalgebra::Vector3<f32> {
-        let eps = 0.001;
-        let engine = crate::fractal::engine::FractalEngine::new();
-
-        let dx = engine.distance_estimate(pos + nalgebra::Vector3::new(eps, 0.0, 0.0)).distance
-               - engine.distance_estimate(pos - nalgebra::Vector3::new(eps, 0.0, 0.0)).distance;
-        let dy = engine.distance_estimate(pos + nalgebra::Vector3::new(0.0, eps, 0.0)).distance
-               - engine.distance_estimate(pos - nalgebra::Vector3::new(0.0, eps, 0.0)).distance;
-        let dz = engine.distance_estimate(pos + nalgebra::Vector3::new(0.0, 0.0, eps)).distance
-               - engine.distance_estimate(pos - nalgebra::Vector3::new(0.0, 0.0, eps)).distance;
-
-        nalgebra::Vector3::new(dx, dy, dz).normalize()
-    }
-
-    fn compute_pbr_shading(&self, hit: &RayHit, scene: &crate::scene::SceneManager) -> nalgebra::Vector3<f32> {
-        let mut color = nalgebra::Vector3::new(0.8, 0.8, 0.8); // Base color
-
-        // Simple diffuse lighting
-        for light in &scene.lighting().directional_lights {
-            let light_dir = -light.direction;
-            let diffuse = hit.normal.dot(&light_dir).max(0.0);
-            color = color * (light.color * light.intensity * diffuse + nalgebra::Vector3::new(scene.lighting().ambient_intensity, scene.lighting().ambient_intensity, scene.lighting().ambient_intensity));
-        }
-
-        color
-    }
-}
-
-/// Data structures
-pub struct RenderResult {
-    pub color_buffer: Vec<f32>,
-    pub depth_buffer: Vec<f32>,
-    pub performance_stats: PerformanceStats,
-}
-
-pub struct RenderLayer {
-    pub data: Vec<f32>,
-    pub blend_mode: BlendMode,
-    pub opacity: f32,
-}
-
-#[derive(Clone)]
-pub enum BlendMode {
-    Normal,
-    Additive,
-    Multiply,
-    Screen,
-}
-
-pub struct Ray {
-    pub origin: nalgebra::Vector3<f32>,
-    pub direction: nalgebra::Vector3<f32>,
-}
-
-pub struct RayHit {
-    pub distance: f32,
-    pub position: nalgebra::Vector3<f32>,
-    pub normal: nalgebra::Vector3<f32>,
-    pub material_id: u32,
-}
-
-pub struct PerformanceStats {
-    pub render_time_ms: f32,
-    pub rays_cast: u32,
-    pub samples_taken: u32,
-}
-
-impl Default for PerformanceStats {
+impl Default for FractalUniforms {
     fn default() -> Self {
         Self {
-            render_time_ms: 0.0,
-            rays_cast: 0,
-            samples_taken: 0,
+            resolution: [1920.0, 1080.0],
+            time: 0.0,
+            zoom: 1.0,
+            offset: [0.0, 0.0],
+            power: 2.0,
+            bailout: 4.0,
+            julia_c: [-0.7, 0.27015],
+            fractal_type: 0, // Mandelbrot
+            max_iterations: 100,
+            color_cycle: 1.0,
+            brightness: 1.0,
+            contrast: 1.0,
+            saturation: 1.0,
         }
-    }
-}
-
-impl crate::scene::Camera {
-    pub fn viewport_width(&self) -> u32 { 1920 } // TODO: Make configurable
-    pub fn viewport_height(&self) -> u32 { 1080 } // TODO: Make configurable
-    pub fn aspect_ratio(&self) -> f32 { self.viewport_width() as f32 / self.viewport_height() as f32 }
-    pub fn view_matrix(&self) -> nalgebra::Matrix3<f32> {
-        // TODO: Implement proper view matrix
-        nalgebra::Matrix3::identity()
-    }
-}
-
-impl crate::scene::Transform {
-    pub fn inverse(&self) -> nalgebra::Matrix4<f32> {
-        // TODO: Implement proper inverse transform
-        nalgebra::Matrix4::identity()
-    }
-
-    pub fn transform_vector(&self, v: &nalgebra::Vector3<f32>) -> nalgebra::Vector3<f32> {
-        // TODO: Implement proper vector transformation
-        *v
     }
 }

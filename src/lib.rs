@@ -935,8 +935,8 @@ pub fn hello_rust_fractal_shader_engine() -> &'static str {
     "Hello from Rust Fractal Shader Engine! Advanced GPU-accelerated fractal rendering."
 }
 
-// Re-export the NodeEditorPlugin for easy access
-pub use node_editor::NodeEditorPlugin;
+// Re-export the NodeEditorPlugin for easy access (placeholder)
+// pub use node_editor::NodeEditorPlugin;
 
 /// Test loading ISF shaders
 pub fn test_load_isf_shaders() -> Result<(), Box<dyn std::error::Error>> {

@@ -1,5 +1,5 @@
-odular-fractal-shader/src/nft/mod.rs</path>
-<content lines="1-150">
+//! NFT minting capabilities for Filecoin + NEAR blockchain integration
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -60,12 +60,36 @@ impl NFTManager {
     }
 }
 
+/// Placeholder fractal types for NFT integration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum FractalFormula {
+    Mandelbrot,
+    Mandelbub,
+    Mandelbox,
+    QuaternionJulia,
+    IFS,
+    Custom { name: String },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FractalParameters {
+    pub max_iterations: u32,
+    pub power: f32,
+    pub scale: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ColorMap {
+    pub hue_shift: f32,
+    pub saturation: f32,
+}
+
 /// Fractal data for NFT minting
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FractalNFTData {
-    pub formula: crate::fractal::types::FractalFormula,
-    pub parameters: crate::fractal::types::FractalParameters,
-    pub color_map: crate::fractal::types::ColorMap,
+    pub formula: FractalFormula,
+    pub parameters: FractalParameters,
+    pub color_map: ColorMap,
     pub animation_data: Option<AnimationData>,
     pub thumbnail: Vec<u8>, // PNG thumbnail
     pub creator: String,
@@ -219,24 +243,24 @@ impl MetadataGenerator {
         let base_score = fractal_data.parameters.max_iterations as f32 / 100.0;
         let power_modifier = fractal_data.parameters.power.abs() / 10.0;
         let formula_modifier = match &fractal_data.formula {
-            crate::fractal::types::FractalFormula::Mandelbulb { .. } => 1.5,
-            crate::fractal::types::FractalFormula::Mandelbox { .. } => 1.3,
-            crate::fractal::types::FractalFormula::QuaternionJulia { .. } => 1.4,
-            crate::fractal::types::FractalFormula::IFS { .. } => 1.2,
+            FractalFormula::Mandelbub => 1.5,
+            FractalFormula::Mandelbox => 1.3,
+            FractalFormula::QuaternionJulia => 1.4,
+            FractalFormula::IFS => 1.2,
             _ => 1.0,
         };
 
         (base_score + power_modifier) * formula_modifier
     }
 
-    fn get_fractal_type_name(&self, formula: &crate::fractal::types::FractalFormula) -> String {
+    fn get_fractal_type_name(&self, formula: &FractalFormula) -> String {
         match formula {
-            crate::fractal::types::FractalFormula::Mandelbrot { .. } => "Mandelbrot".to_string(),
-            crate::fractal::types::FractalFormula::Mandelbulb { .. } => "Mandelbulb".to_string(),
-            crate::fractal::types::FractalFormula::Mandelbox { .. } => "Mandelbox".to_string(),
-            crate::fractal::types::FractalFormula::QuaternionJulia { .. } => "Quaternion Julia".to_string(),
-            crate::fractal::types::FractalFormula::IFS { .. } => "Iterated Function System".to_string(),
-            crate::fractal::types::FractalFormula::Custom { name, .. } => name.clone(),
+            FractalFormula::Mandelbrot => "Mandelbrot".to_string(),
+            FractalFormula::Mandelbub => "Mandelbulb".to_string(),
+            FractalFormula::Mandelbox => "Mandelbox".to_string(),
+            FractalFormula::QuaternionJulia => "Quaternion Julia".to_string(),
+            FractalFormula::IFS => "Iterated Function System".to_string(),
+            FractalFormula::Custom { name } => name.clone(),
         }
     }
 }

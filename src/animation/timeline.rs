@@ -1,441 +1,294 @@
-//! Timeline and Animation Management
+//! Timeline Animation System
 //!
-//! This module provides timeline-based animation editing and playback controls.
+//! This module provides a timeline-based interface for managing keyframe animations,
+//! with support for multiple tracks, curves, and professional animation tools.
 
 use super::keyframe::*;
+use std::collections::HashMap;
+use serde::{Deserialize, Serialize};
 
-/// Timeline for managing multiple animation tracks
+/// Timeline project containing multiple animation tracks
 #[derive(Debug, Clone)]
-pub struct Timeline {
-    name: String,
-    duration: f32,
-    frame_rate: f32,
-    current_frame: u32,
-    tracks: Vec<TrackInfo>,
-    markers: Vec<TimelineMarker>,
+pub struct TimelineProject {
+    pub name: String,
+    pub animation_controller: AnimationController,
+    pub frame_rate: f32,
+    pub current_frame: u32,
+    pub total_frames: u32,
+    pub tracks: Vec<TimelineTrack>,
 }
 
-#[derive(Debug, Clone)]
-struct TrackInfo {
-    name: String,
-    track_type: TrackType,
-    muted: bool,
-    locked: bool,
-    visible: bool,
+/// Timeline track representation for UI
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TimelineTrack {
+    pub id: TrackId,
+    pub name: String,
+    pub track_type: TimelineTrackType,
+    pub visible: bool,
+    pub locked: bool,
+    pub color: [f32; 3],
 }
 
-#[derive(Debug, Clone)]
-pub enum TrackType {
+/// Types of timeline tracks
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum TimelineTrackType {
     Float,
-    FractalParameters,
-    Vector3,
+    Position,
+    Rotation,
+    Scale,
+    Color,
+    Custom,
 }
 
+/// Keyframe data for timeline display
 #[derive(Debug, Clone)]
-pub struct TimelineMarker {
-    name: String,
-    time: f32,
-    color: [f32; 3],
+pub struct TimelineKeyframe {
+    pub time: f32,
+    pub value: f32, // Normalized 0-1 for display
+    pub interpolation: InterpolationMode,
+    pub selected: bool,
 }
 
-impl Timeline {
+/// Timeline selection state
+#[derive(Debug, Clone)]
+pub struct TimelineSelection {
+    pub selected_tracks: Vec<TrackId>,
+    pub selected_keyframes: Vec<(TrackId, usize)>, // (track_id, keyframe_index)
+    pub time_selection: Option<(f32, f32)>, // start and end time
+}
+
+impl TimelineProject {
+    /// Create new timeline project
     pub fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
-            duration: 10.0,
+            animation_controller: AnimationController::new(),
             frame_rate: 30.0,
             current_frame: 0,
+            total_frames: 300, // 10 seconds at 30fps
             tracks: Vec::new(),
-            markers: Vec::new(),
         }
     }
 
-    /// Add a new track to the timeline
-    pub fn add_track(&mut self, name: &str, track_type: TrackType) {
-        self.tracks.push(TrackInfo {
+    /// Add track to timeline
+    pub fn add_track(&mut self, name: &str, track_type: TimelineTrackType, color: [f32; 3]) -> TrackId {
+        let track_id = match track_type {
+            TimelineTrackType::Float => self.animation_controller.add_float_track(name, &format!("custom.{}", name)),
+            TimelineTrackType::Position => self.animation_controller.add_vec3_track(name, "transform.position"),
+            TimelineTrackType::Rotation => self.animation_controller.add_vec3_track(name, "transform.rotation"),
+            TimelineTrackType::Scale => self.animation_controller.add_vec3_track(name, "transform.scale"),
+            TimelineTrackType::Color => self.animation_controller.add_vec3_track(name, "material.color"),
+            TimelineTrackType::Custom => self.animation_controller.add_float_track(name, &format!("custom.{}", name)),
+        };
+
+        self.tracks.push(TimelineTrack {
+            id: track_id,
             name: name.to_string(),
             track_type,
-            muted: false,
-            locked: false,
             visible: true,
-        });
-    }
-
-    /// Remove a track from the timeline
-    pub fn remove_track(&mut self, name: &str) {
-        self.tracks.retain(|track| track.name != name);
-    }
-
-    /// Get track by name
-    pub fn get_track(&self, name: &str) -> Option<&TrackInfo> {
-        self.tracks.iter().find(|track| track.name == name)
-    }
-
-    /// Get mutable track by name
-    pub fn get_track_mut(&mut self, name: &str) -> Option<&mut TrackInfo> {
-        self.tracks.iter_mut().find(|track| track.name == name)
-    }
-
-    /// Set track visibility
-    pub fn set_track_visible(&mut self, name: &str, visible: bool) {
-        if let Some(track) = self.get_track_mut(name) {
-            track.visible = visible;
-        }
-    }
-
-    /// Set track mute state
-    pub fn set_track_muted(&mut self, name: &str, muted: bool) {
-        if let Some(track) = self.get_track_mut(name) {
-            track.muted = muted;
-        }
-    }
-
-    /// Set track lock state
-    pub fn set_track_locked(&mut self, name: &str, locked: bool) {
-        if let Some(track) = self.get_track_mut(name) {
-            track.locked = locked;
-        }
-    }
-
-    /// Add a timeline marker
-    pub fn add_marker(&mut self, name: &str, time: f32, color: [f32; 3]) {
-        self.markers.push(TimelineMarker {
-            name: name.to_string(),
-            time,
+            locked: false,
             color,
         });
+
+        track_id
     }
 
-    /// Remove a timeline marker
-    pub fn remove_marker(&mut self, time: f32) {
-        self.markers.retain(|marker| marker.time != time);
-    }
-
-    /// Get all markers
-    pub fn markers(&self) -> &[TimelineMarker] {
-        &self.markers
-    }
-
-    /// Get timeline duration
-    pub fn duration(&self) -> f32 {
-        self.duration
-    }
-
-    /// Set timeline duration
-    pub fn set_duration(&mut self, duration: f32) {
-        self.duration = duration.max(0.1);
-    }
-
-    /// Get frame rate
-    pub fn frame_rate(&self) -> f32 {
-        self.frame_rate
-    }
-
-    /// Set frame rate
-    pub fn set_frame_rate(&mut self, frame_rate: f32) {
-        self.frame_rate = frame_rate.max(1.0);
-    }
-
-    /// Convert time to frame number
-    pub fn time_to_frame(&self, time: f32) -> u32 {
-        (time * self.frame_rate) as u32
-    }
-
-    /// Convert frame number to time
-    pub fn frame_to_time(&self, frame: u32) -> f32 {
-        frame as f32 / self.frame_rate
-    }
-
-    /// Get current frame
-    pub fn current_frame(&self) -> u32 {
-        self.current_frame
+    /// Get current time in seconds
+    pub fn current_time(&self) -> f32 {
+        self.current_frame as f32 / self.frame_rate
     }
 
     /// Set current frame
     pub fn set_current_frame(&mut self, frame: u32) {
-        let max_frame = self.time_to_frame(self.duration);
-        self.current_frame = frame.min(max_frame);
+        self.current_frame = frame.min(self.total_frames);
+        self.animation_controller.seek(self.current_time());
     }
 
-    /// Get current time
-    pub fn current_time(&self) -> f32 {
-        self.frame_to_time(self.current_frame)
+    /// Convert time to frame
+    pub fn time_to_frame(&self, time: f32) -> u32 {
+        (time * self.frame_rate) as u32
     }
 
-    /// Set current time
-    pub fn set_current_time(&mut self, time: f32) {
-        let clamped_time = time.clamp(0.0, self.duration);
-        self.current_frame = self.time_to_frame(clamped_time);
+    /// Convert frame to time
+    pub fn frame_to_time(&self, frame: u32) -> f32 {
+        frame as f32 / self.frame_rate
     }
 
-    /// Jump to next frame
-    pub fn next_frame(&mut self) {
-        let max_frame = self.time_to_frame(self.duration);
-        if self.current_frame < max_frame {
-            self.current_frame += 1;
+    /// Get keyframes for a track (for UI display)
+    pub fn get_track_keyframes(&self, track_id: TrackId) -> Vec<TimelineKeyframe> {
+        self.animation_controller.tracks.get(&track_id)
+            .map(|track_type| match track_type {
+                AnimationTrackType::Float(track) => {
+                    track.keyframes.iter().enumerate().map(|(i, kf)| {
+                        TimelineKeyframe {
+                            time: kf.time,
+                            value: kf.value, // Assume normalized for display
+                            interpolation: kf.interpolation,
+                            selected: false, // TODO: Implement selection
+                        }
+                    }).collect()
+                }
+                _ => Vec::new(), // TODO: Handle other track types
+            })
+            .unwrap_or_default()
+    }
+
+    /// Add keyframe to track
+    pub fn add_keyframe(&mut self, track_id: TrackId, time: f32, value: f32, interpolation: InterpolationMode) {
+        match self.animation_controller.tracks.get(&track_id) {
+            Some(AnimationTrackType::Float(_)) => {
+                self.animation_controller.add_keyframe(track_id, time, AnimationValue::Float(value), interpolation);
+            }
+            _ => {} // TODO: Handle other types
         }
     }
 
-    /// Jump to previous frame
-    pub fn prev_frame(&mut self) {
-        if self.current_frame > 0 {
-            self.current_frame -= 1;
+    /// Remove keyframe from track
+    pub fn remove_keyframe(&mut self, track_id: TrackId, keyframe_index: usize) {
+        if let Some(track_type) = self.animation_controller.tracks.get_mut(&track_id) {
+            match track_type {
+                AnimationTrackType::Float(track) => {
+                    if keyframe_index < track.keyframes.len() {
+                        track.keyframes.remove(keyframe_index);
+                    }
+                }
+                _ => {} // TODO: Handle other types
+            }
         }
     }
 
-    /// Jump to next marker
-    pub fn jump_to_next_marker(&mut self) {
-        let current_time = self.current_time();
-        if let Some(marker) = self.markers.iter()
-            .find(|marker| marker.time > current_time)
-        {
-            self.set_current_time(marker.time);
+    /// Update keyframe
+    pub fn update_keyframe(&mut self, track_id: TrackId, keyframe_index: usize, time: f32, value: f32) {
+        if let Some(track_type) = self.animation_controller.tracks.get_mut(&track_id) {
+            match track_type {
+                AnimationTrackType::Float(track) => {
+                    if let Some(keyframe) = track.keyframes.get_mut(keyframe_index) {
+                        keyframe.time = time;
+                        keyframe.value = value;
+                        // Re-sort keyframes after time change
+                        track.keyframes.sort_by(|a, b| a.time.partial_cmp(&b.time).unwrap());
+                    }
+                }
+                _ => {} // TODO: Handle other types
+            }
         }
     }
 
-    /// Jump to previous marker
-    pub fn jump_to_prev_marker(&mut self) {
-        let current_time = self.current_time();
-        if let Some(marker) = self.markers.iter()
-            .rev()
-            .find(|marker| marker.time < current_time)
-        {
-            self.set_current_time(marker.time);
-        }
+    /// Play animation
+    pub fn play(&mut self) {
+        self.animation_controller.play();
     }
 
-    /// Get all tracks
-    pub fn tracks(&self) -> &[TrackInfo] {
-        &self.tracks
+    /// Pause animation
+    pub fn pause(&mut self) {
+        self.animation_controller.pause();
     }
 
-    /// Get timeline name
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    /// Set timeline name
-    pub fn set_name(&mut self, name: &str) {
-        self.name = name.to_string();
-    }
-}
-
-/// Animation playback controller
-#[derive(Debug, Clone)]
-pub struct PlaybackController {
-    playing: bool,
-    loop_playback: bool,
-    speed: f32,
-    ping_pong: bool,
-    direction: PlaybackDirection,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum PlaybackDirection {
-    Forward,
-    Backward,
-}
-
-impl PlaybackController {
-    pub fn new() -> Self {
-        Self {
-            playing: false,
-            loop_playback: false,
-            speed: 1.0,
-            ping_pong: false,
-            direction: PlaybackDirection::Forward,
-        }
-    }
-
-    /// Start playback
-    pub fn start(&mut self) {
-        self.playing = true;
-    }
-
-    /// Stop playback
+    /// Stop animation
     pub fn stop(&mut self) {
-        self.playing = false;
+        self.animation_controller.stop();
+        self.current_frame = 0;
     }
 
-    /// Toggle playback state
-    pub fn toggle(&mut self) {
-        self.playing = !self.playing;
-    }
-
-    /// Check if playing
-    pub fn is_playing(&self) -> bool {
-        self.playing
-    }
-
-    /// Set loop playback
-    pub fn set_loop_playback(&mut self, loop_playback: bool) {
-        self.loop_playback = loop_playback;
-    }
-
-    /// Get loop playback state
-    pub fn loop_playback(&self) -> bool {
-        self.loop_playback
-    }
-
-    /// Set playback speed
-    pub fn set_speed(&mut self, speed: f32) {
-        self.speed = speed.max(0.01);
-    }
-
-    /// Get playback speed
-    pub fn speed(&self) -> f32 {
-        self.speed
-    }
-
-    /// Set ping-pong mode
-    pub fn set_ping_pong(&mut self, ping_pong: bool) {
-        self.ping_pong = ping_pong;
-    }
-
-    /// Get ping-pong mode
-    pub fn ping_pong(&self) -> bool {
-        self.ping_pong
-    }
-
-    /// Set playback direction
-    pub fn set_direction(&mut self, direction: PlaybackDirection) {
-        self.direction = direction;
-    }
-
-    /// Get playback direction
-    pub fn direction(&self) -> PlaybackDirection {
-        self.direction
-    }
-
-    /// Update playback based on delta time
-    pub fn update(&mut self, delta_time: f32, timeline: &mut Timeline) {
-        if !self.playing {
-            return;
-        }
-
-        let effective_delta = delta_time * self.speed;
-        let current_time = timeline.current_time();
-        let duration = timeline.duration();
-
-        match self.direction {
-            PlaybackDirection::Forward => {
-                let new_time = current_time + effective_delta;
-                if new_time > duration {
-                    if self.loop_playback {
-                        timeline.set_current_time(new_time % duration);
-                    } else if self.ping_pong {
-                        timeline.set_current_time(duration);
-                        self.direction = PlaybackDirection::Backward;
-                        self.playing = false;
-                    } else {
-                        timeline.set_current_time(duration);
-                        self.playing = false;
-                    }
-                } else {
-                    timeline.set_current_time(new_time);
-                }
-            }
-            PlaybackDirection::Backward => {
-                let new_time = current_time - effective_delta;
-                if new_time < 0.0 {
-                    if self.loop_playback {
-                        timeline.set_current_time(duration + new_time);
-                    } else if self.ping_pong {
-                        timeline.set_current_time(0.0);
-                        self.direction = PlaybackDirection::Forward;
-                        self.playing = false;
-                    } else {
-                        timeline.set_current_time(0.0);
-                        self.playing = false;
-                    }
-                } else {
-                    timeline.set_current_time(new_time);
-                }
-            }
-        }
-    }
-}
-
-impl Default for PlaybackController {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-/// Timeline project that contains all animation data
-#[derive(Debug, Clone)]
-pub struct TimelineProject {
-    name: String,
-    timeline: Timeline,
-    playback_controller: PlaybackController,
-    animation_controller: AnimationController,
-}
-
-impl TimelineProject {
-    pub fn new(name: &str) -> Self {
-        Self {
-            name: name.to_string(),
-            timeline: Timeline::new(name),
-            playback_controller: PlaybackController::new(),
-            animation_controller: AnimationController::new(),
+    /// Step to next frame
+    pub fn step_forward(&mut self) {
+        if self.current_frame < self.total_frames {
+            self.set_current_frame(self.current_frame + 1);
         }
     }
 
-    /// Get timeline reference
-    pub fn timeline(&self) -> &Timeline {
-        &self.timeline
+    /// Step to previous frame
+    pub fn step_backward(&mut self) {
+        if self.current_frame > 0 {
+            self.set_current_frame(self.current_frame - 1);
+        }
     }
 
-    /// Get mutable timeline reference
-    pub fn timeline_mut(&mut self) -> &mut Timeline {
-        &mut self.timeline
-    }
-
-    /// Get playback controller reference
-    pub fn playback_controller(&self) -> &PlaybackController {
-        &self.playback_controller
-    }
-
-    /// Get mutable playback controller reference
-    pub fn playback_controller_mut(&mut self) -> &mut PlaybackController {
-        &mut self.playback_controller
-    }
-
-    /// Get animation controller reference
-    pub fn animation_controller(&self) -> &AnimationController {
-        &self.animation_controller
-    }
-
-    /// Get mutable animation controller reference
-    pub fn animation_controller_mut(&mut self) -> &mut AnimationController {
-        &mut self.animation_controller
-    }
-
-    /// Update the project (advance animation)
+    /// Update timeline (called every frame)
     pub fn update(&mut self, delta_time: f32) {
-        self.playback_controller.update(delta_time, &mut self.timeline);
         self.animation_controller.update(delta_time);
-    }
 
-    /// Export timeline as animation data
-    pub fn export_animation(&self) -> TimelineExportData {
-        TimelineExportData {
-            name: self.name.clone(),
-            duration: self.timeline.duration(),
-            frame_rate: self.timeline.frame_rate(),
-            tracks: self.timeline.tracks().to_vec(),
-            markers: self.timeline.markers().to_vec(),
-            fps: self.timeline.frame_rate(),
-        }
+        // Update current frame based on animation time
+        let current_time = self.animation_controller.current_time;
+        self.current_frame = self.time_to_frame(current_time).min(self.total_frames);
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct TimelineExportData {
-    pub name: String,
-    pub duration: f32,
-    pub frame_rate: f32,
-    pub tracks: Vec<TrackInfo>,
-    pub markers: Vec<TimelineMarker>,
-    pub fps: f32,
+/// Timeline UI utilities
+pub struct TimelineUI;
+
+impl TimelineUI {
+    /// Calculate visible time range for timeline display
+    pub fn calculate_visible_range(current_time: f32, zoom: f32, viewport_width: f32) -> (f32, f32) {
+        let visible_duration = viewport_width / zoom;
+        let start_time = (current_time - visible_duration * 0.5).max(0.0);
+        let end_time = start_time + visible_duration;
+        (start_time, end_time)
+    }
+
+    /// Convert screen coordinates to time
+    pub fn screen_to_time(screen_x: f32, start_time: f32, zoom: f32, timeline_x: f32) -> f32 {
+        start_time + (screen_x - timeline_x) / zoom
+    }
+
+    /// Convert time to screen coordinates
+    pub fn time_to_screen(time: f32, start_time: f32, zoom: f32, timeline_x: f32) -> f32 {
+        timeline_x + (time - start_time) * zoom
+    }
+
+    /// Snap time to frame
+    pub fn snap_to_frame(time: f32, frame_rate: f32) -> f32 {
+        let frame = (time * frame_rate).round();
+        frame / frame_rate
+    }
+
+    /// Get time at mouse position
+    pub fn get_time_at_mouse(mouse_x: f32, timeline_rect: &egui::Rect, visible_start: f32, zoom: f32) -> f32 {
+        let relative_x = mouse_x - timeline_rect.left();
+        visible_start + relative_x / zoom
+    }
+}
+
+/// Animation curve presets
+pub struct AnimationPresets;
+
+impl AnimationPresets {
+    /// Create bounce animation
+    pub fn create_bounce_animation(controller: &mut AnimationController, track_id: TrackId) {
+        controller.add_keyframe(track_id, 0.0, AnimationValue::Float(0.0), InterpolationMode::EaseOut);
+        controller.add_keyframe(track_id, 0.3, AnimationValue::Float(1.2), InterpolationMode::EaseOut);
+        controller.add_keyframe(track_id, 0.6, AnimationValue::Float(0.9), InterpolationMode::EaseOut);
+        controller.add_keyframe(track_id, 0.8, AnimationValue::Float(1.05), InterpolationMode::EaseOut);
+        controller.add_keyframe(track_id, 1.0, AnimationValue::Float(1.0), InterpolationMode::EaseOut);
+    }
+
+    /// Create elastic animation
+    pub fn create_elastic_animation(controller: &mut AnimationController, track_id: TrackId) {
+        controller.add_keyframe(track_id, 0.0, AnimationValue::Float(0.0), InterpolationMode::EaseOut);
+        controller.add_keyframe(track_id, 1.0, AnimationValue::Float(1.0), InterpolationMode::EaseOut);
+    }
+
+    /// Create smooth pulse animation
+    pub fn create_pulse_animation(controller: &mut AnimationController, track_id: TrackId, duration: f32) {
+        let keyframes = 8;
+        for i in 0..keyframes {
+            let time = (i as f32 / (keyframes - 1) as f32) * duration;
+            let value = if i % 2 == 0 { 1.0 } else { 0.8 };
+            let interpolation = if i == keyframes - 1 { InterpolationMode::Smooth } else { InterpolationMode::EaseInOut };
+            controller.add_keyframe(track_id, time, AnimationValue::Float(value), interpolation);
+        }
+    }
+
+    /// Create fractal parameter morphing animation
+    pub fn create_fractal_morph(controller: &mut AnimationController, power_track: TrackId, bailout_track: TrackId) {
+        // Power animation: 2 -> 8 -> 2
+        controller.add_keyframe(power_track, 0.0, AnimationValue::Float(2.0), InterpolationMode::Smooth);
+        controller.add_keyframe(power_track, 2.5, AnimationValue::Float(8.0), InterpolationMode::Smooth);
+        controller.add_keyframe(power_track, 5.0, AnimationValue::Float(2.0), InterpolationMode::Smooth);
+
+        // Bailout animation: 4 -> 2 -> 4
+        controller.add_keyframe(bailout_track, 0.0, AnimationValue::Float(4.0), InterpolationMode::Smooth);
+        controller.add_keyframe(bailout_track, 2.5, AnimationValue::Float(2.0), InterpolationMode::Smooth);
+        controller.add_keyframe(bailout_track, 5.0, AnimationValue::Float(4.0), InterpolationMode::Smooth);
+    }
 }
