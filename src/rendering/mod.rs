@@ -60,13 +60,13 @@ impl GPURenderer {
         // Create compute shader for fractal distance estimation
         let fractal_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Fractal Compute Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("shaders/fractal_compute.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(include_str!("shaders/fractal_compute.wgsl")),
         });
 
         // Create render shader
         let render_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Fractal Render Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("shaders/fractal_render.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(include_str!("shaders/fractal_render.wgsl")),
         });
 
         // Create compute pipeline
@@ -154,10 +154,14 @@ impl GPURenderer {
         });
         let output_texture_view = output_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
+        // Create bind group layouts first
+        let fractal_bind_group_layout = fractal_pipeline.get_bind_group_layout(0);
+        let render_bind_group_layout = render_pipeline.get_bind_group_layout(0);
+
         // Create bind groups
         let fractal_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Fractal Bind Group"),
-            layout: &fractal_pipeline.get_bind_group_layout(0),
+            layout: &fractal_bind_group_layout,
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
@@ -176,11 +180,15 @@ impl GPURenderer {
 
         let render_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Render Bind Group"),
-            layout: &render_pipeline.get_bind_group_layout(0),
+            layout: &render_bind_group_layout,
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
                     resource: wgpu::BindingResource::TextureView(&output_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: uniform_buffer.as_entire_binding(),
                 },
             ],
         });

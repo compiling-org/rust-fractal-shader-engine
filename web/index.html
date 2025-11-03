@@ -8,392 +8,435 @@
         body {
             margin: 0;
             padding: 0;
-            background: #1a1a26;
-            color: #ffffff;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+            color: #ffffff;
             overflow: hidden;
         }
 
-        #container {
+        .container {
             display: flex;
             flex-direction: column;
             height: 100vh;
         }
 
-        #toolbar {
-            background: #2a2a3a;
-            padding: 10px;
-            border-bottom: 1px solid #4a4a5a;
+        .header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
             display: flex;
-            gap: 10px;
+            justify-content: space-between;
             align-items: center;
         }
 
-        #main-content {
-            flex: 1;
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4);
+            background-size: 400% 400%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: gradient 3s ease infinite;
+        }
+
+        @keyframes gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .controls {
             display: flex;
-        }
-
-        #sidebar {
-            width: 300px;
-            background: #2a2a3a;
-            border-right: 1px solid #4a4a5a;
-            padding: 15px;
-            overflow-y: auto;
-        }
-
-        #viewport-container {
-            flex: 1;
-            position: relative;
-            background: #000000;
-        }
-
-        #fractal-canvas {
-            width: 100%;
-            height: 100%;
-            display: block;
-            cursor: crosshair;
+            gap: 1rem;
+            align-items: center;
         }
 
         .control-group {
-            margin-bottom: 20px;
-        }
-
-        .control-group h3 {
-            margin: 0 0 10px 0;
-            color: #00ffff;
-            font-size: 14px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .slider-container {
             display: flex;
-            align-items: center;
-            margin-bottom: 8px;
+            flex-direction: column;
+            gap: 0.5rem;
         }
 
-        .slider-container label {
-            width: 80px;
-            font-size: 12px;
+        .control-group label {
+            font-size: 0.8rem;
             color: #cccccc;
         }
 
-        .slider-container input[type="range"] {
+        .control-group input, .control-group select {
+            padding: 0.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+            font-size: 0.9rem;
+        }
+
+        .control-group input:focus, .control-group select:focus {
+            outline: none;
+            border-color: #4ecdc4;
+            box-shadow: 0 0 0 2px rgba(78, 205, 196, 0.3);
+        }
+
+        .main-content {
             flex: 1;
-            margin: 0 10px;
+            display: flex;
+            position: relative;
         }
 
-        .slider-container span {
-            width: 40px;
-            font-size: 12px;
-            color: #00ffff;
-            text-align: right;
-        }
-
-        .select-container {
-            margin-bottom: 10px;
-        }
-
-        .select-container label {
-            display: block;
-            font-size: 12px;
-            color: #cccccc;
-            margin-bottom: 5px;
-        }
-
-        .select-container select {
-            width: 100%;
-            padding: 5px;
-            background: #3a3a4a;
-            border: 1px solid #4a4a5a;
-            color: #ffffff;
-            border-radius: 3px;
-        }
-
-        .button {
-            background: #00ffff;
-            color: #1a1a26;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 3px;
-            cursor: pointer;
-            font-size: 12px;
-            font-weight: bold;
-            transition: background 0.2s;
-        }
-
-        .button:hover {
-            background: #00cccc;
-        }
-
-        .button.secondary {
-            background: #4a4a5a;
-            color: #ffffff;
-        }
-
-        .button.secondary:hover {
-            background: #5a5a6a;
-        }
-
-        #status {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(0, 0, 0, 0.8);
-            color: #00ffff;
-            padding: 5px 10px;
-            border-radius: 3px;
-            font-size: 12px;
-            font-family: monospace;
-        }
-
-        .glass-panel {
-            background: rgba(42, 42, 58, 0.8);
+        .sidebar {
+            width: 300px;
+            background: rgba(255, 255, 255, 0.05);
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(74, 74, 90, 0.5);
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 15px;
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 1rem;
+            overflow-y: auto;
         }
 
-        .loading {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: #1a1a26;
+        .sidebar h3 {
+            margin-top: 0;
+            color: #4ecdc4;
+        }
+
+        .fractal-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .fractal-item {
+            padding: 0.75rem;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .fractal-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: #4ecdc4;
+        }
+
+        .fractal-item.active {
+            background: rgba(78, 205, 196, 0.2);
+            border-color: #4ecdc4;
+        }
+
+        .canvas-container {
+            flex: 1;
+            position: relative;
+            background: #000000;
             display: flex;
             align-items: center;
             justify-content: center;
-            z-index: 1000;
         }
 
-        .loading-text {
-            color: #00ffff;
-            font-size: 18px;
-            font-family: monospace;
+        #fractal-canvas {
+            max-width: 100%;
+            max-height: 100%;
+            border: none;
+            background: #000000;
+        }
+
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+            color: #cccccc;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top: 3px solid #4ecdc4;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .info-panel {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            min-width: 200px;
+        }
+
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .info-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .info-label {
+            color: #cccccc;
+        }
+
+        .info-value {
+            color: #4ecdc4;
+            font-weight: bold;
+        }
+
+        .status {
+            position: absolute;
+            bottom: 1rem;
+            left: 1rem;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            font-size: 0.8rem;
+            color: #cccccc;
+        }
+
+        .status.online {
+            border-color: #4ecdc4;
+            color: #4ecdc4;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                width: 100%;
+                height: 200px;
+                border-right: none;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            }
+
+            .controls {
+                flex-wrap: wrap;
+            }
+
+            .info-panel {
+                position: static;
+                margin: 1rem;
+            }
         }
     </style>
 </head>
 <body>
-    <div id="loading" class="loading">
-        <div class="loading-text">Loading Fractal Shader Studio...</div>
-    </div>
-
-    <div id="container" style="display: none;">
-        <div id="toolbar">
-            <button class="button" onclick="startAnimation()">▶️ Play</button>
-            <button class="button secondary" onclick="stopAnimation()">⏹️ Stop</button>
-            <button class="button secondary" onclick="exportImage()">📷 Export</button>
-            <span id="fps">FPS: --</span>
-        </div>
-
-        <div id="main-content">
-            <div id="sidebar">
-                <div class="glass-panel">
-                    <div class="control-group">
-                        <h3>Fractal Type</h3>
-                        <div class="select-container">
-                            <select id="fractal-type" onchange="changeFractalType()">
-                                <option value="mandelbrot">Mandelbrot</option>
-                                <option value="julia">Julia</option>
-                                <option value="mandelbulb">Mandelbulb</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="control-group">
-                        <h3>Common Parameters</h3>
-                        <div class="slider-container">
-                            <label>Zoom:</label>
-                            <input type="range" id="zoom" min="0.1" max="10" step="0.1" value="1">
-                            <span id="zoom-value">1.0</span>
-                        </div>
-                        <div class="slider-container">
-                            <label>Iterations:</label>
-                            <input type="range" id="iterations" min="10" max="500" step="10" value="100">
-                            <span id="iterations-value">100</span>
-                        </div>
-                    </div>
-
-                    <div class="control-group" id="mandelbulb-controls" style="display: none;">
-                        <h3>Mandelbulb</h3>
-                        <div class="slider-container">
-                            <label>Power:</label>
-                            <input type="range" id="power" min="2" max="16" step="0.1" value="8">
-                            <span id="power-value">8.0</span>
-                        </div>
-                    </div>
-
-                    <div class="control-group" id="julia-controls" style="display: none;">
-                        <h3>Julia Set</h3>
-                        <div class="slider-container">
-                            <label>C Real:</label>
-                            <input type="range" id="julia-real" min="-2" max="2" step="0.01" value="-0.7">
-                            <span id="julia-real-value">-0.7</span>
-                        </div>
-                        <div class="slider-container">
-                            <label>C Imag:</label>
-                            <input type="range" id="julia-imag" min="-2" max="2" step="0.01" value="0.27">
-                            <span id="julia-imag-value">0.27</span>
-                        </div>
-                    </div>
-
-                    <div class="control-group">
-                        <h3>Color</h3>
-                        <div class="slider-container">
-                            <label>Cycle:</label>
-                            <input type="range" id="color-cycle" min="0" max="1" step="0.01" value="0.5">
-                            <span id="color-cycle-value">0.5</span>
-                        </div>
-                        <div class="slider-container">
-                            <label>Brightness:</label>
-                            <input type="range" id="brightness" min="0" max="2" step="0.1" value="1">
-                            <span id="brightness-value">1.0</span>
-                        </div>
-                    </div>
+    <div class="container">
+        <header class="header">
+            <div class="logo">🌀 Fractal Shader Studio</div>
+            <div class="controls">
+                <div class="control-group">
+                    <label for="fractal-type">Fractal Type</label>
+                    <select id="fractal-type">
+                        <option value="mandelbrot">Mandelbrot</option>
+                        <option value="julia">Julia</option>
+                        <option value="mandelbulb">Mandelbulb</option>
+                        <option value="mandelbox">Mandelbox</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="iterations">Iterations</label>
+                    <input type="range" id="iterations" min="10" max="500" value="100" step="10">
+                </div>
+                <div class="control-group">
+                    <label for="zoom">Zoom</label>
+                    <input type="range" id="zoom" min="0.1" max="10" value="1" step="0.1">
+                </div>
+                <div class="control-group">
+                    <label for="power">Power</label>
+                    <input type="range" id="power" min="2" max="16" value="2" step="0.1">
                 </div>
             </div>
+        </header>
 
-            <div id="viewport-container">
-                <canvas id="fractal-canvas" width="1920" height="1080"></canvas>
-                <div id="status">Ready</div>
-            </div>
+        <div class="main-content">
+            <aside class="sidebar">
+                <h3>Fractal Library</h3>
+                <div class="fractal-list" id="fractal-list">
+                    <div class="fractal-item active" data-type="mandelbrot">
+                        <strong>Mandelbrot Set</strong><br>
+                        <small>The classic fractal boundary</small>
+                    </div>
+                    <div class="fractal-item" data-type="julia">
+                        <strong>Julia Set</strong><br>
+                        <small>Parameterized fractal variations</small>
+                    </div>
+                    <div class="fractal-item" data-type="mandelbulb">
+                        <strong>Mandelbulb</strong><br>
+                        <small>3D power fractal</small>
+                    </div>
+                    <div class="fractal-item" data-type="mandelbox">
+                        <strong>Mandelbox</strong><br>
+                        <small>Folding-based fractal</small>
+                    </div>
+                </div>
+
+                <h3 style="margin-top: 2rem;">Features</h3>
+                <ul style="color: #cccccc; font-size: 0.9rem; line-height: 1.5;">
+                    <li>Real-time fractal rendering</li>
+                    <li>Interactive parameter control</li>
+                    <li>Multiple fractal types</li>
+                    <li>WebGPU/WebGL acceleration</li>
+                    <li>NFT minting capabilities</li>
+                    <li>Export to various formats</li>
+                </ul>
+            </aside>
+
+            <main class="canvas-container">
+                <div id="loading" class="loading">
+                    <div class="spinner"></div>
+                    <div>Loading Fractal Shader Engine...</div>
+                </div>
+                <canvas id="fractal-canvas" width="800" height="600"></canvas>
+
+                <div class="info-panel">
+                    <div class="info-item">
+                        <span class="info-label">FPS:</span>
+                        <span class="info-value" id="fps">0</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Time:</span>
+                        <span class="info-value" id="time">0.00s</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Iterations:</span>
+                        <span class="info-value" id="current-iterations">100</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Zoom:</span>
+                        <span class="info-value" id="current-zoom">1.00</span>
+                    </div>
+                </div>
+
+                <div class="status" id="status">Initializing...</div>
+            </main>
         </div>
     </div>
 
     <script type="module">
-        import init, { WebFractalStudio, web_hello } from './pkg/fractal_studio.js';
+        import init, { WebFractalStudio } from './pkg/modular_fractal_shader.js';
 
-        let studio;
-        let animationId;
+        let studio = null;
+        let animationId = null;
         let lastTime = 0;
 
         async function initialize() {
             try {
+                // Initialize WASM
                 await init();
 
-                console.log(web_hello());
-
+                // Create fractal studio
                 studio = new WebFractalStudio('fractal-canvas');
 
-                // Set up event listeners
+                // Set up controls
                 setupControls();
 
-                // Initial render
-                studio.render_frame();
+                // Start rendering
+                startRendering();
 
-                // Hide loading screen
+                // Update status
+                document.getElementById('status').textContent = 'Ready';
+                document.getElementById('status').classList.add('online');
+
+                // Hide loading
                 document.getElementById('loading').style.display = 'none';
-                document.getElementById('container').style.display = 'flex';
 
-                console.log('Fractal Shader Studio Web initialized successfully');
-
+                console.log('Fractal Shader Studio initialized successfully');
             } catch (error) {
                 console.error('Failed to initialize:', error);
-                document.querySelector('.loading-text').textContent = 'Failed to load. Check console for details.';
+                document.getElementById('status').textContent = 'Error: ' + error.message;
             }
         }
 
         function setupControls() {
             // Fractal type selector
-            document.getElementById('fractal-type').addEventListener('change', changeFractalType);
+            document.getElementById('fractal-type').addEventListener('change', (e) => {
+                if (studio) {
+                    studio.set_fractal_type(e.target.value);
+                }
+            });
 
-            // Sliders
-            const sliders = [
-                'zoom', 'iterations', 'power', 'julia-real', 'julia-imag',
-                'color-cycle', 'brightness'
-            ];
-
-            sliders.forEach(id => {
-                const slider = document.getElementById(id);
-                const valueSpan = document.getElementById(id + '-value');
-
-                slider.addEventListener('input', (e) => {
-                    valueSpan.textContent = e.target.value;
-                    updateParameter(id, parseFloat(e.target.value));
+            // Parameter sliders
+            const parameters = ['iterations', 'zoom', 'power'];
+            parameters.forEach(param => {
+                const element = document.getElementById(param);
+                element.addEventListener('input', (e) => {
+                    if (studio) {
+                        studio.set_parameter(param, parseFloat(e.target.value));
+                        document.getElementById(`current-${param}`).textContent = e.target.value;
+                    }
                 });
             });
 
-            // Initial control visibility
-            updateControlVisibility();
+            // Fractal list items
+            document.querySelectorAll('.fractal-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    // Remove active class from all items
+                    document.querySelectorAll('.fractal-item').forEach(i => i.classList.remove('active'));
+                    // Add active class to clicked item
+                    item.classList.add('active');
+
+                    // Set fractal type
+                    const fractalType = item.dataset.type;
+                    document.getElementById('fractal-type').value = fractalType;
+                    if (studio) {
+                        studio.set_fractal_type(fractalType);
+                    }
+                });
+            });
         }
 
-        function changeFractalType() {
-            const fractalType = document.getElementById('fractal-type').value;
-            studio.set_fractal_type(fractalType);
-            updateControlVisibility();
-            studio.render_frame();
-        }
+        function startRendering() {
+            function render(currentTime) {
+                if (studio) {
+                    const deltaTime = (currentTime - lastTime) / 1000;
+                    studio.render_frame(deltaTime);
 
-        function updateControlVisibility() {
-            const fractalType = document.getElementById('fractal-type').value;
+                    // Update info panel
+                    document.getElementById('fps').textContent = Math.round(1 / deltaTime);
+                    document.getElementById('time').textContent = studio.get_time().toFixed(2) + 's';
+                }
 
-            document.getElementById('mandelbulb-controls').style.display =
-                fractalType === 'mandelbulb' ? 'block' : 'none';
-            document.getElementById('julia-controls').style.display =
-                fractalType === 'julia' ? 'block' : 'none';
-        }
-
-        function updateParameter(param, value) {
-            switch(param) {
-                case 'zoom':
-                    studio.set_parameter('zoom', value);
-                    break;
-                case 'iterations':
-                    studio.set_parameter('iterations', value);
-                    break;
-                case 'power':
-                    studio.set_parameter('power', value);
-                    break;
-            }
-            studio.render_frame();
-        }
-
-        function startAnimation() {
-            if (animationId) return;
-
-            function animate(currentTime) {
-                const deltaTime = currentTime - lastTime;
                 lastTime = currentTime;
-
-                // Update FPS display
-                const fps = Math.round(1000 / deltaTime);
-                document.getElementById('fps').textContent = `FPS: ${fps}`;
-
-                studio.render_frame();
-                animationId = requestAnimationFrame(animate);
+                animationId = requestAnimationFrame(render);
             }
 
-            animationId = requestAnimationFrame(animate);
+            animationId = requestAnimationFrame(render);
         }
-
-        function stopAnimation() {
-            if (animationId) {
-                cancelAnimationFrame(animationId);
-                animationId = null;
-                document.getElementById('fps').textContent = 'FPS: --';
-            }
-        }
-
-        function exportImage() {
-            const canvas = document.getElementById('fractal-canvas');
-            const link = document.createElement('a');
-            link.download = `fractal_${Date.now()}.png`;
-            link.href = canvas.toDataURL();
-            link.click();
-        }
-
-        // Global functions for buttons
-        window.startAnimation = startAnimation;
-        window.stopAnimation = stopAnimation;
-        window.exportImage = exportImage;
-        window.changeFractalType = changeFractalType;
 
         // Initialize when page loads
         window.addEventListener('load', initialize);
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            if (studio) {
+                const canvas = document.getElementById('fractal-canvas');
+                canvas.width = canvas.clientWidth;
+                canvas.height = canvas.clientHeight;
+            }
+        });
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+        });
     </script>
 </body>
 </html>

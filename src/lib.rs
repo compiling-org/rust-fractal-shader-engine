@@ -19,6 +19,18 @@ pub mod nodes;
 pub mod node_editor;
 pub mod shader_converter;
 pub mod nft;
+pub mod benchmark;
+
+// Web deployment module (only compiled for WASM targets)
+#[cfg(target_arch = "wasm32")]
+pub mod web;
+
+// Re-export NFT integration for easy access
+pub use nft::BlockchainNFTIntegration;
+
+// Re-export web functionality when available
+#[cfg(target_arch = "wasm32")]
+pub use web::*;
 
 // Web support (only compiled for WASM targets)
 #[cfg(target_arch = "wasm32")]

@@ -11,6 +11,7 @@ use std::collections::HashMap;
 pub struct NodeId(pub usize);
 
 /// Main node editor state
+#[derive(Clone)]
 pub struct NodeEditor {
     pub nodes: Vec<Node>,
     pub connections: Vec<NodeConnection>,
@@ -171,6 +172,7 @@ pub enum NodeParameter {
     String(String),
 }
 
+#[derive(Clone)]
 pub struct NodeLibrary {
     pub categories: Vec<NodeCategory>,
 }
@@ -503,7 +505,7 @@ impl NodeEditor {
         });
     }
 
-    fn add_node_from_template(&mut self, template: &NodeTemplate, position: Pos2) {
+    pub fn add_node_from_template(&mut self, template: &NodeTemplate, position: Pos2) {
         let node_id = NodeId(self.nodes.len());
 
         let node = Node {

@@ -18,16 +18,20 @@ impl FractalFormulaLibrary {
 
         // Add classic formulas
         formulas.push(Self::mandelbrot_classic());
+        formulas.push(Self::julia_classic());
+        formulas.push(Self::burning_ship_classic());
+        formulas.push(Self::tricorn_classic());
         formulas.push(Self::mandelbulb_classic());
         formulas.push(Self::mandelbox_classic());
-        formulas.push(Self::ifs_dragon_curve());
-        formulas.push(Self::ifs_barnsley_fern());
+        formulas.push(Self::menger_sponge_classic());
+        formulas.push(Self::sierpinski_classic());
+        formulas.push(Self::apollonian_classic());
         formulas.push(Self::quaternion_julia_classic());
+        formulas.push(Self::kaleidoscopic_ifs_classic());
 
         // Add advanced formulas
         formulas.push(Self::mandelbulb_power_tower());
         formulas.push(Self::mandelbox_spherical());
-        formulas.push(Self::ifs_sierpinski_triangle());
         formulas.push(Self::quaternion_julia_cubic());
 
         Self { formulas }
@@ -47,7 +51,10 @@ impl FractalFormulaLibrary {
     pub fn get_formula_name(&self, formula: &FractalFormula) -> String {
         match formula {
             FractalFormula::Mandelbrot { .. } => "Mandelbrot Classic".to_string(),
-            FractalFormula::Mandelbulb { power, .. } => {
+            FractalFormula::Julia { .. } => "Julia Set".to_string(),
+            FractalFormula::BurningShip { .. } => "Burning Ship".to_string(),
+            FractalFormula::Tricorn { .. } => "Tricorn".to_string(),
+            FractalFormula::Mandelbulb { power } => {
                 if *power == 8.0 {
                     "Mandelbulb Classic".to_string()
                 } else {
@@ -55,8 +62,11 @@ impl FractalFormulaLibrary {
                 }
             }
             FractalFormula::Mandelbox { .. } => "Mandelbox Classic".to_string(),
-            FractalFormula::IFS { .. } => "IFS Dragon Curve".to_string(),
+            FractalFormula::MengerSponge { .. } => "Menger Sponge".to_string(),
+            FractalFormula::Sierpinski { .. } => "Sierpinski Tetrahedron".to_string(),
+            FractalFormula::Apollonian { .. } => "Apollonian Gasket".to_string(),
             FractalFormula::QuaternionJulia { .. } => "Quaternion Julia".to_string(),
+            FractalFormula::KaleidoscopicIFS { .. } => "Kaleidoscopic IFS".to_string(),
             FractalFormula::Custom { name, .. } => name.clone(),
         }
     }
@@ -66,7 +76,58 @@ impl FractalFormulaLibrary {
         FractalFormula::Mandelbrot {
             center: [-0.5, 0.0],
             zoom: 1.0,
+        }
+    }
+
+    /// Classic Julia set
+    fn julia_classic() -> FractalFormula {
+        FractalFormula::Julia {
+            c: [-0.7, 0.27015],
             max_iterations: 100,
+        }
+    }
+
+    /// Classic Burning Ship
+    fn burning_ship_classic() -> FractalFormula {
+        FractalFormula::BurningShip {
+            max_iterations: 100,
+        }
+    }
+
+    /// Classic Tricorn
+    fn tricorn_classic() -> FractalFormula {
+        FractalFormula::Tricorn {
+            max_iterations: 100,
+        }
+    }
+
+    /// Classic Menger Sponge
+    fn menger_sponge_classic() -> FractalFormula {
+        FractalFormula::MengerSponge {
+            iterations: 5,
+        }
+    }
+
+    /// Classic Sierpinski Tetrahedron
+    fn sierpinski_classic() -> FractalFormula {
+        FractalFormula::Sierpinski {
+            iterations: 8,
+        }
+    }
+
+    /// Classic Apollonian Gasket
+    fn apollonian_classic() -> FractalFormula {
+        FractalFormula::Apollonian {
+            iterations: 10,
+        }
+    }
+
+    /// Classic Kaleidoscopic IFS
+    fn kaleidoscopic_ifs_classic() -> FractalFormula {
+        FractalFormula::KaleidoscopicIFS {
+            scale: 2.0,
+            rotation: [0.0, 0.0, 0.0],
+            offset: [0.0, 0.0, 0.0],
         }
     }
 
@@ -74,7 +135,6 @@ impl FractalFormulaLibrary {
     fn mandelbulb_classic() -> FractalFormula {
         FractalFormula::Mandelbulb {
             power: 8.0,
-            max_iterations: 100,
         }
     }
 
@@ -82,7 +142,6 @@ impl FractalFormulaLibrary {
     fn mandelbulb_power_tower() -> FractalFormula {
         FractalFormula::Mandelbulb {
             power: 2.0,
-            max_iterations: 150,
         }
     }
 
@@ -90,8 +149,6 @@ impl FractalFormulaLibrary {
     fn mandelbox_classic() -> FractalFormula {
         FractalFormula::Mandelbox {
             scale: 2.0,
-            folding_limit: 1.0,
-            max_iterations: 100,
         }
     }
 
@@ -99,8 +156,6 @@ impl FractalFormulaLibrary {
     fn mandelbox_spherical() -> FractalFormula {
         FractalFormula::Mandelbox {
             scale: 3.0,
-            folding_limit: 0.5,
-            max_iterations: 120,
         }
     }
 
@@ -130,10 +185,8 @@ impl FractalFormulaLibrary {
         probabilities.push(0.5);
         probabilities.push(0.5);
 
-        FractalFormula::IFS {
-            transforms,
-            probabilities,
-            max_iterations: 50,
+        FractalFormula::MengerSponge {
+            iterations: 5,
         }
     }
 
@@ -175,10 +228,8 @@ impl FractalFormulaLibrary {
         ));
         probabilities.push(0.07);
 
-        FractalFormula::IFS {
-            transforms,
-            probabilities,
-            max_iterations: 50,
+        FractalFormula::Sierpinski {
+            iterations: 8,
         }
     }
 
@@ -212,10 +263,8 @@ impl FractalFormulaLibrary {
         ));
         probabilities.push(1.0 / 3.0);
 
-        FractalFormula::IFS {
-            transforms,
-            probabilities,
-            max_iterations: 30,
+        FractalFormula::Apollonian {
+            iterations: 10,
         }
     }
 

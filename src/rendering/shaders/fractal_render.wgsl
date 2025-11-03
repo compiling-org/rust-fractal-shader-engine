@@ -53,7 +53,8 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
 
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
-    let distance_value = textureLoad(distance_texture, vec2<i32>(input.uv * uniforms.resolution), 0).r;
+    let tex_coords = vec2<i32>(floor(input.uv * uniforms.resolution));
+    let distance_value = textureLoad(distance_texture, tex_coords, 0).r;
 
     // Convert distance to iteration count approximation
     let t = clamp(distance_value / f32(uniforms.max_iterations), 0.0, 1.0);

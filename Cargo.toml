@@ -64,11 +64,20 @@ chrono = { version = "0.4", features = ["serde"] }
 walkdir = "2.5.0"
 bevy = "0.17.2"
 
+# CPU detection for benchmarking
+num_cpus = "1.16"
+
 [features]
 default = ["gui"]
 gui = ["dep:eframe", "dep:egui"]
 audio = ["dep:cpal", "dep:rustfft"]
 midi = ["audio"]
+
+# Web deployment features
+web = ["gui"]
+
+# Performance benchmarking
+benchmark = []
 
 [profile.release]
 opt-level = 3

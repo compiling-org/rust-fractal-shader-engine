@@ -12,29 +12,50 @@ pub enum FractalFormula {
     Mandelbrot {
         center: [f32; 2],
         zoom: f32,
+    },
+    /// Julia set
+    Julia {
+        c: [f32; 2],
+        max_iterations: u32,
+    },
+    /// Burning Ship fractal
+    BurningShip {
+        max_iterations: u32,
+    },
+    /// Tricorn fractal
+    Tricorn {
         max_iterations: u32,
     },
     /// 3D Mandelbulb
     Mandelbulb {
         power: f32,
-        max_iterations: u32,
     },
     /// Mandelbox (folding-based)
     Mandelbox {
         scale: f32,
-        folding_limit: f32,
-        max_iterations: u32,
     },
-    /// Iterated Function System
-    IFS {
-        transforms: Vec<Matrix4<f32>>,
-        probabilities: Vec<f32>,
-        max_iterations: u32,
+    /// Menger Sponge
+    MengerSponge {
+        iterations: u32,
+    },
+    /// Sierpinski Tetrahedron
+    Sierpinski {
+        iterations: u32,
+    },
+    /// Apollonian Gasket
+    Apollonian {
+        iterations: u32,
     },
     /// Quaternion Julia set
     QuaternionJulia {
         c: [f32; 4],
         max_iterations: u32,
+    },
+    /// Kaleidoscopic IFS
+    KaleidoscopicIFS {
+        scale: f32,
+        rotation: [f32; 3],
+        offset: [f32; 3],
     },
     /// Custom formula with user-defined distance function
     Custom {
@@ -49,7 +70,8 @@ pub enum FractalFormula {
 pub struct DistanceResult {
     pub distance: f32,
     pub iterations: u32,
-    pub orbit_trap: Option<Vector3<f32>>,
+    pub escaped: bool,
+    pub final_z: Vector3<f32>,
 }
 
 /// Fractal rendering parameters
@@ -59,24 +81,35 @@ pub struct FractalParameters {
     pub position: Vector3<f32>,
     pub rotation: Vector3<f32>,
     pub scale: f32,
-    pub color_map: ColorMapping,
-    pub lighting: LightingParameters,
-    pub volumetric: VolumetricParameters,
+    pub max_iterations: u32,
+    pub bailout: f32,
+    pub color_saturation: f32,
+    pub color_palette: Vec<Vector3<f32>>,
 }
 
 impl Default for FractalParameters {
     fn default() -> Self {
         Self {
-            formula: FractalFormula::Mandelbulb {
-                power: 8.0,
-                max_iterations: 100,
+            formula: FractalFormula::Mandelbrot {
+                center: [-0.5, 0.0],
+                zoom: 1.0,
             },
             position: Vector3::zeros(),
             rotation: Vector3::zeros(),
             scale: 1.0,
-            color_map: ColorMapping::default(),
-            lighting: LightingParameters::default(),
-            volumetric: VolumetricParameters::default(),
+            max_iterations: 100,
+            bailout: 4.0,
+            color_saturation: 1.0,
+            color_palette: vec![
+                Vector3::new(0.0, 0.0, 0.0),    // Black
+                Vector3::new(0.2, 0.0, 0.4),    // Dark purple
+                Vector3::new(0.4, 0.0, 0.8),    // Purple
+                Vector3::new(0.8, 0.2, 1.0),    // Light purple
+                Vector3::new(1.0, 0.4, 0.8),    // Pink
+                Vector3::new(1.0, 0.8, 0.4),    // Orange
+                Vector3::new(1.0, 1.0, 0.8),    // Yellow
+                Vector3::new(1.0, 1.0, 1.0),    // White
+            ],
         }
     }
 }

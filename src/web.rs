@@ -1,238 +1,241 @@
-//! Web deployment and WASM support for the fractal shader engine
+//! Web deployment module for WASM compilation
+//!
+//! This module provides web-specific functionality for deploying the fractal generator
+//! in web browsers using WASM and WebGPU/WebGL.
 
 use wasm_bindgen::prelude::*;
-use web_sys::{console, window, HtmlCanvasElement, WebGlRenderingContext, WebGl2RenderingContext};
-use crate::{RustFractalShaderEngine, ShaderConverter};
-use std::collections::HashMap;
+use web_sys::{console, window, CanvasRenderingContext2d, HtmlCanvasElement};
 
-/// Web-specific fractal shader engine
+// When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
+// allocator.
+#[cfg(feature = "wee_alloc")]
+#[global_allocator]
+static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+
+/// Web-specific fractal studio application
 #[wasm_bindgen]
-pub struct WebFractalShaderEngine {
-    engine: RustFractalShaderEngine,
+pub struct WebFractalStudio {
     canvas: HtmlCanvasElement,
-    gl_context: WebGlRenderingContext,
-    shaders: HashMap<String, WebGlProgram>,
-    current_time: f32,
+    context: CanvasRenderingContext2d,
+    time: f32,
+    fractal_params: crate::FractalParameters,
 }
 
 #[wasm_bindgen]
-impl WebFractalShaderEngine {
-    /// Create a new web fractal shader engine
+impl WebFractalStudio {
+    /// Create a new web fractal studio instance
     #[wasm_bindgen(constructor)]
-    pub fn new(canvas_id: &str) -> Result<WebFractalShaderEngine, JsValue> {
-        // Initialize console logging
-        console_error_panic_hook::set_once();
-        console::log_1(&"Initializing Web Fractal Shader Engine...".into());
+    pub fn new(canvas_id: &str) -> Result<WebFractalStudio, JsValue> {
+        // Get the canvas element
+        let document = web_sys::window()
+            .unwrap()
+            .document()
+            .unwrap();
 
-        // Get canvas element
-        let window = window().unwrap();
-        let document = window.document().unwrap();
         let canvas = document
             .get_element_by_id(canvas_id)
             .unwrap()
-            .dyn_into::<HtmlCanvasElement>()?;
+            .dyn_into::<web_sys::HtmlCanvasElement>()?;
 
-        // Get WebGL context
-        let gl = canvas
-            .get_context("webgl2")?
+        // Get the 2D rendering context
+        let context = canvas
+            .get_context("2d")?
             .unwrap()
-            .dyn_into::<WebGl2RenderingContext>()?;
+            .dyn_into::<web_sys::CanvasRenderingContext2d>()?;
 
-        // Create engine
-        let engine = RustFractalShaderEngine::new();
+        console::log_1(&"Web Fractal Studio initialized".into());
 
-        Ok(WebFractalShaderEngine {
-            engine,
+        Ok(WebFractalStudio {
             canvas,
-            gl_context: gl,
-            shaders: HashMap::new(),
-            current_time: 0.0,
+            context,
+            time: 0.0,
+            fractal_params: crate::FractalParameters::default(),
         })
     }
 
-    /// Load an ISF shader for web use
+    /// Set fractal parameters
     #[wasm_bindgen]
-    pub fn load_isf_shader(&mut self, name: &str, isf_source: &str) -> Result<(), JsValue> {
-        console::log_1(&format!("Loading ISF shader: {}", name).into());
-
-        // Convert ISF to GLSL for WebGL
-        let glsl_source = ShaderConverter::isf_to_wgsl(isf_source)
-            .map_err(|e| JsValue::from_str(&format!("Shader conversion failed: {}", e)))?;
-
-        // Create WebGL shader program
-        let program = self.create_shader_program(&glsl_source)?;
-
-        self.shaders.insert(name.to_string(), program);
-        self.engine.add_shader_module(name, isf_source)
-            .map_err(|e| JsValue::from_str(&format!("Failed to add shader module: {}", e)))?;
-
-        Ok(())
+    pub fn set_parameter(&mut self, name: &str, value: f32) {
+        match name {
+            "iterations" => self.fractal_params.iterations = value as u32,
+            "zoom" => self.fractal_params.zoom = value,
+            "power" => self.fractal_params.power = value,
+            "bailout" => self.fractal_params.bailout = value,
+            "offset_x" => self.fractal_params.offset.0 = value,
+            "offset_y" => self.fractal_params.offset.1 = value,
+            _ => {}
+        }
     }
 
-    /// Render frame
+    /// Set fractal type
     #[wasm_bindgen]
-    pub fn render(&mut self, delta_time: f32) -> Result<(), JsValue> {
-        self.current_time += delta_time;
+    pub fn set_fractal_type(&mut self, fractal_type: &str) {
+        self.fractal_params.fractal_type = match fractal_type {
+            "mandelbrot" => crate::FractalType::Mandelbrot,
+            "julia" => crate::FractalType::Julia,
+            "mandelbulb" => crate::FractalType::Mandelbulb,
+            "mandelbox" => crate::FractalType::Mandelbox,
+            _ => crate::FractalType::Mandelbrot,
+        };
+    }
+
+    /// Render a frame
+    #[wasm_bindgen]
+    pub fn render_frame(&mut self, delta_time: f32) {
+        self.time += delta_time;
 
         // Clear canvas
-        self.gl_context.clear_color(0.0, 0.0, 0.0, 1.0);
-        self.gl_context.clear(WebGlRenderingContext::COLOR_BUFFER_BIT);
+        let width = self.canvas.width() as f64;
+        let height = self.canvas.height() as f64;
+        self.context.clear_rect(0.0, 0.0, width, height);
 
-        // Set viewport
-        let width = self.canvas.width() as i32;
-        let height = self.canvas.height() as i32;
-        self.gl_context.viewport(0, 0, width, height);
-
-        // Render active shaders
-        for (name, program) in &self.shaders {
-            self.render_shader(name, program)?;
-        }
-
-        Ok(())
+        // Simple fractal rendering (placeholder for full WebGPU implementation)
+        self.render_simple_fractal();
     }
 
-    /// Set shader parameter
-    #[wasm_bindgen]
-    pub fn set_parameter(&mut self, shader_name: &str, param_name: &str, value: f32) {
-        self.engine.set_fractal_parameter(param_name, value);
+    /// Render a simple fractal using Canvas 2D API
+    fn render_simple_fractal(&self) {
+        let width = self.canvas.width();
+        let height = self.canvas.height();
+
+        // Create image data
+        let image_data = web_sys::ImageData::new_with_u8_clamped_array(
+            wasm_bindgen::Clamped(&self.generate_fractal_pixels(width, height)),
+            width,
+        ).unwrap();
+
+        self.context.put_image_data(&image_data, 0.0, 0.0).unwrap();
     }
 
-    /// Get available shaders
-    #[wasm_bindgen]
-    pub fn get_shader_names(&self) -> Vec<JsValue> {
-        self.shaders.keys()
-            .map(|name| JsValue::from_str(name))
-            .collect()
-    }
-}
+    /// Generate fractal pixel data
+    fn generate_fractal_pixels(&self, width: u32, height: u32) -> Vec<u8> {
+        let mut pixels = Vec::with_capacity((width * height * 4) as usize);
 
-impl WebFractalShaderEngine {
-    /// Create WebGL shader program from GLSL source
-    fn create_shader_program(&self, glsl_source: &str) -> Result<WebGlProgram, JsValue> {
-        let gl = &self.gl_context;
+        for y in 0..height {
+            for x in 0..width {
+                let px = (x as f32 / width as f32 - 0.5) * 4.0 / self.fractal_params.zoom;
+                let py = (y as f32 / height as f32 - 0.5) * 4.0 / self.fractal_params.zoom;
 
-        // Create vertex shader
-        let vertex_shader = gl.create_shader(WebGlRenderingContext::VERTEX_SHADER).unwrap();
-        let vertex_source = r#"
-            attribute vec2 a_position;
-            varying vec2 v_uv;
+                let cx = px + self.fractal_params.offset.0;
+                let cy = py + self.fractal_params.offset.1;
 
-            void main() {
-                v_uv = a_position * 0.5 + 0.5;
-                gl_Position = vec4(a_position, 0.0, 1.0);
+                let (iterations, escaped) = self.compute_fractal_point(cx, cy);
+
+                let color = if escaped {
+                    self.fractal_color(iterations)
+                } else {
+                    (0, 0, 0) // Black for points in the set
+                };
+
+                pixels.push(color.0); // R
+                pixels.push(color.1); // G
+                pixels.push(color.2); // B
+                pixels.push(255);     // A
             }
-        "#;
-
-        gl.shader_source(&vertex_shader, vertex_source);
-        gl.compile_shader(&vertex_shader);
-
-        if !gl.get_shader_parameter(&vertex_shader, WebGlRenderingContext::COMPILE_STATUS).as_bool().unwrap() {
-            let error = gl.get_shader_info_log(&vertex_shader).unwrap();
-            return Err(JsValue::from_str(&format!("Vertex shader compilation failed: {}", error)));
         }
 
-        // Create fragment shader
-        let fragment_shader = gl.create_shader(WebGlRenderingContext::FRAGMENT_SHADER).unwrap();
-
-        // Convert WGSL-style GLSL to WebGL GLSL
-        let webgl_source = self.convert_to_webgl_glsl(glsl_source);
-
-        gl.shader_source(&fragment_shader, &webgl_source);
-        gl.compile_shader(&fragment_shader);
-
-        if !gl.get_shader_parameter(&fragment_shader, WebGlRenderingContext::COMPILE_STATUS).as_bool().unwrap() {
-            let error = gl.get_shader_info_log(&fragment_shader).unwrap();
-            return Err(JsValue::from_str(&format!("Fragment shader compilation failed: {}", error)));
-        }
-
-        // Create program
-        let program = gl.create_program().unwrap();
-        gl.attach_shader(&program, &vertex_shader);
-        gl.attach_shader(&program, &fragment_shader);
-        gl.link_program(&program);
-
-        if !gl.get_program_parameter(&program, WebGlRenderingContext::LINK_STATUS).as_bool().unwrap() {
-            let error = gl.get_program_info_log(&program).unwrap();
-            return Err(JsValue::from_str(&format!("Program linking failed: {}", error)));
-        }
-
-        Ok(program)
+        pixels
     }
 
-    /// Convert WGSL-style GLSL to WebGL-compatible GLSL
-    fn convert_to_webgl_glsl(&self, wgsl_glsl: &str) -> String {
-        let mut webgl_source = String::from("#version 300 es\nprecision highp float;\n");
+    /// Compute fractal value at a point
+    fn compute_fractal_point(&self, cx: f32, cy: f32) -> (u32, bool) {
+        match self.fractal_params.fractal_type {
+            crate::FractalType::Mandelbrot => {
+                let mut zx = 0.0;
+                let mut zy = 0.0;
+                let mut iteration = 0;
 
-        // Convert vec2<f32> to vec2, etc.
-        let converted = wgsl_glsl
-            .replace("vec2<f32>", "vec2")
-            .replace("vec3<f32>", "vec3")
-            .replace("vec4<f32>", "vec4")
-            .replace("f32", "float")
-            .replace("i32", "int")
-            .replace("mat2x2<f32>", "mat2")
-            .replace("mat3x3<f32>", "mat3")
-            .replace("mat4x4<f32>", "mat4")
-            .replace("@builtin(position)", "")
-            .replace("@location(0)", "")
-            .replace("fn main(", "void main(")
-            .replace("-> vec4<f32> {", ") {")
-            .replace("return", "gl_FragColor =")
-            .replace("coord.xy", "gl_FragCoord.xy")
-            .replace("resolution", "u_resolution")
-            .replace("time", "u_time");
+                while zx * zx + zy * zy < self.fractal_params.bailout && iteration < self.fractal_params.iterations {
+                    let xtemp = zx * zx - zy * zy + cx;
+                    zy = 2.0 * zx * zy + cy;
+                    zx = xtemp;
+                    iteration += 1;
+                }
 
-        webgl_source.push_str("uniform vec2 u_resolution;\n");
-        webgl_source.push_str("uniform float u_time;\n");
-        webgl_source.push_str("varying vec2 v_uv;\n\n");
-        webgl_source.push_str(&converted);
+                (iteration, iteration < self.fractal_params.iterations)
+            }
+            crate::FractalType::Julia => {
+                let mut zx = cx;
+                let mut zy = cy;
+                let mut iteration = 0;
 
-        webgl_source
+                while zx * zx + zy * zy < self.fractal_params.bailout && iteration < self.fractal_params.iterations {
+                    let xtemp = zx * zx - zy * zy + self.fractal_params.julia_c.0;
+                    zy = 2.0 * zx * zy + self.fractal_params.julia_c.1;
+                    zx = xtemp;
+                    iteration += 1;
+                }
+
+                (iteration, iteration < self.fractal_params.iterations)
+            }
+            _ => (0, false), // Placeholder for other fractal types
+        }
     }
 
-    /// Render a specific shader
-    fn render_shader(&self, name: &str, program: &WebGlProgram) -> Result<(), JsValue> {
-        let gl = &self.gl_context;
+    /// Generate color based on iteration count
+    fn fractal_color(&self, iterations: u32) -> (u8, u8, u8) {
+        if iterations == self.fractal_params.iterations {
+            return (0, 0, 0);
+        }
 
-        gl.use_program(Some(program));
+        let t = iterations as f32 / self.fractal_params.iterations as f32;
+        let r = ((0.5 + 0.5 * (t * 6.283185).sin()) * 255.0) as u8;
+        let g = ((0.5 + 0.5 * ((t * 6.283185) + 2.094395).sin()) * 255.0) as u8;
+        let b = ((0.5 + 0.5 * ((t * 6.283185) + 4.188790).sin()) * 255.0) as u8;
 
-        // Set uniforms
-        let time_loc = gl.get_uniform_location(program, "u_time");
-        gl.uniform1f(time_loc.as_ref(), self.current_time);
+        (r, g, b)
+    }
 
-        let resolution_loc = gl.get_uniform_location(program, "u_resolution");
-        gl.uniform2f(resolution_loc.as_ref(),
-                    self.canvas.width() as f32,
-                    self.canvas.height() as f32);
+    /// Get current time
+    #[wasm_bindgen]
+    pub fn get_time(&self) -> f32 {
+        self.time
+    }
 
-        // Create quad vertices
-        let vertices: [f32; 8] = [
-            -1.0, -1.0,
-             1.0, -1.0,
-            -1.0,  1.0,
-             1.0,  1.0,
-        ];
-
-        let buffer = gl.create_buffer().unwrap();
-        gl.bind_buffer(WebGlRenderingContext::ARRAY_BUFFER, Some(&buffer));
-        gl.buffer_data_with_array_buffer_view(
-            WebGlRenderingContext::ARRAY_BUFFER,
-            &js_sys::Float32Array::from(&vertices[..]),
-            WebGlRenderingContext::STATIC_DRAW,
-        );
-
-        let position_loc = gl.get_attrib_location(program, "a_position") as u32;
-        gl.enable_vertex_attrib_array(position_loc);
-        gl.vertex_attrib_pointer_with_i32(position_loc, 2, WebGlRenderingContext::FLOAT, false, 0, 0);
-
-        gl.draw_arrays(WebGlRenderingContext::TRIANGLE_STRIP, 0, 4);
-
-        Ok(())
+    /// Reset time
+    #[wasm_bindgen]
+    pub fn reset_time(&mut self) {
+        self.time = 0.0;
     }
 }
 
-/// Initialize web exports
+/// Initialize the web module
 #[wasm_bindgen(start)]
 pub fn main() {
-    console::log_1(&"Web Fractal Shader Engine loaded!".into());
+    console::log_1(&"Fractal Shader Engine Web Module Loaded".into());
+}
+
+/// Export functions for JavaScript
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = console)]
+    fn log(s: &str);
+}
+
+/// Web-specific utilities
+pub mod utils {
+    use wasm_bindgen::prelude::*;
+
+    /// Get current timestamp
+    #[wasm_bindgen]
+    pub fn get_timestamp() -> f64 {
+        js_sys::Date::now()
+    }
+
+    /// Request animation frame callback
+    #[wasm_bindgen]
+    pub fn request_animation_frame(callback: &js_sys::Function) -> i32 {
+        web_sys::window()
+            .unwrap()
+            .request_animation_frame(callback)
+            .unwrap()
+    }
+
+    /// Cancel animation frame
+    #[wasm_bindgen]
+    pub fn cancel_animation_frame(id: i32) {
+        web_sys::window()
+            .unwrap()
+            .cancel_animation_frame(id);
+    }
 }

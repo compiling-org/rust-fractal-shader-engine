@@ -11,6 +11,113 @@ pub struct NFTManager {
     minted_nfts: HashMap<String, NFTMetadata>,
 }
 
+/// Integration with blockchain-nft-interactive crate
+pub struct BlockchainNFTIntegration {
+    nft_manager: crate::nft::NFTManager,
+    fractal_data_converter: FractalDataConverter,
+}
+
+impl BlockchainNFTIntegration {
+    pub fn new() -> Self {
+        Self {
+            nft_manager: crate::nft::NFTManager::new(),
+            fractal_data_converter: FractalDataConverter::new(),
+        }
+    }
+
+    pub fn mint_fractal_nft_from_engine(
+        &mut self,
+        fractal_params: &crate::FractalParameters,
+        fractal_type: &crate::FractalType,
+        thumbnail_data: &[u8],
+        creator_address: &str,
+        title: &str,
+        description: &str,
+        blockchain: crate::nft::Blockchain,
+    ) -> Result<String, crate::nft::NFTError> {
+        // Convert fractal engine data to NFT format
+        let fractal_nft_data = self.fractal_data_converter.convert_from_engine(
+            fractal_params,
+            fractal_type,
+            thumbnail_data,
+            creator_address,
+            title,
+            description,
+        )?;
+
+        // Mint NFT using the NFT manager
+        self.nft_manager.mint_fractal_nft(&fractal_nft_data, blockchain)
+    }
+
+    pub fn get_nft_manager(&self) -> &crate::nft::NFTManager {
+        &self.nft_manager
+    }
+
+    pub fn get_nft_manager_mut(&mut self) -> &mut crate::nft::NFTManager {
+        &mut self.nft_manager
+    }
+}
+
+/// Converts between fractal engine data and NFT data formats
+pub struct FractalDataConverter;
+
+impl FractalDataConverter {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn convert_from_engine(
+        &self,
+        fractal_params: &crate::FractalParameters,
+        fractal_type: &crate::FractalType,
+        thumbnail_data: &[u8],
+        creator_address: &str,
+        title: &str,
+        description: &str,
+    ) -> Result<crate::nft::FractalNFTData, crate::nft::NFTError> {
+        // Convert fractal type
+        let formula = self.convert_fractal_type(fractal_type);
+
+        // Convert parameters
+        let parameters = crate::nft::FractalParameters {
+            max_iterations: fractal_params.iterations,
+            power: fractal_params.power,
+            scale: fractal_params.scale,
+        };
+
+        // Create basic color map (could be enhanced)
+        let color_map = crate::nft::ColorMap {
+            hue_shift: 0.0,
+            saturation: 1.0,
+        };
+
+        Ok(crate::nft::FractalNFTData {
+            formula,
+            parameters,
+            color_map,
+            animation_data: None, // Could be added later
+            thumbnail: thumbnail_data.to_vec(),
+            creator: creator_address.to_string(),
+            title: title.to_string(),
+            description: description.to_string(),
+            tags: vec!["fractal".to_string(), "generative".to_string()],
+        })
+    }
+
+    fn convert_fractal_type(&self, fractal_type: &crate::FractalType) -> crate::nft::FractalFormula {
+        match fractal_type {
+            crate::FractalType::Mandelbrot => crate::nft::FractalFormula::Mandelbrot,
+            crate::FractalType::Mandelbulb | crate::FractalType::MandelbulbV2 => crate::nft::FractalFormula::Mandelbub,
+            crate::FractalType::Mandelbox | crate::FractalType::AmazingBox | crate::FractalType::BulbBox => crate::nft::FractalFormula::Mandelbox,
+            crate::FractalType::Quaternion | crate::FractalType::QuaternionJulia => crate::nft::FractalFormula::QuaternionJulia,
+            crate::FractalType::KaleidoscopicIFS => crate::nft::FractalFormula::IFS,
+            _ => crate::nft::FractalFormula::Custom {
+                name: format!("{:?}", fractal_type),
+            },
+        }
+    }
+}
+
 impl NFTManager {
     pub fn new() -> Self {
         Self {
