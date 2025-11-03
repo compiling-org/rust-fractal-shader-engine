@@ -20,13 +20,16 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 # GUI framework
-eframe = { version = "0.33.0", optional = true }
-egui = { version = "0.33.0", optional = true }
+eframe = { version = "0.30.0", optional = true, features = ["wgpu"] }
+egui = { version = "0.30.0", optional = true }
 
 # Graphics and compute
-wgpu = "26.0.1"
-winit = "0.30.12"
+wgpu = "0.19.0"
+winit = "0.29.0"
 bytemuck = { version = "1.15", features = ["derive"] }
+
+# Explicitly add a compatible version of termcolor to try to resolve the conflict
+termcolor = "1.1.3"
 
 # Math and utilities
 nalgebra = "0.32"
