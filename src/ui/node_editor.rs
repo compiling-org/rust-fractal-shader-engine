@@ -3,8 +3,7 @@
 //! This module provides a comprehensive node-based visual programming interface
 //! for creating complex fractal compositions, adapted from TouchDesigner and Unreal Engine.
 
-// use crate::fractal::types::*;
-use egui::{Color32, Pos2, Vec2, Rect, Ui, Response, Painter, Stroke, FontId, RichText, FontFamily};
+use egui::{Color32, Pos2, Vec2, Rect, Ui, Response, Painter, Stroke, FontId, RichText, FontFamily, Shape, Sense, Id, Rounding, Align2, ScrollArea};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -238,6 +237,9 @@ impl NodeEditor {
 
         // Draw node library panel
         self.draw_node_library(ui, rect);
+
+        // Execute node graph if we have nodes
+        // self.execute_node_graph(ui);
     }
 
     fn handle_input(&mut self, ui: &Ui, response: &Response) {
@@ -271,6 +273,11 @@ impl NodeEditor {
         // Handle pending connections
         if response.clicked() && self.pending_connection.is_some() {
             self.pending_connection = None;
+        }
+
+        // Handle pin connections
+        if let Some(mouse_pos) = response.hover_pos() {
+            self.handle_pin_connections(ui, mouse_pos, response);
         }
     }
 
@@ -331,9 +338,18 @@ impl NodeEditor {
 
     fn draw_pending_connection(&self, ui: &Ui, pending: &PendingConnection) {
         if let Some(from_node) = self.nodes.iter().find(|n| n.id == pending.from_node) {
+            // Check if it's an output pin connection
             if let Some(from_pin) = from_node.outputs.iter().find(|p| p.id == pending.from_pin) {
                 let painter = ui.painter();
-                let from_pos = from_pin.position;
+                let from_pos = self.world_to_screen(from_pin.position + from_node.position.to_vec2(), ui.clip_rect());
+                let to_pos = pending.to_pos;
+
+                self.draw_connection_curve(painter, from_pos, to_pos, Color32::from_rgb(255, 200, 100));
+            }
+            // Check if it's an input pin connection (reverse connection)
+            else if let Some(from_pin) = from_node.inputs.iter().find(|p| p.id == pending.from_pin) {
+                let painter = ui.painter();
+                let from_pos = self.world_to_screen(from_pin.position + from_node.position.to_vec2(), ui.clip_rect());
                 let to_pos = pending.to_pos;
 
                 self.draw_connection_curve(painter, from_pos, to_pos, Color32::from_rgb(255, 200, 100));
@@ -382,8 +398,7 @@ impl NodeEditor {
             node.color
         };
 
-        painter.rect_filled(node_rect, 8.0, bg_color);
-        painter.rect_stroke(node_rect, 8.0, Stroke::new(2.0, Color32::from_rgb(60, 70, 85)), egui::StrokeKind::Middle);
+        painter.rect_filled(node_rect, Rounding::same(8), bg_color);
 
         // Node title
         painter.text(
@@ -403,7 +418,7 @@ impl NodeEditor {
             self.draw_pin(painter, output, node_rect.min, false);
         }
 
-        // Handle node interaction
+        // Handle node interaction - make sure this works
         let response = ui.interact(node_rect, egui::Id::new(node.id), egui::Sense::click_and_drag());
 
         if response.clicked() {
@@ -444,7 +459,18 @@ impl NodeEditor {
             node_pos + egui::Vec2::new(pin.position.x, pin.position.y)
         };
 
-        painter.circle_filled(pin_pos, 6.0, pin_color);
+        // Highlight pin if connected
+        let final_color = if pin.connected {
+            Color32::from_rgb(
+                (pin_color.r() as f32 * 1.2).min(255.0) as u8,
+                (pin_color.g() as f32 * 1.2).min(255.0) as u8,
+                (pin_color.b() as f32 * 1.2).min(255.0) as u8,
+            )
+        } else {
+            pin_color
+        };
+
+        painter.circle_filled(pin_pos, 6.0, final_color);
         painter.circle_stroke(pin_pos, 6.0, Stroke::new(2.0, Color32::WHITE));
 
         // Pin label
@@ -589,6 +615,194 @@ impl NodeEditor {
         canvas_rect.min + (world_pos.to_vec2() + self.pan_offset) * self.zoom
     }
 
+    fn screen_to_world(&self, screen_pos: Pos2, canvas_rect: Rect) -> Pos2 {
+        Pos2::new(
+            (screen_pos.x - canvas_rect.min.x - self.pan_offset.x) / self.zoom,
+            (screen_pos.y - canvas_rect.min.y - self.pan_offset.y) / self.zoom,
+        )
+    }
+
+    fn handle_pin_connections(&mut self, _ui: &Ui, mouse_pos: Pos2, response: &Response) {
+        let canvas_rect = response.rect;
+
+        // Check for pin clicks to start connections
+        for node in &self.nodes.clone() {
+            let node_screen_pos = self.world_to_screen(node.position, canvas_rect);
+            let _node_rect = Rect::from_min_size(node_screen_pos, node.size * self.zoom);
+
+            // Check input pins
+            for input_pin in &node.inputs {
+                let pin_screen_pos = node_screen_pos + egui::Vec2::new(0.0, input_pin.position.y * self.zoom);
+                let pin_rect = Rect::from_center_size(pin_screen_pos, egui::Vec2::new(12.0, 12.0));
+
+                if pin_rect.contains(mouse_pos) && response.clicked_by(egui::PointerButton::Primary) {
+                    // Start connection from input pin (unusual but allowed)
+                    self.pending_connection = Some(PendingConnection {
+                        from_node: node.id,
+                        from_pin: input_pin.id,
+                        from_pos: pin_screen_pos,
+                        to_pos: mouse_pos,
+                    });
+                    return;
+                }
+            }
+
+            // Check output pins
+            for output_pin in &node.outputs {
+                let pin_screen_pos = node_screen_pos + egui::Vec2::new(output_pin.position.x * self.zoom, output_pin.position.y * self.zoom);
+                let pin_rect = Rect::from_center_size(pin_screen_pos, egui::Vec2::new(12.0, 12.0));
+
+                if pin_rect.contains(mouse_pos) && response.clicked_by(egui::PointerButton::Primary) {
+                    // Start connection from output pin
+                    self.pending_connection = Some(PendingConnection {
+                        from_node: node.id,
+                        from_pin: output_pin.id,
+                        from_pos: pin_screen_pos,
+                        to_pos: mouse_pos,
+                    });
+                    return;
+                }
+            }
+        }
+
+        // Handle connection completion
+        if let Some(pending) = &self.pending_connection.clone() {
+            if response.clicked_by(egui::PointerButton::Primary) {
+                // Try to complete connection
+                for node in &self.nodes {
+                    let node_screen_pos = self.world_to_screen(node.position, canvas_rect);
+                    let _node_rect = Rect::from_min_size(node_screen_pos, node.size * self.zoom);
+
+                    // Check input pins for connection target
+                    for input_pin in &node.inputs {
+                        let pin_screen_pos = node_screen_pos + egui::Vec2::new(0.0, input_pin.position.y * self.zoom);
+                        let pin_rect = Rect::from_center_size(pin_screen_pos, egui::Vec2::new(12.0, 12.0));
+
+                        if pin_rect.contains(mouse_pos) && node.id != pending.from_node {
+                            // Create connection
+                            self.connections.push(NodeConnection {
+                                from_node: pending.from_node,
+                                from_pin: pending.from_pin,
+                                to_node: node.id,
+                                to_pin: input_pin.id,
+                            });
+
+                            // Mark pins as connected - collect node IDs first to avoid borrowing issues
+                            let from_node_id = pending.from_node;
+                            let to_node_id = node.id;
+                            let from_pin_id = pending.from_pin;
+                            let to_pin_id = input_pin.id;
+
+                            // Update pin connection status
+                            self.mark_pin_connected(from_node_id, from_pin_id, true);
+                            self.mark_pin_connected(to_node_id, to_pin_id, true);
+
+                            self.pending_connection = None;
+                            return;
+                        }
+                    }
+                }
+
+                // No valid connection target found, cancel pending connection
+                self.pending_connection = None;
+            } else if response.dragged_by(egui::PointerButton::Primary) {
+                // Update pending connection position
+                if let Some(pending) = self.pending_connection.as_mut() {
+                    pending.to_pos = mouse_pos;
+                }
+            }
+        }
+    }
+
+    fn mark_pin_connected(&mut self, node_id: NodeId, pin_id: PinId, connected: bool) {
+        if let Some(node) = self.nodes.iter_mut().find(|n| n.id == node_id) {
+            // Check outputs first
+            if let Some(pin) = node.outputs.iter_mut().find(|p| p.id == pin_id) {
+                pin.connected = connected;
+                return;
+            }
+            // Then check inputs
+            if let Some(pin) = node.inputs.iter_mut().find(|p| p.id == pin_id) {
+                pin.connected = connected;
+                return;
+            }
+        }
+    }
+
+    fn execute_node_graph(&mut self, ui: &Ui) {
+        // Simple execution for demonstration - execute all nodes
+        for node in &self.nodes {
+            self.execute_node(node, ui);
+        }
+    }
+
+    fn execute_node(&self, node: &Node, ui: &Ui) {
+        // Basic node execution - in a real implementation this would be much more sophisticated
+        match &node.node_type {
+            NodeType::Mandelbulb => {
+                // Simulate mandelbulb computation
+                let power = node.parameters.get("power").and_then(|p| match p {
+                    NodeParameter::Float(f) => Some(*f),
+                    _ => None,
+                }).unwrap_or(8.0);
+
+                let iterations = node.parameters.get("iterations").and_then(|p| match p {
+                    NodeParameter::Int(i) => Some(*i as u32),
+                    _ => None,
+                }).unwrap_or(50);
+
+                // This would normally generate actual fractal data
+                // For now, just log the execution
+                log::debug!("Executing Mandelbulb: power={}, iterations={}", power, iterations);
+            }
+            NodeType::Add => {
+                // Get connected inputs and compute result
+                let mut result = 0.0;
+                for connection in &self.connections {
+                    if connection.to_node == node.id {
+                        // Find the source node and get its output value
+                        if let Some(source_node) = self.nodes.iter().find(|n| n.id == connection.from_node) {
+                            if let Some(output_value) = self.get_node_output_value(source_node) {
+                                result += output_value;
+                            }
+                        }
+                    }
+                }
+                log::debug!("Add node result: {}", result);
+            }
+            _ => {
+                // Other node types would be handled here
+            }
+        }
+    }
+
+    fn get_node_output_value(&self, node: &Node) -> Option<f32> {
+        match &node.node_type {
+            NodeType::Constant => {
+                node.parameters.get("value").and_then(|p| match p {
+                    NodeParameter::Float(f) => Some(*f),
+                    _ => None,
+                })
+            }
+            NodeType::Sin => {
+                // Get input from connections
+                let mut input = 0.0;
+                for connection in &self.connections {
+                    if connection.to_node == node.id {
+                        if let Some(source_node) = self.nodes.iter().find(|n| n.id == connection.from_node) {
+                            if let Some(val) = self.get_node_output_value(source_node) {
+                                input = val;
+                                break;
+                            }
+                        }
+                    }
+                }
+                Some(input.sin())
+            }
+            _ => None,
+        }
+    }
+
     fn create_node_library() -> NodeLibrary {
         NodeLibrary {
             categories: vec![
@@ -613,6 +827,12 @@ impl NodeEditor {
                             node_type: NodeType::IFS,
                             color: Color32::from_rgb(200, 150, 100),
                         },
+                        NodeTemplate {
+                            name: "Quaternion Julia".to_string(),
+                            description: "4D quaternion fractal".to_string(),
+                            node_type: NodeType::QuaternionJulia,
+                            color: Color32::from_rgb(200, 100, 150),
+                        },
                     ],
                 },
                 NodeCategory {
@@ -629,6 +849,46 @@ impl NodeEditor {
                             description: "Sine function".to_string(),
                             node_type: NodeType::Sin,
                             color: Color32::from_rgb(200, 100, 100),
+                        },
+                        NodeTemplate {
+                            name: "Constant".to_string(),
+                            description: "Constant numeric value".to_string(),
+                            node_type: NodeType::Constant,
+                            color: Color32::from_rgb(150, 150, 150),
+                        },
+                    ],
+                },
+                NodeCategory {
+                    name: "Color".to_string(),
+                    nodes: vec![
+                        NodeTemplate {
+                            name: "Color Mix".to_string(),
+                            description: "Mix two colors".to_string(),
+                            node_type: NodeType::ColorMix,
+                            color: Color32::from_rgb(200, 150, 100),
+                        },
+                        NodeTemplate {
+                            name: "Color Adjust".to_string(),
+                            description: "Adjust brightness/contrast".to_string(),
+                            node_type: NodeType::ColorAdjust,
+                            color: Color32::from_rgb(150, 200, 100),
+                        },
+                    ],
+                },
+                NodeCategory {
+                    name: "Animation".to_string(),
+                    nodes: vec![
+                        NodeTemplate {
+                            name: "Time".to_string(),
+                            description: "Current time value".to_string(),
+                            node_type: NodeType::Time,
+                            color: Color32::from_rgb(100, 100, 200),
+                        },
+                        NodeTemplate {
+                            name: "LFO".to_string(),
+                            description: "Low frequency oscillator".to_string(),
+                            node_type: NodeType::LFO,
+                            color: Color32::from_rgb(200, 100, 200),
                         },
                     ],
                 },

@@ -4,7 +4,7 @@
 //! JWildfire, Mandelbulb3D, TouchDesigner, and Unreal Engine.
 
 #[cfg(feature = "gui")]
-mod ui;
+mod gui;
 mod fractal;
 mod scene;
 mod animation;
@@ -12,10 +12,19 @@ mod export;
 mod benchmark;
 
 #[cfg(feature = "gui")]
-use ui::main::run_gui;
-use crate::fractal::FractalParameters;
+use fractal_generator::fractal::FractalParameters;
 
 fn main() {
+    // Set up panic hook for better error reporting
+    std::panic::set_hook(Box::new(|panic_info| {
+        eprintln!("❌ Application panicked: {}", panic_info);
+        eprintln!("This might be related to the known Bevy 0.17 + bevy_egui focus issue.");
+        eprintln!("Try running with RUST_BACKTRACE=1 for more detailed information.");
+        
+        // Try to save any unsaved work here if possible
+        eprintln!("Attempting to save current state...");
+    }));
+    
     let args: Vec<String> = std::env::args().collect();
 
     if args.len() > 1 {
@@ -71,9 +80,21 @@ fn main() {
     #[cfg(feature = "gui")]
     {
         println!("🚀 Starting GUI application...");
-        if let Err(e) = run_gui() {
-            eprintln!("Failed to start GUI: {}", e);
-            std::process::exit(1);
+        match std::panic::catch_unwind(|| gui::run_gui()) {
+            Ok(Ok(())) => {
+                println!("✅ GUI application exited normally");
+            },
+            Ok(Err(e)) => {
+                eprintln!("❌ Failed to start GUI: {}", e);
+                std::process::exit(1);
+            },
+            Err(panic_info) => {
+                eprintln!("❌ GUI application panicked: {:?}", panic_info);
+                eprintln!("This is likely the known Bevy 0.17 + bevy_egui focus issue.");
+                eprintln!("The application may have exited when the window lost/gained focus.");
+                eprintln!("Try running with RUST_BACKTRACE=1 for more detailed information.");
+                std::process::exit(1);
+            }
         }
     }
 
@@ -106,7 +127,8 @@ fn run_compatibility_tests() {
 
     // Test fractal computation
     println!("  🌀 Fractal Computation Test:");
-    let params = FractalParameters::default();
+    #[cfg(feature = "gui")]
+    let params = fractal_generator::fractal::FractalParameters::default();
     let start = std::time::Instant::now();
 
     for _ in 0..1000 {

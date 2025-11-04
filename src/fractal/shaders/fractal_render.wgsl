@@ -66,20 +66,34 @@ fn apply_bloom(color: vec4<f32>, uv: vec2<f32>) -> vec4<f32> {
     }
 
     // Simple 5-tap blur for bloom approximation
-    let offsets = array<vec2<f32>, 5>(
-        vec2<f32>(0.0, 0.0),
-        vec2<f32>(0.01, 0.0),
-        vec2<f32>(-0.01, 0.0),
-        vec2<f32>(0.0, 0.01),
-        vec2<f32>(0.0, -0.01)
-    );
-
+    // Using constant indexing to avoid WGSL validation errors
     var bloom_color = vec3<f32>(0.0);
-    for (var i = 0; i < 5; i = i + 1) {
-        let sample_uv = clamp(uv + offsets[i] * post_params.bloom_intensity, vec2<f32>(0.0), vec2<f32>(1.0));
-        let sample_color = textureSample(fractal_texture, texture_sampler, sample_uv).rgb;
-        bloom_color = bloom_color + sample_color;
-    }
+    
+    // Sample 0
+    let sample_uv_0 = clamp(uv + vec2<f32>(0.0, 0.0) * post_params.bloom_intensity, vec2<f32>(0.0), vec2<f32>(1.0));
+    let sample_color_0 = textureSample(fractal_texture, texture_sampler, sample_uv_0).rgb;
+    bloom_color = bloom_color + sample_color_0;
+    
+    // Sample 1
+    let sample_uv_1 = clamp(uv + vec2<f32>(0.01, 0.0) * post_params.bloom_intensity, vec2<f32>(0.0), vec2<f32>(1.0));
+    let sample_color_1 = textureSample(fractal_texture, texture_sampler, sample_uv_1).rgb;
+    bloom_color = bloom_color + sample_color_1;
+    
+    // Sample 2
+    let sample_uv_2 = clamp(uv + vec2<f32>(-0.01, 0.0) * post_params.bloom_intensity, vec2<f32>(0.0), vec2<f32>(1.0));
+    let sample_color_2 = textureSample(fractal_texture, texture_sampler, sample_uv_2).rgb;
+    bloom_color = bloom_color + sample_color_2;
+    
+    // Sample 3
+    let sample_uv_3 = clamp(uv + vec2<f32>(0.0, 0.01) * post_params.bloom_intensity, vec2<f32>(0.0), vec2<f32>(1.0));
+    let sample_color_3 = textureSample(fractal_texture, texture_sampler, sample_uv_3).rgb;
+    bloom_color = bloom_color + sample_color_3;
+    
+    // Sample 4
+    let sample_uv_4 = clamp(uv + vec2<f32>(0.0, -0.01) * post_params.bloom_intensity, vec2<f32>(0.0), vec2<f32>(1.0));
+    let sample_color_4 = textureSample(fractal_texture, texture_sampler, sample_uv_4).rgb;
+    bloom_color = bloom_color + sample_color_4;
+    
     bloom_color = bloom_color / 5.0;
 
     // Add bloom to bright areas

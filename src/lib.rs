@@ -14,12 +14,18 @@ use walkdir::WalkDir;
 // Module declarations
 pub mod shader_renderer;
 pub mod audio;
+pub mod gesture;
+pub mod osc;
 pub mod ui;
 pub mod nodes;
 pub mod node_editor;
 pub mod shader_converter;
 pub mod nft;
 pub mod benchmark;
+pub mod fractal;
+pub mod project;
+pub mod scene;
+pub mod animation;
 
 // Web deployment module (only compiled for WASM targets)
 #[cfg(target_arch = "wasm32")]
@@ -58,7 +64,7 @@ pub struct ShaderModule {
 }
 
 /// Fractal rendering parameters
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FractalParameters {
     pub iterations: u32,
     pub zoom: f32,
@@ -106,7 +112,7 @@ pub struct FractalParameters {
 }
 
 /// Types of fractals supported
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum FractalType {
     // Classic 2D fractals
     Mandelbrot,
@@ -159,7 +165,7 @@ pub enum FractalType {
 }
 
 /// Rendering state management
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RenderState {
     pub width: u32,
     pub height: u32,
@@ -170,7 +176,7 @@ pub struct RenderState {
 }
 
 /// Output projection modes for VR/360° rendering
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum OutputMode {
     Standard2D,
     Stereographic,

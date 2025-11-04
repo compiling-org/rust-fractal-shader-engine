@@ -1,274 +1,514 @@
-//! WGPU-based fractal renderer
-//!
-//! This module provides GPU-accelerated rendering for fractal visualization
-//! using WGPU/WebGPU compute shaders for real-time distance field evaluation.
-
 use super::types::*;
 use super::engine::FractalEngine;
-use wgpu::{self, util::DeviceExt};
+use bevy::render::renderer::{RenderDevice, RenderQueue};
 use std::sync::Arc;
+use nalgebra::Vector3;
+use bevy_egui::egui;
 
 /// GPU-accelerated fractal renderer
 pub struct FractalRenderer {
-    device: wgpu::Device,
-    queue: wgpu::Queue,
+    device: Arc<RenderDevice>,
+    queue: Arc<RenderQueue>,
     compute_pipeline: wgpu::ComputePipeline,
     render_pipeline: wgpu::RenderPipeline,
-    fractal_buffer: wgpu::Buffer,
+    distance_field_buffer: wgpu::Buffer,
     parameter_buffer: wgpu::Buffer,
     output_texture: wgpu::Texture,
     output_texture_view: wgpu::TextureView,
-    bind_group: wgpu::BindGroup,
+    sampler: wgpu::Sampler,
+    post_process_buffer: wgpu::Buffer,
     engine: FractalEngine,
+    width: u32,
+    height: u32,
+    // For egui texture integration
+    egui_texture: Option<egui::TextureId>,
 }
 
 impl FractalRenderer {
-    /// Create a new GPU-accelerated fractal renderer
-    pub async fn new(width: u32, height: u32) -> Result<Self, Box<dyn std::error::Error>> {
-        // Create WGPU instance and adapter
-        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::PRIMARY,
-            ..Default::default()
-        });
+    /// Create a new GPU-accelerated fractal renderer using provided WGPU device and queue
+    pub fn new_with_wgpu_context(
+        device: Arc<RenderDevice>,
+        queue: Arc<RenderQueue>,
+        width: u32,
+        height: u32,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        log::info!("Creating fractal renderer with size {}x{}", width, height);
 
-        let adapter = instance
-            .request_adapter(&wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::HighPerformance,
-                compatible_surface: None,
-                force_fallback_adapter: false,
-            })
-            .await
-            .ok_or("Failed to find suitable GPU adapter")?;
-
-        let (device, queue) = adapter
-            .request_device(
-                &wgpu::DeviceDescriptor {
-                    required_features: wgpu::Features::empty(),
-                    required_limits: wgpu::Limits::default(),
-                    label: Some("Fractal Renderer Device"),
-                },
-                None,
-            )
-            .await?;
+        // Get the actual wgpu device and queue
+        let wgpu_device = device.wgpu_device();
+        let wgpu_queue = &queue.0;
 
         // Create compute shader for fractal evaluation
-        let compute_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        let compute_shader = wgpu_device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Fractal Compute Shader"),
             source: wgpu::ShaderSource::Wgsl(include_str!("shaders/fractal_compute.wgsl").into()),
         });
 
-        // Create render shader for final output
-        let render_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        // Create render shader for displaying results
+        let render_shader = wgpu_device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Fractal Render Shader"),
             source: wgpu::ShaderSource::Wgsl(include_str!("shaders/fractal_render.wgsl").into()),
         });
 
-        // Create compute pipeline
-        let compute_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: Some("Fractal Compute Pipeline"),
-            layout: None,
-            module: &compute_shader,
-            entry_point: "main",
+        // Create compute pipeline with explicit bind group layout
+        let bind_group_layout = wgpu_device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("Fractal Compute Bind Group Layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: false },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::StorageTexture {
+                        access: wgpu::StorageTextureAccess::WriteOnly,
+                        format: wgpu::TextureFormat::Rgba8Unorm,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                    },
+                    count: None,
+                },
+            ],
         });
 
-        // Create render pipeline
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        let pipeline_layout = wgpu_device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("Fractal Compute Pipeline Layout"),
+            bind_group_layouts: &[&bind_group_layout],
+            push_constant_ranges: &[],
+        });
+
+        let compute_pipeline = wgpu_device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: Some("Fractal Compute Pipeline"),
+            layout: Some(&pipeline_layout),
+            module: &compute_shader,
+            entry_point: Some("main"),
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
+            cache: None,
+        });
+
+        // Create render pipeline with proper bind group layout for the render shader
+        let render_bind_group_layout_0 = wgpu_device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("Fractal Render Bind Group Layout 0"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+        });
+
+        let render_bind_group_layout_1 = wgpu_device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("Fractal Render Bind Group Layout 1"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+            ],
+        });
+
+        let render_pipeline_layout = wgpu_device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("Fractal Render Pipeline Layout"),
+            bind_group_layouts: &[&render_bind_group_layout_0, &render_bind_group_layout_1],
+            push_constant_ranges: &[],
+        });
+
+        let render_pipeline = wgpu_device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Fractal Render Pipeline"),
-            layout: None,
+            layout: Some(&render_pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &render_shader,
-                entry_point: "vs_main",
+                entry_point: Some("vs_main"),
                 buffers: &[],
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState {
                 module: &render_shader,
-                entry_point: "fs_main",
+                entry_point: Some("fs_main"),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: wgpu::TextureFormat::Rgba8UnormSrgb,
                     blend: Some(wgpu::BlendState::REPLACE),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
             }),
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
                 strip_index_format: None,
                 front_face: wgpu::FrontFace::Ccw,
                 cull_mode: Some(wgpu::Face::Back),
-                polygon_mode: wgpu::PolygonMode::Fill,
                 unclipped_depth: false,
+                polygon_mode: wgpu::PolygonMode::Fill,
                 conservative: false,
             },
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
+            cache: None,
         });
 
         // Create buffers
-        let fractal_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Fractal Data Buffer"),
-            size: (width * height * 4) as u64, // RGBA f32
-            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
+        // Create distance field buffer within device limits
+        // Limit to maximum allowed buffer binding size (128MB)
+        let max_buffer_binding_size = 134217728; // 128MB limit
+        let requested_size = (width * height * std::mem::size_of::<f32>() as u32) as u64;
+        let actual_size = std::cmp::min(requested_size, max_buffer_binding_size as u64);
+        
+        let distance_field_buffer = wgpu_device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Distance Field Buffer"),
+            size: actual_size,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
 
-        let parameter_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        let parameter_buffer = wgpu_device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Fractal Parameters Buffer"),
-            contents: bytemuck::cast_slice(&[0.0f32; 64]), // Parameter storage
+            size: 256 * std::mem::size_of::<f32>() as u64, // Enough space for all parameters
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
         });
 
-        // Create output texture
-        let output_texture = device.create_texture(&wgpu::TextureDescriptor {
+        // Create output texture with size limits
+        // Limit texture dimensions to device limits (typically 8192)
+        let max_dimension = 8192;
+        let actual_width = std::cmp::min(width, max_dimension);
+        let actual_height = std::cmp::min(height, max_dimension);
+        
+        let output_texture = wgpu_device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Fractal Output Texture"),
             size: wgpu::Extent3d {
-                width,
-                height,
+                width: actual_width,
+                height: actual_height,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            format: wgpu::TextureFormat::Rgba8Unorm,
             usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::TEXTURE_BINDING,
             view_formats: &[],
         });
 
         let output_texture_view = output_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        // Create bind group
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Fractal Bind Group"),
-            layout: &compute_pipeline.get_bind_group_layout(0),
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: fractal_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: parameter_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::TextureView(&output_texture_view),
-                },
-            ],
+        // Create sampler for the render shader
+        let sampler = wgpu_device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("Fractal Texture Sampler"),
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
         });
+
+        // Create post-process parameters buffer
+        let post_process_buffer = wgpu_device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Post Process Parameters Buffer"),
+            size: 32 * std::mem::size_of::<f32>() as u64, // Enough space for post-process parameters
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        let engine = FractalEngine::new();
 
         Ok(Self {
             device,
             queue,
             compute_pipeline,
             render_pipeline,
-            fractal_buffer,
+            distance_field_buffer,
             parameter_buffer,
             output_texture,
             output_texture_view,
-            bind_group,
-            engine: FractalEngine::new(),
+            sampler,
+            post_process_buffer,
+            engine,
+            width,
+            height,
+            egui_texture: None,
         })
     }
 
-    /// Render a frame with current fractal parameters
+    /// Render a single frame - just submits the compute pass, doesn't read back data
     pub fn render_frame(&mut self, time: f32, resolution: (u32, u32)) -> Result<(), Box<dyn std::error::Error>> {
-        // Update parameters
-        let params = self.create_parameter_data(time, resolution);
-        self.queue.write_buffer(&self.parameter_buffer, 0, bytemuck::cast_slice(&params));
-
-        // Create command encoder
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+        log::debug!("Starting render frame with time: {}, resolution: {:?}", time, resolution);
+        
+        let wgpu_device = self.device.wgpu_device();
+        let wgpu_queue = &self.queue.0;
+        
+        let mut encoder = wgpu_device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Fractal Render Encoder"),
         });
 
+        // Update parameters
+        let params = self.create_parameter_data(time, resolution);
+        wgpu_queue.write_buffer(&self.parameter_buffer, 0, bytemuck::cast_slice(&params));
+
         // Compute pass
         {
+            log::debug!("Starting compute pass");
+            let bind_group = wgpu_device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("Fractal Compute Bind Group"),
+                layout: &self.compute_pipeline.get_bind_group_layout(0),
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: self.distance_field_buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: self.parameter_buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: wgpu::BindingResource::TextureView(&self.output_texture_view),
+                    },
+                ],
+            });
+
             let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
                 label: Some("Fractal Compute Pass"),
+                timestamp_writes: None,
             });
 
             compute_pass.set_pipeline(&self.compute_pipeline);
-            compute_pass.set_bind_group(0, &self.bind_group, &[]);
-
-            let workgroups_x = (resolution.0 + 15) / 16; // 16x16 workgroups
-            let workgroups_y = (resolution.1 + 15) / 16;
-
-            compute_pass.dispatch_workgroups(workgroups_x, workgroups_y, 1);
+            compute_pass.set_bind_group(0, &bind_group, &[]);
+            
+            let work_groups_x = (self.width + 15) / 16;
+            let work_groups_y = (self.height + 15) / 16;
+            log::debug!("Dispatching compute workgroups: {} x {}", work_groups_x, work_groups_y);
+            compute_pass.dispatch_workgroups(work_groups_x, work_groups_y, 1);
+            log::debug!("Compute pass completed");
         }
 
-        // Submit commands
-        self.queue.submit(std::iter::once(encoder.finish()));
-
+        // Submit command buffer for compute pass
+        log::debug!("Submitting compute command buffer");
+        wgpu_queue.submit(Some(encoder.finish()));
+        
+        log::debug!("Frame rendering completed successfully");
         Ok(())
     }
+    
+    /// Render a single frame and update the egui texture
+    pub fn render_frame_to_texture(&mut self, time: f32, resolution: (u32, u32), ctx: &egui::Context) -> Result<egui::TextureId, Box<dyn std::error::Error>> {
+        log::debug!("Starting render frame with time: {}, resolution: {:?}", time, resolution);
+        
+        let wgpu_device = self.device.wgpu_device();
+        let wgpu_queue = &self.queue.0;
+        
+        let mut encoder = wgpu_device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Fractal Render Encoder"),
+        });
 
-    /// Get the output texture for display
-    pub fn get_output_texture(&self) -> &wgpu::TextureView {
-        &self.output_texture_view
+        // Update parameters
+        let params = self.create_parameter_data(time, resolution);
+        wgpu_queue.write_buffer(&self.parameter_buffer, 0, bytemuck::cast_slice(&params));
+
+        // Compute pass
+        {
+            log::debug!("Starting compute pass");
+            let bind_group = wgpu_device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("Fractal Compute Bind Group"),
+                layout: &self.compute_pipeline.get_bind_group_layout(0),
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: self.distance_field_buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: self.parameter_buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: wgpu::BindingResource::TextureView(&self.output_texture_view),
+                    },
+                ],
+            });
+
+            let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("Fractal Compute Pass"),
+                timestamp_writes: None,
+            });
+
+            compute_pass.set_pipeline(&self.compute_pipeline);
+            compute_pass.set_bind_group(0, &bind_group, &[]);
+            
+            let work_groups_x = (self.width + 15) / 16;
+            let work_groups_y = (self.height + 15) / 16;
+            log::debug!("Dispatching compute workgroups: {} x {}", work_groups_x, work_groups_y);
+            compute_pass.dispatch_workgroups(work_groups_x, work_groups_y, 1);
+            log::debug!("Compute pass completed");
+        }
+
+        // Submit command buffer for compute pass
+        log::debug!("Submitting compute command buffer");
+        wgpu_queue.submit(Some(encoder.finish()));
+        
+        // Return the texture ID for egui
+        if let Some(texture_id) = self.egui_texture {
+            Ok(texture_id)
+        } else {
+            // Create a new texture ID
+            let pixels = vec![egui::Color32::BLACK; (resolution.0 as usize) * (resolution.1 as usize)];
+            let color_image = egui::ColorImage {
+                size: [resolution.0 as usize, resolution.1 as usize],
+                pixels,
+                ..Default::default()
+            };
+            
+            let texture_id = ctx.tex_manager().write().alloc(
+                "fractal_viewport".to_string(),
+                egui::ImageData::Color(std::sync::Arc::new(color_image)),
+                Default::default(),
+            );
+            self.egui_texture = Some(texture_id);
+            Ok(texture_id)
+        }
+    }
+
+    /// Get the output texture for direct use in egui
+    pub fn get_output_texture(&self) -> (&wgpu::Texture, u32, u32) {
+        (&self.output_texture, self.width, self.height)
+    }
+    
+    /// Set the egui texture ID for this renderer
+    pub fn set_egui_texture(&mut self, texture_id: egui::TextureId) {
+        self.egui_texture = Some(texture_id);
+    }
+    
+    /// Get the egui texture ID
+    pub fn get_egui_texture(&self) -> Option<egui::TextureId> {
+        self.egui_texture
     }
 
     /// Update fractal parameters
-    pub fn update_parameters(&mut self, params: &FractalParams) {
+    pub fn update_parameters(&mut self, params: &FractalParameters) {
         self.engine.parameters = params.clone();
     }
 
     /// Set active fractal formula
     pub fn set_formula(&mut self, formula_id: &str) -> Result<(), String> {
-        self.engine.set_formula(formula_id)
+        let new_formula = match formula_id {
+            "mandelbrot" => FractalFormula::Mandelbrot { center: [-0.5, 0.0], zoom: 1.0 },
+            "mandelbulb" => FractalFormula::Mandelbulb { power: 8.0 },
+            "mandelbox" => FractalFormula::Mandelbox { scale: 2.0 },
+            "julia" => FractalFormula::Julia { c: [-0.7, 0.27015], max_iterations: 100 },
+            _ => return Err(format!("Unknown formula: {}", formula_id)),
+        };
+        self.engine.parameters_mut().formula = new_formula;
+        Ok(())
     }
 
     /// Create parameter data for GPU upload
-    fn create_parameter_data(&self, time: f32, resolution: (u32, u32)) -> [f32; 64] {
-        let mut params = [0.0f32; 64];
+    fn create_parameter_data(&self, time: f32, resolution: (u32, u32)) -> [f32; 256] {
+        let mut params = [0.0f32; 256];
 
         // Basic parameters
         params[0] = self.engine.parameters.max_iterations as f32;
         params[1] = self.engine.parameters.bailout;
-        params[2] = self.engine.parameters.power;
+        // Extract power from formula if it's Mandelbulb
+        params[2] = match &self.engine.parameters.formula {
+            FractalFormula::Mandelbulb { power } => *power,
+            _ => 2.0,
+        };
         params[3] = self.engine.parameters.scale;
-        params[4..7].copy_from_slice(&self.engine.parameters.offset);
-        params[7..10].copy_from_slice(&self.engine.parameters.rotation);
+        // Position
+        params[4] = self.engine.parameters.position.x;
+        params[5] = self.engine.parameters.position.y;
+        params[6] = self.engine.parameters.position.z;
+        // Rotation
+        params[7] = self.engine.parameters.rotation.x;
+        params[8] = self.engine.parameters.rotation.y;
+        params[9] = self.engine.parameters.rotation.z;
 
-        // Color parameters
-        params[10..13].copy_from_slice(&self.engine.parameters.color_params.base_color);
-        params[13..16].copy_from_slice(&self.engine.parameters.color_params.secondary_color);
-        params[16] = self.engine.parameters.color_params.cycle_frequency;
-        params[17] = self.engine.parameters.color_params.saturation;
-        params[18] = self.engine.parameters.color_params.value;
+        // Color parameters - use first two colors from palette
+        if !self.engine.parameters.color_palette.is_empty() {
+            let base_color = self.engine.parameters.color_palette[0];
+            params[10] = base_color.x;
+            params[11] = base_color.y;
+            params[12] = base_color.z;
+            
+            if self.engine.parameters.color_palette.len() > 1 {
+                let secondary_color = self.engine.parameters.color_palette[1];
+                params[13] = secondary_color.x;
+                params[14] = secondary_color.y;
+                params[15] = secondary_color.z;
+            }
+        }
+        // Use color_saturation as cycle_frequency equivalent
+        params[16] = self.engine.parameters.color_saturation;
+        // Use color_saturation for saturation
+        params[17] = self.engine.parameters.color_saturation;
+        // Use color_saturation for value
+        params[18] = self.engine.parameters.color_saturation;
 
-        // Volumetric parameters
-        params[19] = self.engine.parameters.volumetric_params.density;
-        params[20..23].copy_from_slice(&self.engine.parameters.volumetric_params.fog_color);
-        params[23] = self.engine.parameters.volumetric_params.scattering;
-        params[24] = self.engine.parameters.volumetric_params.absorption;
-        params[25] = self.engine.parameters.volumetric_params.anisotropy;
+        // Volumetric parameters - use VolumetricParameters if available
+        // For now, use default values since the struct doesn't have these fields
+        params[19] = 0.1; // density
+        params[20] = 0.8; // fog_color.x
+        params[21] = 0.9; // fog_color.y
+        params[22] = 1.0; // fog_color.z
+        params[23] = 0.5; // scattering
+        params[24] = 0.1; // absorption
+        params[25] = 0.0; // anisotropy
 
         // Rendering parameters
         params[26] = time;
         params[27] = resolution.0 as f32;
         params[28] = resolution.1 as f32;
-        params[29] = self.engine.quality.resolution_scale;
-        params[30] = self.engine.quality.max_steps as f32;
-        params[31] = self.engine.quality.surface_epsilon;
+        // Use resolution from quality settings
+        params[29] = self.engine.quality_settings.resolution[0] as f32;
+        // Use max_iterations as max_steps equivalent
+        params[30] = self.engine.quality_settings.max_iterations as f32;
+        // Use normal_epsilon as surface_epsilon equivalent
+        params[31] = self.engine.quality_settings.normal_epsilon;
 
         params
-    }
-
-    /// Get access to the underlying fractal engine
-    pub fn engine(&self) -> &FractalEngine {
-        &self.engine
-    }
-
-    /// Get mutable access to the fractal engine
-    pub fn engine_mut(&mut self) -> &mut FractalEngine {
-        &mut self.engine
     }
 }
 
 /// CPU-based fallback renderer for systems without GPU compute support
 pub struct CPUFractalRenderer {
     pub engine: FractalEngine,
-    pub camera_position: Point3D,
-    pub camera_target: Point3D,
+    pub camera_position: Vector3<f32>,
+    pub camera_target: Vector3<f32>,
     pub fov: f32,
     pub max_distance: f32,
 }
@@ -277,89 +517,91 @@ impl CPUFractalRenderer {
     pub fn new() -> Self {
         Self {
             engine: FractalEngine::new(),
-            camera_position: Point3D::new(0.0, 0.0, 5.0),
-            camera_target: Point3D::zero(),
+            camera_position: Vector3::new(0.0, 0.0, 5.0),
+            camera_target: Vector3::new(0.0, 0.0, 0.0),
             fov: 60.0,
             max_distance: 100.0,
         }
     }
 
-    /// Render a frame using CPU ray marching
-    pub fn render_frame(&self, width: u32, height: u32) -> Vec<u8> {
-        let mut pixels = Vec::with_capacity((width * height * 4) as usize);
-
+    pub fn render(&self, width: u32, height: u32) -> Vec<u8> {
+        let mut pixels = vec![0; (width * height * 4) as usize];
+        
         for y in 0..height {
             for x in 0..width {
-                let color = self.render_pixel(x as f32, y as f32, width as f32, height as f32);
-                pixels.push((color[0] * 255.0) as u8);
-                pixels.push((color[1] * 255.0) as u8);
-                pixels.push((color[2] * 255.0) as u8);
-                pixels.push((color[3] * 255.0) as u8);
+                let uv = (
+                    x as f32 / width as f32,
+                    y as f32 / height as f32,
+                );
+                
+                // Convert UV to NDC
+                let ndc_x = (2.0 * uv.0 - 1.0) * (width as f32 / height as f32);
+                let ndc_y = 1.0 - 2.0 * uv.1;
+                
+                // Generate ray
+                let forward = (self.camera_target - self.camera_position).normalize();
+                let right = Vector3::new(0.0, 1.0, 0.0).cross(&forward).normalize();
+                let up = forward.cross(&right).normalize();
+                
+                let ray_direction = (forward + right * ndc_x + up * ndc_y).normalize();
+                
+                // Ray marching
+                let mut t = 0.0;
+                let mut iterations = 0u32;
+                
+                for _ in 0..self.engine.quality_settings.max_iterations {
+                    let point = self.camera_position + ray_direction * t;
+                    let result = self.engine.compute_distance(point);
+                    
+                    // Use normal_epsilon since quality_settings doesn't have surface_epsilon
+                    if result.distance < self.engine.quality_settings.normal_epsilon {
+                        // Hit surface - calculate color
+                        let color = self.calculate_color(point, &result);
+                        // Skip AO calculation since it's not available
+                        let idx = ((y * width + x) * 4) as usize;
+                        pixels[idx] = (color[0] * 255.0) as u8;
+                        pixels[idx + 1] = (color[1] * 255.0) as u8;
+                        pixels[idx + 2] = (color[2] * 255.0) as u8;
+                        pixels[idx + 3] = 255;
+                        break;
+                    }
+                    
+                    // Use distance_threshold since quality_settings doesn't have min_step
+                    t += result.distance.abs().max(self.engine.quality_settings.distance_threshold);
+                    
+                    if t > self.max_distance {
+                        // Background color
+                        let idx = ((y * width + x) * 4) as usize;
+                        pixels[idx] = 10;
+                        pixels[idx + 1] = 10;
+                        pixels[idx + 2] = 20;
+                        pixels[idx + 3] = 255;
+                        break;
+                    }
+                    
+                    iterations += 1;
+                    if iterations > self.engine.quality_settings.max_iterations {
+                        break;
+                    }
+                }
             }
         }
-
+        
         pixels
     }
-
-    /// Render a single pixel using CPU ray marching
-    fn render_pixel(&self, x: f32, y: f32, width: f32, height: f32) -> [f32; 4] {
-        // Convert screen coordinates to camera ray
-        let aspect = width / height;
-        let tan_fov = (self.fov * 0.5).to_radians().tan();
-
-        let ndc_x = (2.0 * x / width - 1.0) * aspect * tan_fov;
-        let ndc_y = (1.0 - 2.0 * y / height) * tan_fov;
-
-        // Camera basis vectors
-        let forward = (self.camera_target - self.camera_position).normalize();
-        let right = Point3D::new(0.0, 1.0, 0.0).cross(&forward).normalize();
-        let up = forward.cross(&right).normalize();
-
-        let ray_direction = (forward + right * ndc_x + up * ndc_y).normalize();
-
-        // Ray marching
-        let mut t = 0.0;
-        let mut iterations = 0u32;
-
-        for _ in 0..self.engine.quality.max_steps {
-            let point = self.camera_position + ray_direction * t;
-            let result = self.engine.evaluate_distance(point);
-
-            if result.distance < self.engine.quality.surface_epsilon {
-                // Hit surface - calculate color
-                let color = self.calculate_color(point, &result);
-                let ao = self.engine.calculate_ao(point, result.normal, 4);
-                return [color[0] * ao, color[1] * ao, color[2] * ao, 1.0];
-            }
-
-            t += result.distance.abs().max(self.engine.quality.min_step);
-
-            if t > self.max_distance {
-                break;
-            }
-
-            iterations += 1;
-        }
-
-        // Background
-        [0.1, 0.1, 0.2, 1.0]
-    }
-
+    
     /// Calculate surface color
-    fn calculate_color(&self, point: Point3D, result: &DistanceResult) -> [f32; 3] {
-        let color_params = &self.engine.parameters.color_params;
-
-        // Iteration-based coloring
+    fn calculate_color(&self, point: Vector3<f32>, result: &DistanceResult) -> [f32; 3] {
+        // Use color_palette and color_saturation instead of color_params
+        if self.engine.parameters.color_palette.is_empty() {
+            return [0.0, 0.0, 0.0];
+        }
+        
+        let base_color = self.engine.parameters.color_palette[0];
+        
+        // Simple coloring based on iterations
         let t = (result.iterations as f32) / (self.engine.parameters.max_iterations as f32);
-        let color_mix = t * color_params.cycle_frequency;
-
-        let r = (color_params.base_color[0] * (1.0 - t) + color_params.secondary_color[0] * t)
-            * (color_mix.sin() * 0.5 + 0.5);
-        let g = (color_params.base_color[1] * (1.0 - t) + color_params.secondary_color[1] * t)
-            * ((color_mix + 2.094).sin() * 0.5 + 0.5);
-        let b = (color_params.base_color[2] * (1.0 - t) + color_params.secondary_color[2] * t)
-            * ((color_mix + 4.188).sin() * 0.5 + 0.5);
-
-        [r * color_params.saturation, g * color_params.saturation, b * color_params.value]
+        
+        [base_color.x * t, base_color.y * t, base_color.z * t]
     }
 }

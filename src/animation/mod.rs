@@ -6,7 +6,10 @@ pub mod easing;
 pub mod keyframe;
 pub mod timeline;
 
+use serde::{Deserialize, Serialize};
+
 /// Animation system for fractal parameters and scene elements
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnimationController {
     timeline: TimelineProject,
     current_time: f32,
@@ -73,6 +76,7 @@ impl AnimationController {
 }
 
 /// Timeline project containing animation tracks
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TimelineProject {
     tracks: Vec<AnimationTrack>,
     duration: f32,
@@ -123,6 +127,7 @@ impl TimelineProject {
 }
 
 /// Animation track for a specific parameter
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnimationTrack {
     pub name: String,
     pub parameter_path: String, // e.g., "fractal.power" or "camera.position.x"
@@ -130,21 +135,21 @@ pub struct AnimationTrack {
     pub interpolation: InterpolationMode,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Keyframe {
     pub time: f32,
     pub value: f32,
     pub easing: EasingType,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum InterpolationMode {
     Linear,
     Cubic,
     Step,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum EasingType {
     Linear,
     EaseIn,

@@ -128,6 +128,7 @@ pub struct NodeConnection {
 }
 
 /// Node execution context
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExecutionContext {
     pub time: f32,
     pub resolution: [f32; 2],
@@ -136,7 +137,7 @@ pub struct ExecutionContext {
 }
 
 /// Result of executing a node
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum NodeResult {
     Scalar(f32),
     Vector3(Vector3<f32>),

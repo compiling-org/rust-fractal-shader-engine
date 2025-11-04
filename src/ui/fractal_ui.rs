@@ -3,33 +3,9 @@
 //! This module provides specialized UI components for fractal generation,
 //! adapted from the WGSL Shader Studio for fractal-specific functionality.
 
-// use crate::fractal::types::*;
-// use crate::ui::fractal_nodes::*;
 use egui::{Color32, RichText, Ui, Vec2, Response};
 use std::collections::HashMap;
-// Placeholder types until fractal module is properly implemented
-#[derive(Debug, Clone)]
-pub enum FractalFormula {
-    Mandelbrot,
-    Mandelbub,
-    Mandelbox,
-    IFS,
-    QuaternionJulia,
-    Custom,
-}
-
-#[derive(Debug, Clone)]
-pub struct FractalParameters {
-    pub max_iterations: u32,
-    pub power: f32,
-    pub scale: f32,
-}
-
-#[derive(Debug, Clone)]
-pub struct ColorMap {
-    pub hue_shift: f32,
-    pub saturation: f32,
-}
+use nalgebra::{Vector2, Vector3};
 
 /// Fractal formula selector with preview thumbnails
 pub struct FractalFormulaSelector {
@@ -54,13 +30,14 @@ impl FractalFormulaSelector {
         egui::ScrollArea::vertical()
             .max_height(300.0)
             .show(ui, |ui| {
-                // Placeholder fractal formulas
+                // Fractal formulas with 3D support
                 let formulas = vec![
                     ("Mandelbrot", "Classic 2D Mandelbrot set"),
-                    ("Mandelbulb", "3D power fractal"),
-                    ("Mandelbox", "Box folding fractal"),
+                    ("Julia", "2D Julia set with customizable parameters"),
+                    ("Mandelbulb", "3D power fractal with spherical coordinates"),
+                    ("Mandelbox", "3D box folding fractal"),
                     ("Quaternion Julia", "4D quaternion fractal"),
-                    ("IFS", "Iterated function system"),
+                    ("IFS", "Iterated function system (2D)"),
                 ];
 
                 for (name, description) in formulas {
@@ -85,8 +62,39 @@ impl FractalFormulaSelector {
 /// Fractal parameter editor with specialized controls
 pub struct FractalParameterEditor {
     pub parameters: FractalParameters,
-    pub color_map: ColorMap,
-    pub parameter_ranges: HashMap<String, (f32, f32)>,
+    pub color_params: ColorParameters,
+    pub quality_settings: QualitySettings,
+}
+
+#[derive(Debug, Clone)]
+pub struct FractalParameters {
+    pub max_iterations: u32,
+    pub power: f32,
+    pub scale: f32,
+    pub bailout: f32,
+    pub julia_c: Vector2<f32>,
+    pub folding_limit: f32,
+    pub folding_value: f32,
+}
+
+#[derive(Debug, Clone)]
+pub struct ColorParameters {
+    pub base_color: Vector3<f32>,
+    pub secondary_color: Vector3<f32>,
+    pub cycle_frequency: f32,
+    pub saturation: f32,
+    pub value: f32,
+    pub hue_shift: f32,
+}
+
+#[derive(Debug, Clone)]
+pub struct QualitySettings {
+    pub resolution_scale: f32,
+    pub max_steps: u32,
+    pub surface_epsilon: f32,
+    pub min_step: f32,
+    pub ao_samples: u32,
+    pub shadow_samples: u32,
 }
 
 impl FractalParameterEditor {
@@ -96,46 +104,46 @@ impl FractalParameterEditor {
                 max_iterations: 100,
                 power: 8.0,
                 scale: 1.0,
+                bailout: 4.0,
+                julia_c: Vector2::new(-0.7, 0.27015),
+                folding_limit: 1.0,
+                folding_value: 1.0,
             },
-            color_map: ColorMap {
-                hue_shift: 0.0,
+            color_params: ColorParameters {
+                base_color: Vector3::new(0.5, 0.5, 0.5),
+                secondary_color: Vector3::new(1.0, 1.0, 1.0),
+                cycle_frequency: 1.0,
                 saturation: 1.0,
+                value: 1.0,
+                hue_shift: 0.0,
             },
-            parameter_ranges: HashMap::new(),
+            quality_settings: QualitySettings {
+                resolution_scale: 1.0,
+                max_steps: 100,
+                surface_epsilon: 0.001,
+                min_step: 0.01,
+                ao_samples: 4,
+                shadow_samples: 8,
+            },
         }
     }
 
-    pub fn show(&mut self, ui: &mut Ui, formula: &FractalFormula) {
+    pub fn show(&mut self, ui: &mut Ui) {
         ui.label(RichText::new("🎛️ Fractal Parameters").size(16.0));
         ui.separator();
 
-        match formula {
-            FractalFormula::Mandelbub => {
-                self.show_mandelbulb_parameters(ui);
-            }
-            FractalFormula::Mandelbox => {
-                self.show_mandelbox_parameters(ui);
-            }
-            FractalFormula::IFS => {
-                self.show_ifs_parameters(ui);
-            }
-            FractalFormula::QuaternionJulia => {
-                self.show_quaternion_julia_parameters(ui);
-            }
-            FractalFormula::Mandelbrot => {
-                self.show_mandelbrot_parameters(ui);
-            }
-            FractalFormula::Custom { .. } => {
-                self.show_custom_parameters(ui);
-            }
-        }
+        // For now, we'll show a generic parameter editor
+        self.show_generic_parameters(ui);
 
         // Color mapping parameters (common to all)
         self.show_color_mapping_parameters(ui);
+        
+        // Quality settings
+        self.show_quality_settings(ui);
     }
 
-    fn show_mandelbulb_parameters(&mut self, ui: &mut Ui) {
-        ui.label("Mandelbulb Parameters:");
+    fn show_generic_parameters(&mut self, ui: &mut Ui) {
+        ui.label("Fractal Parameters:");
 
         ui.horizontal(|ui| {
             ui.label("Power:");
@@ -148,65 +156,24 @@ impl FractalParameterEditor {
         });
 
         ui.horizontal(|ui| {
-            ui.label("Scale:");
-            ui.add(egui::DragValue::new(&mut self.parameters.scale).range(0.1..=5.0).speed(0.01));
-        });
-    }
-
-    fn show_mandelbox_parameters(&mut self, ui: &mut Ui) {
-        ui.label("Mandelbox Parameters:");
-
-        ui.horizontal(|ui| {
-            ui.label("Scale:");
-            ui.add(egui::DragValue::new(&mut self.parameters.scale).range(0.1..=5.0).speed(0.01));
-        });
-
-        ui.horizontal(|ui| {
-            ui.label("Max Iterations:");
-            ui.add(egui::DragValue::new(&mut self.parameters.max_iterations).range(10..=200));
-        });
-    }
-
-    fn show_ifs_parameters(&mut self, ui: &mut Ui) {
-        ui.label("IFS Parameters:");
-
-        ui.horizontal(|ui| {
-            ui.label("Max Iterations:");
-            ui.add(egui::DragValue::new(&mut self.parameters.max_iterations).range(5..=50));
-        });
-
-        ui.horizontal(|ui| {
-            ui.label("Scale:");
-            ui.add(egui::DragValue::new(&mut self.parameters.scale).range(0.1..=2.0).speed(0.01));
-        });
-    }
-
-    fn show_quaternion_julia_parameters(&mut self, ui: &mut Ui) {
-        ui.label("Quaternion Julia Parameters:");
-
-        ui.horizontal(|ui| {
-            ui.label("Max Iterations:");
-            ui.add(egui::DragValue::new(&mut self.parameters.max_iterations).range(10..=200));
+            ui.label("Bailout:");
+            ui.add(egui::DragValue::new(&mut self.parameters.bailout).range(1.0..=100.0).speed(0.1));
         });
 
         ui.horizontal(|ui| {
             ui.label("Scale:");
             ui.add(egui::DragValue::new(&mut self.parameters.scale).range(0.1..=5.0).speed(0.01));
         });
-    }
-
-    fn show_mandelbrot_parameters(&mut self, ui: &mut Ui) {
-        ui.label("Mandelbrot Parameters:");
 
         ui.horizontal(|ui| {
-            ui.label("Max Iterations:");
-            ui.add(egui::DragValue::new(&mut self.parameters.max_iterations).range(50..=1000));
+            ui.label("Julia C (real):");
+            ui.add(egui::DragValue::new(&mut self.parameters.julia_c.x).range(-2.0..=2.0).speed(0.01));
         });
-    }
 
-    fn show_custom_parameters(&mut self, ui: &mut Ui) {
-        ui.label("Custom Formula Parameters:");
-        ui.label("Custom parameters not yet implemented");
+        ui.horizontal(|ui| {
+            ui.label("Julia C (imag):");
+            ui.add(egui::DragValue::new(&mut self.parameters.julia_c.y).range(-2.0..=2.0).speed(0.01));
+        });
     }
 
     fn show_color_mapping_parameters(&mut self, ui: &mut Ui) {
@@ -215,12 +182,42 @@ impl FractalParameterEditor {
 
         ui.horizontal(|ui| {
             ui.label("Hue Shift:");
-            ui.add(egui::DragValue::new(&mut self.color_map.hue_shift).range(-180.0..=180.0));
+            ui.add(egui::DragValue::new(&mut self.color_params.hue_shift).range(-180.0..=180.0));
         });
 
         ui.horizontal(|ui| {
             ui.label("Saturation:");
-            ui.add(egui::DragValue::new(&mut self.color_map.saturation).range(0.0..=2.0).speed(0.01));
+            ui.add(egui::DragValue::new(&mut self.color_params.saturation).range(0.0..=2.0).speed(0.01));
+        });
+
+        ui.horizontal(|ui| {
+            ui.label("Brightness:");
+            ui.add(egui::DragValue::new(&mut self.color_params.value).range(0.0..=2.0).speed(0.01));
+        });
+
+        ui.horizontal(|ui| {
+            ui.label("Color Cycle:");
+            ui.add(egui::DragValue::new(&mut self.color_params.cycle_frequency).range(0.0..=10.0).speed(0.01));
+        });
+    }
+
+    fn show_quality_settings(&mut self, ui: &mut Ui) {
+        ui.separator();
+        ui.label("Quality Settings:");
+
+        ui.horizontal(|ui| {
+            ui.label("Resolution Scale:");
+            ui.add(egui::Slider::new(&mut self.quality_settings.resolution_scale, 0.1..=2.0));
+        });
+
+        ui.horizontal(|ui| {
+            ui.label("Max Steps:");
+            ui.add(egui::DragValue::new(&mut self.quality_settings.max_steps).range(10..=1000));
+        });
+
+        ui.horizontal(|ui| {
+            ui.label("Surface Epsilon:");
+            ui.add(egui::DragValue::new(&mut self.quality_settings.surface_epsilon).range(0.0001..=0.1).speed(0.0001));
         });
     }
 }
@@ -233,6 +230,8 @@ pub struct FractalViewport {
     pub show_grid: bool,
     pub show_axes: bool,
     pub navigation_mode: NavigationMode,
+    pub renderer: Option<String>, // Placeholder
+    pub texture: Option<egui::TextureHandle>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -251,6 +250,8 @@ impl FractalViewport {
             show_grid: true,
             show_axes: true,
             navigation_mode: NavigationMode::Orbit,
+            renderer: None,
+            texture: None,
         }
     }
 
@@ -264,27 +265,38 @@ impl FractalViewport {
             Color32::from_rgb(20, 22, 28),
         );
 
-        // Grid overlay
-        if self.show_grid {
-            self.draw_grid(ui, rect);
-        }
+        // If we have a texture, show it
+        if let Some(texture) = &self.texture {
+            let texture_rect = rect.shrink(10.0); // Add some padding
+            ui.painter().image(
+                texture.id(),
+                texture_rect,
+                egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+                Color32::WHITE,
+            );
+        } else {
+            // Grid overlay
+            if self.show_grid {
+                self.draw_grid(ui, rect);
+            }
 
-        // Axes overlay
-        if self.show_axes {
-            self.draw_axes(ui, rect);
+            // Axes overlay
+            if self.show_axes {
+                self.draw_axes(ui, rect);
+            }
+
+            // Placeholder fractal preview
+            ui.painter().text(
+                rect.center(),
+                egui::Align2::CENTER_CENTER,
+                "3D Fractal Viewport\n(Initializing GPU renderer...)",
+                egui::FontId::proportional(16.0),
+                Color32::from_rgb(150, 150, 160),
+            );
         }
 
         // Navigation controls overlay
         self.draw_navigation_overlay(ui, rect);
-
-        // Placeholder fractal preview
-        ui.painter().text(
-            rect.center(),
-            egui::Align2::CENTER_CENTER,
-            "3D Fractal Viewport\n(Real-time rendering integration)",
-            egui::FontId::proportional(16.0),
-            Color32::from_rgb(150, 150, 160),
-        );
 
         response
     }
@@ -567,4 +579,50 @@ pub struct ExportSettings {
     pub quality: f32,
     pub include_animation: bool,
     pub animation_frames: u32,
+}
+
+/// Code editor for fractal formulas with external editor support
+pub struct FractalCodeEditor {
+    pub code: String,
+    pub language: String,
+    pub external_editor_path: String,
+    pub show_external_editor_button: bool,
+}
+
+impl FractalCodeEditor {
+    pub fn new() -> Self {
+        Self {
+            code: String::new(),
+            language: "wgsl".to_string(),
+            external_editor_path: String::new(),
+            show_external_editor_button: true,
+        }
+    }
+
+    pub fn show(&mut self, ui: &mut Ui) {
+        ui.label(RichText::new("📝 Fractal Code Editor").size(16.0));
+        ui.separator();
+
+        // External editor button (like TouchDesigner)
+        if self.show_external_editor_button {
+            if ui.button("Open in External Editor").clicked() {
+                // This would launch the external editor in a real implementation
+                ui.label("External editor would open here...");
+            }
+            ui.separator();
+        }
+
+        // Code editor area
+        egui::ScrollArea::vertical()
+            .auto_shrink([false; 2])
+            .show(ui, |ui| {
+                ui.add(
+                    egui::TextEdit::multiline(&mut self.code)
+                        .font(egui::TextStyle::Monospace)
+                        .code_editor()
+                        .desired_width(f32::INFINITY)
+                        .desired_rows(20)
+                );
+            });
+    }
 }

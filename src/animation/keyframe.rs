@@ -30,7 +30,7 @@ pub enum InterpolationMode {
 }
 
 /// Animation track containing keyframes for a specific property
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnimationTrack<T> {
     pub id: TrackId,
     pub name: String,
@@ -40,7 +40,7 @@ pub struct AnimationTrack<T> {
 }
 
 /// Animation controller managing multiple tracks
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnimationController {
     pub tracks: HashMap<TrackId, AnimationTrackType>,
     pub current_time: f32,
@@ -49,7 +49,7 @@ pub struct AnimationController {
     pub loop_animation: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AnimationTrackType {
     Float(AnimationTrack<f32>),
     Vec3(AnimationTrack<Vector3<f32>>),

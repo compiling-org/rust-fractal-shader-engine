@@ -5,12 +5,13 @@
 
 use nalgebra::{Matrix4, Vector3, Vector4, UnitQuaternion};
 use std::collections::HashMap;
+use serde::{Deserialize, Serialize};
 
 /// Unique identifier for scene objects
 pub type ObjectId = u64;
 
 /// 3D transformation with position, rotation, and scale
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Transform {
     pub position: Vector3<f32>,
     pub rotation: UnitQuaternion<f32>,
@@ -53,7 +54,7 @@ impl Transform {
 }
 
 /// Material properties for scene objects
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Material {
     pub base_color: Vector3<f32>,
     pub metallic: f32,
@@ -75,7 +76,7 @@ impl Default for Material {
 }
 
 /// Types of objects that can exist in the scene
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ObjectType {
     /// Fractal object with fractal parameters
     FractalObject {
@@ -106,7 +107,7 @@ pub enum ObjectType {
 }
 
 /// Light types
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum LightType {
     Directional,
     Point,
@@ -114,10 +115,10 @@ pub enum LightType {
 }
 
 /// 2D vector for UV coordinates
-pub type Vector2<f32> = nalgebra::Vector2<f32>;
+use nalgebra::Vector2;
 
 /// Scene object with transform and properties
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SceneObject {
     pub id: ObjectId,
     pub name: String,
@@ -208,7 +209,7 @@ impl SceneObject {
 }
 
 /// 3D scene containing all objects and settings
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Scene {
     pub objects: HashMap<ObjectId, SceneObject>,
     pub active_camera_id: Option<ObjectId>,

@@ -1,45 +1,43 @@
-odular-fractal-shader/README.md</path>
-<content lines="1-400">
-# Rust Fractal Shader Engine
+# Modular Fractal Shader - Professional Fractal Generator
 
-A comprehensive, modular fractal shader system built with Rust and Bevy. Features advanced GPU-accelerated fractal rendering, ISF shader support, real-time audio/MIDI control, and a visual node-based composition interface.
+A comprehensive, modular fractal generator built with Rust and Bevy. Features advanced GPU-accelerated fractal rendering, real-time audio/MIDI control, and a visual node-based composition interface.
 
-## ⚠️ **WORK IN PROGRESS - Active Development & Integration**
+## 🚀 **Latest Update - November 2025**
+
+### **Architecture Migration Complete**
+- ✅ **GUI Framework**: Migrated from eframe to Bevy 0.17 + bevy_egui
+- ✅ **Rendering Engine**: Integrated WGPU renderer with Bevy's render pipeline
+- ✅ **Performance**: Optimized GPU resource management and rendering pipeline
+- ✅ **Compatibility**: Resolved dependency conflicts and compilation issues
 
 ### **Current Status & Recent Updates**
 
 #### ✅ **Completed Features (v1.0.0)**
-- **ISF Shader Support**: ISF shaders with multi-format conversion (ISF ↔ GLSL ↔ WGSL ↔ HLSL)
 - **GPU Acceleration**: WebGPU/Vulkan/Metal/DX12 rendering with real-time performance
 - **Node-Based Editor**: Visual composition interface with drag-and-drop functionality
-- **Audio/MIDI Integration**: Real-time spectrum analysis and MIDI control mapping
-- **Shader Conversion**: Automatic format translation between shader languages
-- **PBR Rendering Pipeline**: Physically-based rendering with global illumination
-- **Real-time Output**: Video mapping and installation support (Syphon, Spout, NDI, DMX)
-- **NFT Integration**: Filecoin + NEAR blockchain minting capabilities
-- **Video Recording**: Export capabilities for fractal animations
-- **Advanced Fractal Engine**: Complete distance estimation for all major fractal types
-- **3D Scene Environment**: Full 3D environment with external mesh import
+- **Shader Generation**: Advanced fractal algorithms with distance estimation
+- **3D Scene Environment**: Full 3D environment with fractal objects
 - **Animation System**: Keyframe animation for camera, lighting, and parameters
-- **Procedural Motion**: L-systems, noise, and attractor-based animation
-- **High-Tech UI**: Glassmorphism, customizable workspaces, pie menus
+- **Export System**: 3D mesh export (OBJ, STL) and image formats
+- **Professional UI**: Modern dark theme with glassmorphism design
+- **Cross-Platform**: Windows, macOS, Linux support
 - **Web Deployment**: WASM/WebGPU support for browser-based editing
 
 #### 🔄 **In Development**
-- **Performance Optimization**: Memory usage and rendering speed improvements
-- **Cross-Platform Testing**: Comprehensive testing across Windows, macOS, Linux
-- **Advanced Features**: Machine learning shader generation, VR/AR support
+- **Advanced Features**: Global illumination, volumetric effects, VR/AR support
+- **Animation Enhancements**: Timeline editor, audio reactivity, MIDI control
+- **Export Improvements**: Animation sequences, voxel formats, NFT integration
+- **Node Editor**: Advanced node composition and preset management
 
 #### 🚧 **Known Issues**
-- **Compilation**: Some dependency conflicts with latest Bevy versions
-- **Web Deployment**: WASM compilation needs optimization
-- **Performance**: Large shader collections may have memory issues
+- **Performance**: Memory optimization for complex scenes
+- **Feature Completeness**: Some advanced animation features pending
 
 #### 📈 **Next Development Phase**
-1. **Fix Compilation Issues**: Resolve Bevy/naga dependency conflicts
-2. **Performance Benchmarking**: Optimize for large shader collections
-3. **Cross-Platform Testing**: Ensure compatibility across all target platforms
-4. **Advanced Features**: ML shader generation, VR/AR environments
+1. **Animation System**: Complete timeline editor and keyframe animation
+2. **Audio Integration**: Real-time audio analysis and MIDI control
+3. **Advanced Rendering**: Global illumination and volumetric effects
+4. **Export Features**: Animation sequences and additional formats
 
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange)](https://www.rust-lang.org/)
 [![Bevy](https://img.shields.io/badge/bevy-0.17-blue)](https://bevyengine.org/)
@@ -47,89 +45,86 @@ A comprehensive, modular fractal shader system built with Rust and Bevy. Feature
 
 ## ✨ Features
 
-### 🎨 **Shader Generation & Conversion**
-- ** ISF Shaders** - Complete collection from Sleepless Monk
-- **Multi-format Support** - ISF ↔ GLSL ↔ WGSL ↔ HLSL conversion
-- **Real-time Conversion** - Automatic shader format translation
-- **Custom Shader Support** - Load and convert user-created shaders
+### 🎨 **Fractal Generation**
+- **2D Fractals**: Mandelbrot, Julia, Burning Ship, Tricorn, Phoenix
+- **3D Fractals**: Mandelbulb, Mandelbox, Menger Sponge, Quaternion Julia
+- **Hybrid Fractals**: BulbBox, Amazing Box, Kaleidoscopic IFS
+- **Procedural**: Generic spirals, torus, helix, vortex patterns
+- **Distance Estimation**: GPU-accelerated real-time rendering
 
 ### 🎛️ **Interactive Control System**
-- **16 Controllable Parameters** - Time, mouse, zoom, iterations, colors, audio, MIDI
-- **Audio-Reactive** - Real-time spectrum analysis and beat detection
-- **MIDI Control** - Full MIDI CC mapping and note triggers
-- **Live Parameter Mapping** - Dynamic parameter assignment
+- **Real-time Parameters**: Zoom, iterations, power, bailout, rotation
+- **Color Control**: Customizable palettes and gradient mapping
+- **Transform Controls**: Position, scale, rotation, folding parameters
+- **Fractal-specific**: Mandelbulb power, Mandelbox folding, IFS transforms
 
 ### 🎯 **Node-Based Composition**
-- **Visual Node Editor** - Drag-and-drop shader composition
-- **Generator Nodes** - 2D/3D fractals, noise, mathematical functions
-- **FX Nodes** - Color correction, geometry transforms, filters
-- **Audio/MIDI Nodes** - Spectrum analysis, beat detection, MIDI mapping
-- **Buffer Nodes** - Multi-pass rendering, feedback loops
+- **Visual Node Editor**: Drag-and-drop fractal composition
+- **Generator Nodes**: 2D/3D fractals, noise, mathematical functions
+- **Transform Nodes**: Position, scale, rotate, warp operations
+- **Effect Nodes**: Color correction, geometry transforms, filters
+- **Animation Nodes**: Timeline control, LFO oscillators, noise generators
 
 ### 🚀 **Performance & Compatibility**
-- **GPU Acceleration** - WebGPU/Vulkan/Metal/DX12 support
-- **Real-time Rendering** - 60+ FPS on modern GPUs
-- **Cross-Platform** - Windows, macOS, Linux, Web (future)
-- **Memory Efficient** - Optimized for large shader collections
+- **GPU Acceleration**: WebGPU/Vulkan/Metal/DX12 support
+- **Real-time Rendering**: 60+ FPS on modern GPUs
+- **Cross-Platform**: Windows, macOS, Linux, Web (WASM)
+- **Memory Efficient**: Optimized resource management
 
 ### 🎬 **Animation & Motion**
-- **Keyframe Animation** - Professional timeline with interpolation
-- **Procedural Animation** - L-systems, noise, attractors
-- **Camera Animation** - Cinematic camera movement
-- **Parameter Automation** - Dynamic fractal parameter changes
+- **Keyframe Animation**: Professional timeline with interpolation
+- **Procedural Animation**: L-systems, noise, attractors
+- **Camera Animation**: Cinematic camera movement
+- **Parameter Automation**: Dynamic fractal parameter changes
 
-### 🎨 **PBR Rendering Pipeline**
-- **Physically Based Rendering** - Realistic material properties
-- **Global Illumination** - Indirect lighting and reflections
-- **HDRI Environment Maps** - Realistic lighting environments
-- **Advanced Materials** - Metallic, roughness, emission properties
+### 🎨 **Rendering Pipeline**
+- **Ray Marching**: Real-time distance field rendering
+- **Adaptive Quality**: Automatic LOD based on performance
+- **Professional Viewport**: 3D navigation and camera controls
+- **Material System**: PBR materials with metallic/roughness workflow
 
 ### 📺 **Real-time Output**
-- **Video Mapping** - Projection mapping with keystone correction
-- **Installation Support** - Multi-screen setups with edge blending
-- **Live Performance** - Syphon, Spout, NDI, DMX output
-- **Interactive Installations** - Real-time parameter control
+- **Multi-Display**: Support for complex display setups
+- **Viewport Controls**: Professional camera and navigation tools
+- **Interactive Controls**: Real-time parameter adjustment
+- **Export Preview**: WYSIWYG export preparation
 
-### 🔗 **Blockchain Integration**
-- **NFT Minting** - Filecoin and NEAR blockchain support
-- **Metadata Generation** - Automatic complexity scoring and attributes
-- **IPFS Storage** - Decentralized fractal data storage
-- **Smart Contracts** - Automated minting and royalties
-
-### 🎮 **High-Tech UI/UX**
-- **Glassmorphism Design** - Modern semi-transparent interfaces
-- **Customizable Workspaces** - Multiple layout configurations
-- **Pie Menus** - Context-sensitive radial menus
-- **Cinematic Viewport** - Professional rendering viewport with HUD
+### 🎮 **Professional UI/UX**
+- **Dark Theme**: Modern dark interface with glassmorphism
+- **Customizable Workspaces**: Multiple layout configurations
+- **Context Menus**: Right-click context-sensitive actions
+- **Keyboard Shortcuts**: Efficient workflow optimization
 
 ## 📦 Installation
 
-### From Crates.io
-```bash
-cargo add rust-fractal-shader-engine
-```
+### Prerequisites
+- Rust 1.70+
+- Vulkan/Metal/DX12 compatible GPU
+- Audio device (optional, for audio features)
+- MIDI device (optional, for MIDI control)
 
 ### From Source
 ```bash
-git clone https://github.com/compiling-org/rust-fractal-shader-engine
-cd rust-fractal-shader-engine
+git clone https://github.com/compiling-org/modular-fractal-shader
+cd modular-fractal-shader
 cargo build --release
 ```
 
 ## 🎮 Usage
 
 ### Basic Usage
-```rust
-use rust_fractal_shader_engine::RustFractalShaderEngine;
+```bash
+# Start GUI application
+cargo run
 
-let mut engine = RustFractalShaderEngine::new();
+# Run performance benchmarks
+cargo run -- benchmark
 
-// Load ISF shaders from directory
-let loaded = engine.load_isf_shaders_from_directory("assets/shaders/isf").unwrap();
-println!("Loaded {} ISF shaders", loaded.len());
+# Run compatibility tests
+cargo run -- test
 
-// Convert ISF to WGSL
-let wgsl_code = engine.convert_isf_to_wgsl(isf_source).unwrap();
+# Build for web deployment
+cargo run --features web
 ```
 
 ### Node Editor Demo
@@ -137,19 +132,18 @@ let wgsl_code = engine.convert_isf_to_wgsl(isf_source).unwrap();
 cargo run --example node_editor_demo
 ```
 
-### ISF Shader Loader
+### Fractal Rendering Demo
 ```bash
-cargo run --example load_isf_shaders
+cargo run --example fractal_demo
 ```
 
 ### Web Deployment
 ```javascript
-import init, { WebFractalStudio } from './pkg/rust_fractal_shader_engine.js';
+import init, { WebFractalStudio } from './pkg/modular_fractal_shader.js';
 
 async function run() {
     await init();
     const studio = WebFractalStudio.new('canvas');
-    studio.load_isf_shader(shaderSource);
     // Start rendering loop
     function render() {
         studio.render_frame(performance.now());
@@ -162,23 +156,20 @@ async function run() {
 ## 🏗️ Architecture
 
 ### Core Components
-- **`RustFractalShaderEngine`** - Main engine with shader management
-- **`ShaderConverter`** - Multi-format shader conversion
-- **`NodeEditorPlugin`** - Visual node composition system
-- **`AudioMidiSystem`** - Real-time audio and MIDI processing
-- **`FractalUniforms`** - GPU parameter buffer structure
-- **`PBRPipeline`** - Physically-based rendering system
-- **`OutputSystem`** - Real-time output management
-- **`NFTManager`** - Blockchain integration
-- **`WorkspaceManager`** - UI layout management
+- **`FractalEngine`** - Main fractal computation engine
+- **`FractalRenderer`** - GPU-accelerated rendering system
+- **`NodeEditor`** - Visual node composition system
+- **`AnimationSystem`** - Timeline and keyframe animation
+- **`SceneSystem`** - 3D scene management
+- **`ExportSystem`** - Mesh and image export
+- **`UISystem`** - Bevy + bevy_egui interface
 
-### Shader Pipeline
-1. **Load** - Import ISF/GLSL shaders from files
-2. **Parse** - Extract metadata and parameters
-3. **Convert** - Transform to target format (WGSL/HLSL)
-4. **Compose** - Combine via node-based interface
-5. **Render** - GPU-accelerated real-time display
-6. **Output** - Export to various formats and destinations
+### Rendering Pipeline
+1. **Fractal Computation** - Distance estimation on GPU
+2. **Ray Marching** - Real-time rendering of distance fields
+3. **Lighting** - Physically-based lighting calculations
+4. **Post-Processing** - Color grading and effects
+5. **Viewport Display** - Interactive 3D viewport
 
 ## 🎨 Node Types
 
@@ -186,22 +177,25 @@ async function run() {
 - **Fractals**: Mandelbrot, Julia, Burning Ship, Mandelbulb, Mandelbox, IFS
 - **Noise**: Perlin, Simplex, Voronoi, Flow noise
 - **Mathematical**: L-Systems, Cellular Automata, Strange Attractors
-- **Imported**: ISF shaders, Shadertoy conversions
+- **Geometric**: Spheres, Boxes, Torus, Custom shapes
+
+### Transforms
+- **Spatial**: Translate, Rotate, Scale
+- **Deformations**: Warp, Twist, Bend, Taper
+- **Combinations**: Union, Intersect, Subtract, Smooth operations
+- **Replication**: Array, Mirror, Circular patterns
 
 ### Effects
 - **Color**: Brightness, Contrast, Saturation, Hue, Curves
-- **Geometry**: Rotate, Scale, Warp, Kaleidoscope
+- **Geometry**: Displace, Noise, Fractal perturbation
 - **Filter**: Blur, Sharpen, Edge Detect, Posterize
 - **Distortion**: Wave, Ripple, Fisheye, Swirl
-
-### Audio/MIDI
-- **Analysis**: Spectrum, Beat Detection, Frequency Bands
-- **Control**: MIDI CC Mapping, Note Triggers, Velocity
 
 ### Animation
 - **Timeline**: Keyframe animation with interpolation
 - **Procedural**: LFO, Noise, Attractors
 - **Logic**: If/Then/Else, Switches, Math operations
+- **Control**: Parameter drivers and expressions
 
 ### Rendering
 - **Materials**: PBR properties, textures, normal maps
@@ -210,12 +204,6 @@ async function run() {
 - **Post-Processing**: Bloom, DOF, color grading
 
 ## 🔧 Development
-
-### Prerequisites
-- Rust 1.70+
-- Vulkan/Metal/DX12 compatible GPU
-- Audio device (optional, for audio features)
-- MIDI device (optional, for MIDI control)
 
 ### Building
 ```bash
@@ -230,80 +218,69 @@ cargo test
 
 # Run examples
 cargo run --example node_editor_demo
-cargo run --example load_isf_shaders
+cargo run --example fractal_demo
 ```
 
 ### Project Structure
 ```
 src/
-├── lib.rs              # Main library interface
-├── shader_converter.rs # Shader format conversion
-├── shader_renderer.rs  # GPU rendering system
-├── node_editor.rs      # Visual node editor
-├── nodes.rs           # Node definitions and logic
-├── audio.rs           # Audio/MIDI processing
-├── fractal/           # Fractal computation engine
+├── main.rs              # Application entry point
+├── lib.rs               # Library interface
+├── gui.rs               # Bevy GUI implementation
+├── fractal/             # Fractal engine
 │   ├── mod.rs
 │   ├── engine.rs
 │   ├── formulas.rs
+│   ├── renderer.rs
 │   └── types.rs
-├── pbr/               # PBR rendering pipeline
-│   └── mod.rs
-├── output/            # Real-time output system
-│   └── mod.rs
-├── export/            # Video/image export
-│   └── mod.rs
-├── web/               # Web deployment
-│   └── mod.rs
-├── nft/               # NFT/blockchain integration
-│   └── mod.rs
-├── ui/                # User interface
+├── ui/                  # User interface
 │   ├── mod.rs
 │   ├── main.rs
-│   ├── workspaces.rs
+│   ├── node_editor.rs
+│   ├── theme.rs
 │   └── fractal_ui.rs
-└── animation/         # Animation system
-    ├── mod.rs
-    ├── timeline.rs
-    ├── keyframe.rs
-    └── easing.rs
+├── scene/               # 3D scene management
+│   └── mod.rs
+├── animation/           # Animation system
+│   ├── mod.rs
+│   ├── timeline.rs
+│   └── keyframe.rs
+├── export/              # Export functionality
+│   └── mod.rs
+├── benchmark.rs         # Performance benchmarking
+├── project.rs           # Project management
+└── nodes.rs             # Node definitions
 
-examples/
-├── node_editor_demo.rs    # Visual node editor demo
-├── fractal_demo.rs         # Basic fractal rendering
-└── load_isf_shaders.rs     # ISF shader loading demo
-
-assets/shaders/isf/     # ISF shader collection (369 shaders)
-docs/                   # Documentation
+docs/                    # Documentation
+examples/                # Example applications
+assets/                  # Shaders and resources
 ```
 
 ## 🎯 Roadmap
 
 ### ✅ Completed
-- [x] ISF shader loading and parsing
-- [x] Shader format conversion (ISF ↔ WGSL/HLSL)
-- [x] GPU uniform parameter system
+- [x] Fractal engine with distance estimation
+- [x] GPU-accelerated rendering with WGPU
 - [x] Node-based visual composition
-- [x] Audio analysis and MIDI control
-- [x] Real-time fractal rendering
-- [x] PBR rendering pipeline with global illumination
-- [x] Real-time output for video mapping/installations
-- [x] NFT minting (Filecoin + NEAR)
-- [x] Video recording and export
-- [x] High-tech UI with glassmorphism
-- [x] Customizable workspaces and pie menus
+- [x] Professional UI with Bevy + bevy_egui
+- [x] 3D scene management
+- [x] Basic animation system
+- [x] Mesh and image export
+- [x] Cross-platform support
 - [x] Web deployment (WASM/WebGPU)
+- [x] Migration from eframe to Bevy
 
 ### 🚧 In Progress
-- [x] Performance optimization
-- [ ] Cross-platform testing
-- [ ] Advanced fractal algorithms
+- [x] Advanced animation timeline
+- [ ] Audio/MIDI integration
+- [ ] Global illumination
+- [ ] Volumetric effects
 
 ### 🔮 Future
 - [ ] Plugin system for custom nodes
 - [ ] Networked multi-user collaboration
 - [ ] VR/AR fractal environments
-- [ ] Machine learning shader generation
+- [ ] AI-assisted fractal generation
 
 ## 🤝 Contributing
 
@@ -321,16 +298,16 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- **ISF Community** - For the incredible shader collection
 - **Bevy Engine** - For the amazing Rust game engine
 - **WebGPU/WGSL** - For modern GPU compute capabilities
 - **Rust Community** - For the excellent ecosystem
+- **Fractal Community** - For the inspiration and algorithms
 
 ## 📞 Contact
 
-- **Repository**: [GitHub](https://github.com/compiling-org/rust-fractal-shader-engine)
-- **Issues**: [GitHub Issues](https://github.com/compiling-org/rust-fractal-shader-engine/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/compiling-org/rust-fractal-shader-engine/discussions)
+- **Repository**: [GitHub](https://github.com/compiling-org/modular-fractal-shader)
+- **Issues**: [GitHub Issues](https://github.com/compiling-org/modular-fractal-shader/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/compiling-org/modular-fractal-shader/discussions)
 
 ---
 

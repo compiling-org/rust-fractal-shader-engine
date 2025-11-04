@@ -3,393 +3,1028 @@
 //! This module provides the main egui application for the Fractal Shader Studio,
 //! integrating the GPU renderer with the user interface.
 
-use eframe::egui;
+use bevy::prelude::*;
+use bevy_egui::{EguiPlugin, EguiContexts};
+use rfd::FileDialog;
 use crate::ui::node_editor::NodeEditor;
+use crate::fractal::FractalRenderer;
+use crate::project::FractalStudioProject;
+use std::sync::Arc;
 
 /// Main application state
 pub struct FractalStudioApp {
-    time: f32,
-    show_fractal_library: bool,
-    show_parameter_inspector: bool,
-    show_timeline: bool,
-    selected_fractal_type: usize,
-    fractal_types: Vec<&'static str>,
-    node_editor: NodeEditor,
-    
-    // GPU renderer placeholder
-    viewport_texture: Option<egui::TextureId>,
-    has_wgpu_support: bool,
+    // Fractal parameters
+    pub time: f32,
+    pub selected_fractal: usize,
+    pub fractal_types: Vec<&'static str>,
+    pub node_editor: NodeEditor,
 
-    // Working fractal parameters
-    iterations: u32,
-    zoom: f32,
-    offset_x: f32,
-    offset_y: f32,
-    power: f32,
-    bailout: f32,
-    julia_c_real: f32,
-    julia_c_imag: f32,
-    color_offset: f32,
-    color_scale: f32,
+    // GPU renderer
+    pub fractal_renderer: Option<FractalRenderer>,
+    pub viewport_texture: Option<egui::TextureId>,
+    pub has_wgpu_support: bool,
+
+    // Workspace management
+    pub current_workspace: WorkspaceView,
+
+    // Project management
+    pub current_project: FractalStudioProject,
+
+    // Default fractal parameters - reduced for better performance
+    pub max_iterations: u32,
+    pub bailout: f32,
+    pub power: f32,
+    pub scale: f32,
+    pub position: [f32; 3],
+    pub rotation: [f32; 3],
+    pub color_saturation: f32,
+    
+    // Undo/Redo system
+    pub undo_stack: Vec<AppStateSnapshot>,
+    pub redo_stack: Vec<AppStateSnapshot>,
+    pub max_undo_steps: usize,
+}
+
+// Snapshot of application state for undo/redo
+#[derive(Clone)]
+pub struct AppStateSnapshot {
+    pub time: f32,
+    pub selected_fractal: usize,
+    pub max_iterations: u32,
+    pub bailout: f32,
+    pub power: f32,
+    pub scale: f32,
+    pub position: [f32; 3],
+    pub rotation: [f32; 3],
+    pub color_saturation: f32,
+    pub current_workspace: WorkspaceView,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WorkspaceView {
+    Modeling,
+    Animation,
+    Rendering,
+    NodeEditor,
 }
 
 impl Default for FractalStudioApp {
     fn default() -> Self {
         Self {
             time: 0.0,
-            show_fractal_library: true,
-            show_parameter_inspector: true,
-            show_timeline: false,
-            selected_fractal_type: 0,
+            selected_fractal: 0,
             fractal_types: vec![
                 "Mandelbrot",
-                "Julia",
                 "Mandelbulb",
                 "Mandelbox",
-                "IFS Dragon",
                 "Quaternion Julia",
+                "Burning Ship",
+                "Nova",
+                "Phoenix",
+                "Buffalo",
+                "Celtic",
+                "Perpendicular Mandelbrot",
+                "Mandelbar",
+                "Tricorn",
+                "Feather",
+                "Sierpinski",
+                "Koch Snowflake",
+                "Dragon Curve",
+                "IFS Tree",
+                "Lorenz Attractor",
+                "Rossler Attractor",
+                "Chen-Lee Attractor",
             ],
             node_editor: NodeEditor::new(),
+            fractal_renderer: None,
             viewport_texture: None,
             has_wgpu_support: false,
+            current_workspace: WorkspaceView::Modeling,
+            current_project: FractalStudioProject::default(),
             // Default fractal parameters - reduced for better performance
-            iterations: 30,
-            zoom: 1.0,
-            offset_x: 0.0,
-            offset_y: 0.0,
-            power: 2.0,
+            max_iterations: 50,     // Reduced from 100
             bailout: 4.0,
-            julia_c_real: -0.7,
-            julia_c_imag: 0.27015,
-            color_offset: 0.0,
-            color_scale: 1.0,
+            power: 8.0,
+            scale: 2.0,
+            position: [0.0, 0.0, 0.0],
+            rotation: [0.0, 0.0, 0.0],
+            color_saturation: 1.0,
+            // Undo/Redo system
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
+            max_undo_steps: 50,
         }
     }
 }
 
 impl FractalStudioApp {
-    /// Create new application instance
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+    pub fn new() -> Self {
         log::info!("Creating FractalStudioApp instance");
 
-        // Check if we have WGPU support (in newer versions, this field might be different)
-        // For now, we'll assume WGPU is available since we've enabled the feature
-        let has_wgpu_support = true;
-        log::info!("WGPU support available: {}", has_wgpu_support);
-
-        // Configure the app for better Windows compatibility
-        let ctx = &cc.egui_ctx;
-        ctx.set_pixels_per_point(1.0); // Ensure proper scaling
-
-        // Additional Windows-specific fixes from online solutions
-        ctx.set_visuals(egui::Visuals::dark()); // Force dark theme
-        ctx.style_mut(|style| {
-            style.spacing.item_spacing = egui::vec2(8.0, 6.0);
-            style.spacing.button_padding = egui::vec2(8.0, 4.0);
-        });
-
         let mut app = Self::default();
-        app.has_wgpu_support = has_wgpu_support;
+        app.has_wgpu_support = false; // Will be set when WGPU context is available
 
         log::info!("FractalStudioApp created successfully");
         app
     }
 
-    /// Update fractal parameters from UI
-    fn update_fractal_parameters(&mut self, _ui: &mut egui::Ui) {
-        // Update node graph parameters if available
-        // TODO: Implement proper node parameter updates
-    }
-}
-
-impl eframe::App for FractalStudioApp {
-    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        log::debug!("Update called");
-
-        // Update time
-        self.time += ctx.input(|i| i.stable_dt);
-
-        // Request repaint for smooth animation
-        ctx.request_repaint();
-
-        // Main UI layout - simplified for Windows compatibility
-        egui::TopBottomPanel::top("menu_bar").show(ctx, |ui| {
-            self.show_menu_bar(ui);
-        });
-
-        egui::SidePanel::left("fractal_library")
-            .default_width(200.0)
-            .show(ctx, |ui| {
-                self.show_fractal_library_panel(ui);
-            });
-
-        egui::SidePanel::right("parameter_inspector")
-            .default_width(250.0)
-            .show(ctx, |ui| {
-                self.show_parameter_inspector_panel(ui);
-            });
-
-        egui::CentralPanel::default().show(ctx, |ui| {
-            self.show_main_workspace(ctx, ui, frame);
-        });
-
-        if self.show_timeline {
-            egui::TopBottomPanel::bottom("timeline")
-                .default_height(150.0)
-                .show(ctx, |ui| {
-                    self.show_timeline_panel(ui);
-                });
+    pub fn initialize_wgpu(&mut self, device: Arc<bevy::render::renderer::RenderDevice>, queue: Arc<bevy::render::renderer::RenderQueue>, width: u32, height: u32) {
+        log::info!("Initializing WGPU renderer with size {}x{}", width, height);
+        
+        // Limit texture dimensions to device limits (typically 8192)
+        let max_dimension = 8192;
+        let actual_width = std::cmp::min(width, max_dimension);
+        let actual_height = std::cmp::min(height, max_dimension);
+        
+        match FractalRenderer::new_with_wgpu_context(
+            device,
+            queue,
+            actual_width,
+            actual_height,
+        ) {
+            Ok(renderer) => {
+                self.fractal_renderer = Some(renderer);
+                self.has_wgpu_support = true;
+                log::info!("Fractal renderer initialized successfully");
+            }
+            Err(e) => {
+                log::error!("Failed to initialize fractal renderer: {}", e);
+                self.has_wgpu_support = false;
+            }
         }
-
-        log::debug!("Update completed");
     }
 
-    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
-        log::info!("Application exiting");
-    }
-
-    fn save(&mut self, _storage: &mut dyn eframe::Storage) {
-        // Save application state
-        log::info!("Saving application state");
-    }
-
-    fn auto_save_interval(&self) -> std::time::Duration {
-        std::time::Duration::from_secs(30)
-    }
-}
-
-impl FractalStudioApp {
-    /// Show menu bar
-    fn show_menu_bar(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
+    /// Show top panel with application title and controls
+    fn show_top_panel(&mut self, ui: &mut egui::Ui) {
+        // Create menu bar
+        egui::menu::bar(ui, |ui| {
             ui.menu_button("File", |ui| {
                 if ui.button("New Project").clicked() {
-                    *self = Self::default();
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Create a new project
+                    self.current_project = crate::project::FractalStudioProject::new("Untitled Project");
+                    self.viewport_texture = None;
+                    ui.close();
                 }
-                if ui.button("Open Project").clicked() {
-                    // TODO: Implement file dialog
+                if ui.button("Open Project...").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Open file dialog for .fract files
+                    if let Some(path) = rfd::FileDialog::new()
+                        .add_filter("Fractal Studio Project", &["fract"])
+                        .pick_file()
+                    {
+                        match crate::project::FractalStudioProject::load_from_file(&path) {
+                            Ok(project) => {
+                                self.current_project = project;
+                                log::info!("Project loaded successfully from {:?}", path);
+                            }
+                            Err(e) => {
+                                log::error!("Failed to load project: {}", e);
+                            }
+                        }
+                    }
+                    ui.close();
                 }
                 ui.separator();
-                if ui.button("Export Image").clicked() {
-                    // TODO: Implement export
+                
+                // Recent files (placeholder)
+                ui.label("Recent Projects:");
+                if ui.button("Project1.fract").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // TODO: Open recent project
+                    ui.close();
+                }
+                if ui.button("Fractal_Animation.fract").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // TODO: Open recent project
+                    ui.close();
                 }
                 ui.separator();
-                if ui.button("Mint NFT").clicked() {
-                    // TODO: Implement NFT minting dialog
+                
+                if ui.button("Save Project").clicked() {
+                    // Save to current project file or prompt for location
+                    if let Some(path) = rfd::FileDialog::new()
+                        .add_filter("Fractal Studio Project", &["fract"])
+                        .save_file()
+                    {
+                        match self.current_project.save_to_file(&path) {
+                            Ok(_) => {
+                                log::info!("Project saved successfully to {:?}", path);
+                            }
+                            Err(e) => {
+                                log::error!("Failed to save project: {}", e);
+                            }
+                        }
+                    }
+                    ui.close();
+                }
+                if ui.button("Save Project As...").clicked() {
+                    // Save project with new name
+                    if let Some(path) = rfd::FileDialog::new()
+                        .add_filter("Fractal Studio Project", &["fract"])
+                        .save_file()
+                    {
+                        match self.current_project.save_to_file(&path) {
+                            Ok(_) => {
+                                log::info!("Project saved successfully to {:?}", path);
+                            }
+                            Err(e) => {
+                                log::error!("Failed to save project: {}", e);
+                            }
+                        }
+                    }
+                    ui.close();
+                }
+                if ui.button("Save Project Copy...").clicked() {
+                    // Save a copy of the project
+                    if let Some(path) = rfd::FileDialog::new()
+                        .add_filter("Fractal Studio Project", &["fract"])
+                        .save_file()
+                    {
+                        match self.current_project.save_to_file(&path) {
+                            Ok(_) => {
+                                log::info!("Project copy saved successfully to {:?}", path);
+                            }
+                            Err(e) => {
+                                log::error!("Failed to save project copy: {}", e);
+                            }
+                        }
+                    }
+                    ui.close();
+                }
+                ui.separator();
+                
+                // Import/Export
+                ui.menu_button("Import", |ui| {
+                    if ui.button("Import Image...").clicked() {
+                        // Save current state for undo
+                        self.save_state_for_undo();
+                        
+                        // Import image file
+                        if let Some(path) = rfd::FileDialog::new()
+                            .add_filter("Image Files", &["png", "jpg", "jpeg", "tiff", "bmp"])
+                            .pick_file()
+                        {
+                            log::info!("Importing image from {:?}", path);
+                            // TODO: Implement image import
+                        }
+                        ui.close();
+                    }
+                    if ui.button("Import Mesh...").clicked() {
+                        // Save current state for undo
+                        self.save_state_for_undo();
+                        
+                        // Import mesh file
+                        if let Some(path) = rfd::FileDialog::new()
+                            .add_filter("Mesh Files", &["obj", "stl", "fbx", "gltf"])
+                            .pick_file()
+                        {
+                            log::info!("Importing mesh from {:?}", path);
+                            // TODO: Implement mesh import
+                        }
+                        ui.close();
+                    }
+                    if ui.button("Import Shader...").clicked() {
+                        // Save current state for undo
+                        self.save_state_for_undo();
+                        
+                        // Import shader file
+                        if let Some(path) = rfd::FileDialog::new()
+                            .add_filter("Shader Files", &["glsl", "wgsl", "hlsl", "isf"])
+                            .pick_file()
+                        {
+                            log::info!("Importing shader from {:?}", path);
+                            // TODO: Implement shader import
+                        }
+                        ui.close();
+                    }
+                });
+                
+                ui.menu_button("Export", |ui| {
+                    if ui.button("Export Image...").clicked() {
+                        // Export current view as image
+                        if let Some(path) = rfd::FileDialog::new()
+                            .add_filter("Image Files", &["png", "jpg", "tiff"])
+                            .save_file()
+                        {
+                            log::info!("Exporting image to {:?}", path);
+                            // TODO: Implement image export
+                        }
+                        ui.close();
+                    }
+                    if ui.button("Export Animation...").clicked() {
+                        // Export animation sequence
+                        if let Some(path) = rfd::FileDialog::new()
+                            .add_filter("Video Files", &["mp4", "avi", "mov"])
+                            .save_file()
+                        {
+                            log::info!("Exporting animation to {:?}", path);
+                            // TODO: Implement animation export
+                        }
+                        ui.close();
+                    }
+                    if ui.button("Export Mesh...").clicked() {
+                        // Export fractal as mesh
+                        if let Some(path) = rfd::FileDialog::new()
+                            .add_filter("Mesh Files", &["obj", "stl", "fbx"])
+                            .save_file()
+                        {
+                            log::info!("Exporting mesh to {:?}", path);
+                            // TODO: Implement mesh export
+                        }
+                        ui.close();
+                    }
+                    if ui.button("Export Shader...").clicked() {
+                        // Export current shader
+                        if let Some(path) = rfd::FileDialog::new()
+                            .add_filter("Shader Files", &["glsl", "wgsl"])
+                            .save_file()
+                        {
+                            log::info!("Exporting shader to {:?}", path);
+                            // TODO: Implement shader export
+                        }
+                        ui.close();
+                    }
+                });
+                ui.separator();
+                
+                // Project management
+                if ui.button("Project Settings...").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Open project settings dialog
+                    log::info!("Opening project settings");
+                    // TODO: Implement project settings dialog
+                    ui.close();
+                }
+                ui.separator();
+                
+                if ui.button("Quit").clicked() {
+                    // Quit application
+                    log::info!("Quitting application");
+                    // TODO: Implement proper application shutdown
+                    ui.close();
+                }
+            });
+
+            ui.menu_button("Edit", |ui| {
+                if ui.button("Undo").clicked() {
+                    // Undo last action
+                    self.undo();
+                    log::info!("Undo action");
+                    ui.close();
+                }
+                if ui.button("Redo").clicked() {
+                    // Redo last undone action
+                    self.redo();
+                    log::info!("Redo action");
+                    ui.close();
+                }
+                ui.separator();
+                
+                if ui.button("Cut").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Cut selected items
+                    log::info!("Cut action");
+                    // TODO: Implement cut
+                    ui.close();
+                }
+                if ui.button("Copy").clicked() {
+                    // Copy selected items
+                    log::info!("Copy action");
+                    // TODO: Implement copy
+                    ui.close();
+                }
+                if ui.button("Paste").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Paste clipboard contents
+                    log::info!("Paste action");
+                    // TODO: Implement paste
+                    ui.close();
+                }
+                ui.separator();
+                
+                // Selection
+                if ui.button("Select All").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Select all objects
+                    log::info!("Select all");
+                    // TODO: Implement select all
+                    ui.close();
+                }
+                if ui.button("Deselect All").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Deselect all objects
+                    log::info!("Deselect all");
+                    // TODO: Implement deselect all
+                    ui.close();
+                }
+                ui.separator();
+                
+                // Preferences
+                if ui.button("Preferences...").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Open preferences dialog
+                    log::info!("Opening preferences");
+                    // TODO: Implement preferences dialog
+                    ui.close();
                 }
             });
 
             ui.menu_button("View", |ui| {
-                ui.checkbox(&mut self.show_fractal_library, "Fractal Library");
-                ui.checkbox(&mut self.show_parameter_inspector, "Parameter Inspector");
-                ui.checkbox(&mut self.show_timeline, "Timeline");
+                // Workspace views
+                ui.label("Workspaces:");
+                if ui.button("Modeling").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    self.current_workspace = WorkspaceView::Modeling;
+                    ui.close();
+                }
+                if ui.button("Animation").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    self.current_workspace = WorkspaceView::Animation;
+                    ui.close();
+                }
+                if ui.button("Rendering").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    self.current_workspace = WorkspaceView::Rendering;
+                    ui.close();
+                }
+                if ui.button("Node Editor").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    self.current_workspace = WorkspaceView::NodeEditor;
+                    ui.close();
+                }
+                ui.separator();
+                
+                // View controls
+                ui.label("View Controls:");
+                if ui.button("Reset View").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Reset camera view
+                    self.position = [0.0, 0.0, 0.0];
+                    self.rotation = [0.0, 0.0, 0.0];
+                    log::info!("Reset view");
+                    ui.close();
+                }
+                if ui.button("Frame All").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Frame all objects in view
+                    log::info!("Frame all objects");
+                    // TODO: Implement frame all
+                    ui.close();
+                }
+                ui.separator();
+                
+                // Panels
+                ui.label("Panels:");
+                if ui.button("Show/Hide Left Panel").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Toggle left panel visibility
+                    log::info!("Toggle left panel");
+                    // TODO: Implement panel toggle
+                    ui.close();
+                }
+                if ui.button("Show/Hide Right Panel").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Toggle right panel visibility
+                    log::info!("Toggle right panel");
+                    // TODO: Implement panel toggle
+                    ui.close();
+                }
+                if ui.button("Show/Hide Bottom Panel").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Toggle bottom panel visibility
+                    log::info!("Toggle bottom panel");
+                    // TODO: Implement panel toggle
+                    ui.close();
+                }
+                ui.separator();
+                
+                if ui.button("Fullscreen").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Toggle fullscreen mode
+                    log::info!("Toggle fullscreen");
+                    // TODO: Implement fullscreen toggle
+                    ui.close();
+                }
+            });
+
+            ui.menu_button("Fractal", |ui| {
+                // Fractal generation
+                ui.label("Fractal Types:");
+                if ui.button("Mandelbrot").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    self.selected_fractal = 0;
+                    self.reset_parameters_for_fractal_type(0);
+                    ui.close();
+                }
+                if ui.button("Mandelbulb").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    self.selected_fractal = 1;
+                    self.reset_parameters_for_fractal_type(1);
+                    ui.close();
+                }
+                if ui.button("Mandelbox").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    self.selected_fractal = 2;
+                    self.reset_parameters_for_fractal_type(2);
+                    ui.close();
+                }
+                if ui.button("Quaternion Julia").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    self.selected_fractal = 3;
+                    self.reset_parameters_for_fractal_type(3);
+                    ui.close();
+                }
+                ui.separator();
+                
+                // Fractal operations
+                if ui.button("Generate Fractal").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Generate the current fractal
+                    log::info!("Generating fractal");
+                    // TODO: Implement fractal generation
+                    ui.close();
+                }
+                if ui.button("Optimize Parameters").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Optimize rendering parameters
+                    log::info!("Optimizing parameters");
+                    // TODO: Implement parameter optimization
+                    ui.close();
+                }
+                ui.separator();
+                
+                // Fractal settings
+                if ui.button("Fractal Settings...").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Open fractal settings dialog
+                    log::info!("Opening fractal settings");
+                    // TODO: Implement fractal settings dialog
+                    ui.close();
+                }
+            });
+
+            ui.menu_button("Animation", |ui| {
+                // Animation controls
+                if ui.button("Play Animation").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Start playing animation
+                    log::info!("Playing animation");
+                    // TODO: Implement animation playback
+                    ui.close();
+                }
+                if ui.button("Pause Animation").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Pause animation
+                    log::info!("Pausing animation");
+                    // TODO: Implement animation pause
+                    ui.close();
+                }
+                if ui.button("Stop Animation").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Stop animation
+                    log::info!("Stopping animation");
+                    // TODO: Implement animation stop
+                    ui.close();
+                }
+                ui.separator();
+                
+                // Keyframe operations
+                if ui.button("Insert Keyframe").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Insert keyframe at current time
+                    log::info!("Inserting keyframe");
+                    // TODO: Implement keyframe insertion
+                    ui.close();
+                }
+                if ui.button("Delete Keyframe").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Delete selected keyframe
+                    log::info!("Deleting keyframe");
+                    // TODO: Implement keyframe deletion
+                    ui.close();
+                }
+                ui.separator();
+                
+                // Animation settings
+                if ui.button("Animation Settings...").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Open animation settings dialog
+                    log::info!("Opening animation settings");
+                    // TODO: Implement animation settings dialog
+                    ui.close();
+                }
+                if ui.button("Timeline Editor...").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Open timeline editor
+                    log::info!("Opening timeline editor");
+                    // TODO: Implement timeline editor
+                    ui.close();
+                }
+            });
+
+            ui.menu_button("Render", |ui| {
+                // Render operations
+                if ui.button("Render Image").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Render current view as high-quality image
+                    log::info!("Rendering image");
+                    // TODO: Implement image rendering
+                    ui.close();
+                }
+                if ui.button("Render Animation").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Render animation sequence
+                    log::info!("Rendering animation");
+                    // TODO: Implement animation rendering
+                    ui.close();
+                }
+                ui.separator();
+                
+                // Render settings
+                if ui.button("Render Settings...").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Open render settings dialog
+                    log::info!("Opening render settings");
+                    // TODO: Implement render settings dialog
+                    ui.close();
+                }
+                if ui.button("Render Viewport").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Render current viewport
+                    log::info!("Rendering viewport");
+                    // TODO: Implement viewport rendering
+                    ui.close();
+                }
+                ui.separator();
+                
+                // Render quality
+                ui.label("Render Quality:");
+                if ui.button("Preview").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Set preview quality
+                    log::info!("Setting preview quality");
+                    // TODO: Implement quality settings
+                    ui.close();
+                }
+                if ui.button("Production").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Set production quality
+                    log::info!("Setting production quality");
+                    // TODO: Implement quality settings
+                    ui.close();
+                }
+                if ui.button("Custom").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Set custom quality
+                    log::info!("Setting custom quality");
+                    // TODO: Implement quality settings
+                    ui.close();
+                }
+            });
+
+            ui.menu_button("Nodes", |ui| {
+                // Node operations
+                if ui.button("Add Node").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Add new node to graph
+                    log::info!("Adding node");
+                    // TODO: Implement node addition
+                    ui.close();
+                }
+                if ui.button("Delete Node").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Delete selected node
+                    log::info!("Deleting node");
+                    // TODO: Implement node deletion
+                    ui.close();
+                }
+                ui.separator();
+                
+                // Node library
+                ui.label("Node Library:");
+                if ui.button("Fractal Nodes").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Show fractal nodes
+                    log::info!("Showing fractal nodes");
+                    // TODO: Implement node library
+                    ui.close();
+                }
+                if ui.button("Math Nodes").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Show math nodes
+                    log::info!("Showing math nodes");
+                    // TODO: Implement node library
+                    ui.close();
+                }
+                if ui.button("Color Nodes").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Show color nodes
+                    log::info!("Showing color nodes");
+                    // TODO: Implement node library
+                    ui.close();
+                }
+                if ui.button("Animation Nodes").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Show animation nodes
+                    log::info!("Showing animation nodes");
+                    // TODO: Implement node library
+                    ui.close();
+                }
+                ui.separator();
+                
+                // Node settings
+                if ui.button("Node Settings...").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Open node settings dialog
+                    log::info!("Opening node settings");
+                    // TODO: Implement node settings dialog
+                    ui.close();
+                }
+            });
+
+            ui.menu_button("Tools", |ui| {
+                // Camera tools
+                ui.label("Camera:");
+                if ui.button("Orbit Camera").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Activate orbit camera tool
+                    log::info!("Activating orbit camera tool");
+                    // TODO: Implement camera tools
+                    ui.close();
+                }
+                if ui.button("Pan Camera").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Activate pan camera tool
+                    log::info!("Activating pan camera tool");
+                    // TODO: Implement camera tools
+                    ui.close();
+                }
+                if ui.button("Zoom Camera").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Activate zoom camera tool
+                    log::info!("Activating zoom camera tool");
+                    // TODO: Implement camera tools
+                    ui.close();
+                }
+                ui.separator();
+                
+                // Selection tools
+                ui.label("Selection:");
+                if ui.button("Select Object").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Activate object selection tool
+                    log::info!("Activating object selection tool");
+                    // TODO: Implement selection tools
+                    ui.close();
+                }
+                if ui.button("Select Region").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Activate region selection tool
+                    log::info!("Activating region selection tool");
+                    // TODO: Implement selection tools
+                    ui.close();
+                }
+                ui.separator();
+                
+                // Utility tools
+                if ui.button("Measure Tool").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Activate measurement tool
+                    log::info!("Activating measurement tool");
+                    // TODO: Implement utility tools
+                    ui.close();
+                }
+                if ui.button("Transform Tool").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Activate transform tool
+                    log::info!("Activating transform tool");
+                    // TODO: Implement utility tools
+                    ui.close();
+                }
+            });
+
+            ui.menu_button("Window", |ui| {
+                // Window management
+                if ui.button("New Window").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Create new application window
+                    log::info!("Creating new window");
+                    // TODO: Implement window management
+                    ui.close();
+                }
+                ui.separator();
+                
+                // Workspace layouts
+                ui.label("Workspace Layouts:");
+                if ui.button("Save Current Layout").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Save current workspace layout
+                    log::info!("Saving current layout");
+                    // TODO: Implement layout saving
+                    ui.close();
+                }
+                if ui.button("Reset Layout").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Reset to default layout
+                    log::info!("Resetting layout");
+                    // TODO: Implement layout reset
+                    ui.close();
+                }
+                ui.separator();
+                
+                if ui.button("Fullscreen").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Toggle fullscreen mode
+                    log::info!("Toggling fullscreen");
+                    // TODO: Implement fullscreen toggle
+                    ui.close();
+                }
             });
 
             ui.menu_button("Help", |ui| {
-                if ui.button("About").clicked() {
-                    // TODO: Show about dialog
+                if ui.button("Documentation").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Open documentation
+                    log::info!("Opening documentation");
+                    // TODO: Implement documentation access
+                    ui.close();
+                }
+                if ui.button("Tutorials").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Open tutorials
+                    log::info!("Opening tutorials");
+                    // TODO: Implement tutorial access
+                    ui.close();
+                }
+                if ui.button("Examples").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Open examples
+                    log::info!("Opening examples");
+                    // TODO: Implement example access
+                    ui.close();
+                }
+                ui.separator();
+                
+                if ui.button("Community Forum").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Open community forum
+                    log::info!("Opening community forum");
+                    // TODO: Implement forum access
+                    ui.close();
+                }
+                if ui.button("Report Bug").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // Open bug reporting interface
+                    log::info!("Opening bug reporting");
+                    // TODO: Implement bug reporting
+                    ui.close();
+                }
+                ui.separator();
+                
+                if ui.button("About Fractal Studio").clicked() {
+                    // Show about dialog
+                    log::info!("Showing about dialog");
+                    // TODO: Implement about dialog
+                    ui.close();
+                }
+                if ui.button("System Info").clicked() {
+                    // Show system information
+                    log::info!("Showing system info");
+                    // TODO: Implement system info display
+                    ui.close();
                 }
             });
-        });
-    }
 
-    /// Show fractal library panel
-    fn show_fractal_library_panel(&mut self, ui: &mut egui::Ui) {
-        ui.heading("Fractal Library");
-
-        ui.separator();
-
-        egui::ScrollArea::vertical().show(ui, |ui| {
-            let mut new_selection = self.selected_fractal_type;
-            for (i, fractal_name) in self.fractal_types.iter().enumerate() {
-                if ui.selectable_label(self.selected_fractal_type == i, *fractal_name).clicked() {
-                    new_selection = i;
-                }
-            }
-
-            // Update selection and reset parameters if changed
-            if new_selection != self.selected_fractal_type {
-                self.selected_fractal_type = new_selection;
-                self.reset_parameters_for_fractal_type(new_selection);
-            }
-        });
-
-        ui.separator();
-        ui.label("Click to select fractal type");
-        ui.label("Parameters will update automatically");
-    }
-
-    /// Reset parameters based on fractal type
-    fn reset_parameters_for_fractal_type(&mut self, fractal_type: usize) {
-        match fractal_type {
-            0 => { // Mandelbrot
-                self.iterations = 100;
-                self.zoom = 1.0;
-                self.offset_x = 0.0;
-                self.offset_y = 0.0;
-                self.power = 2.0;
-                self.bailout = 4.0;
-            }
-            1 => { // Julia
-                self.iterations = 100;
-                self.zoom = 1.0;
-                self.offset_x = 0.0;
-                self.offset_y = 0.0;
-                self.power = 2.0;
-                self.bailout = 4.0;
-                self.julia_c_real = -0.7;
-                self.julia_c_imag = 0.27015;
-            }
-            2 => { // Mandelbulb
-                self.iterations = 50;
-                self.zoom = 1.0;
-                self.offset_x = 0.0;
-                self.offset_y = 0.0;
-                self.power = 8.0;
-                self.bailout = 4.0;
-            }
-            3 => { // Mandelbox
-                self.iterations = 20;
-                self.zoom = 1.0;
-                self.offset_x = 0.0;
-                self.offset_y = 0.0;
-                self.power = 2.0;
-                self.bailout = 4.0;
-            }
-            _ => {}
-        }
-    }
-
-    /// Show parameter inspector panel
-    fn show_parameter_inspector_panel(&mut self, ui: &mut egui::Ui) {
-        ui.heading("Parameters");
-
-        ui.separator();
-
-        egui::ScrollArea::vertical().show(ui, |ui| {
-            // Fractal type specific parameters
-            match self.selected_fractal_type {
-                0 => self.show_mandelbrot_parameters(ui),
-                1 => self.show_julia_parameters(ui),
-                2 => self.show_mandelbulb_parameters(ui),
-                _ => {}
-            }
-
-            ui.separator();
-
-            // Common parameters
-            self.show_common_parameters(ui);
-
-            ui.separator();
-
-            // Color parameters
-            self.show_color_parameters(ui);
-
-            ui.separator();
-
-            // Render controls
-            self.show_render_controls(ui);
-        });
-    }
-
-    /// Show Mandelbrot parameters
-    fn show_mandelbrot_parameters(&mut self, ui: &mut egui::Ui) {
-        ui.label("Mandelbrot Parameters");
-
-        ui.add(egui::Slider::new(&mut self.zoom, 0.1..=10.0).text("Zoom"));
-        ui.add(egui::Slider::new(&mut self.offset_x, -2.0..=2.0).text("Center X"));
-        ui.add(egui::Slider::new(&mut self.offset_y, -2.0..=2.0).text("Center Y"));
-    }
-
-    /// Show Julia parameters
-    fn show_julia_parameters(&mut self, ui: &mut egui::Ui) {
-        ui.label("Julia Parameters");
-
-        ui.add(egui::Slider::new(&mut self.julia_c_real, -2.0..=2.0).text("C Real"));
-        ui.add(egui::Slider::new(&mut self.julia_c_imag, -2.0..=2.0).text("C Imag"));
-        ui.add(egui::Slider::new(&mut self.zoom, 0.1..=10.0).text("Zoom"));
-        ui.add(egui::Slider::new(&mut self.offset_x, -2.0..=2.0).text("Center X"));
-        ui.add(egui::Slider::new(&mut self.offset_y, -2.0..=2.0).text("Center Y"));
-    }
-
-    /// Show Mandelbulb parameters
-    fn show_mandelbulb_parameters(&mut self, ui: &mut egui::Ui) {
-        ui.label("Mandelbulb Parameters");
-
-        ui.add(egui::Slider::new(&mut self.power, 2.0..=16.0).text("Power"));
-        ui.add(egui::Slider::new(&mut self.zoom, 0.1..=5.0).text("Zoom"));
-        ui.add(egui::Slider::new(&mut self.offset_x, -2.0..=2.0).text("Center X"));
-        ui.add(egui::Slider::new(&mut self.offset_y, -2.0..=2.0).text("Center Y"));
-    }
-
-    /// Show common parameters
-    fn show_common_parameters(&mut self, ui: &mut egui::Ui) {
-        ui.label("Common Parameters");
-
-        ui.add(egui::Slider::new(&mut self.iterations, 10..=500).text("Max Iterations"));
-        ui.add(egui::Slider::new(&mut self.bailout, 2.0..=100.0).text("Bailout"));
-    }
-
-    /// Show color parameters
-    fn show_color_parameters(&mut self, ui: &mut egui::Ui) {
-        ui.label("Color Parameters");
-
-        ui.add(egui::Slider::new(&mut self.color_offset, 0.0..=6.28).text("Color Offset"));
-        ui.add(egui::Slider::new(&mut self.color_scale, 0.1..=5.0).text("Color Scale"));
-    }
-
-    /// Show render controls
-    fn show_render_controls(&mut self, ui: &mut egui::Ui) {
-        ui.label("Render Controls");
-
-        if ui.button("Reset Parameters").clicked() {
-            self.reset_parameters_for_fractal_type(self.selected_fractal_type);
-        }
-
-        if ui.button("Randomize Colors").clicked() {
-            self.color_offset = rand::random::<f32>() * 6.28;
-            self.color_scale = 0.5 + rand::random::<f32>() * 2.0;
-        }
-
-        ui.separator();
-        
-        // Performance controls
-        ui.label("Performance");
-        ui.add(egui::Slider::new(&mut self.iterations, 10..=100).text("Max Iterations"));
-        
-        ui.separator();
-        ui.label(format!("Current FPS: {:.1}", 1.0 / ui.input(|i| i.unstable_dt)));
-        ui.label(format!("Time: {:.2}s", self.time));
-    }
-
-    /// Show main workspace with multiple panels like Mandelbulb3D/Mandelber
-    fn show_main_workspace(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        // Create dockable workspace system similar to professional 3D software
-        let available_size = ui.available_size();
-
-        // Top toolbar
-        ui.horizontal(|ui| {
-            ui.heading("🌀 Fractal Shader Studio");
-
-            ui.separator();
-
-            // Workspace tabs
-            if ui.selectable_label(true, "🏠 Modeling").clicked() {
-                // Switch to modeling workspace
-            }
-            if ui.selectable_label(false, "🎬 Animation").clicked() {
-                // Switch to animation workspace
-            }
-            if ui.selectable_label(false, "🎨 Rendering").clicked() {
-                // Switch to rendering workspace
-            }
-            if ui.selectable_label(false, "🔗 Node Editor").clicked() {
-                // Switch to node editor workspace
-            }
-
-            ui.separator();
-
-            // Status info
+            // Spacer to push status to the right
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.label(format!("FPS: {:.1}", 1.0 / ui.input(|i| i.unstable_dt)));
                 ui.label(format!("Time: {:.2}s", self.time));
@@ -397,71 +1032,277 @@ impl FractalStudioApp {
         });
 
         ui.separator();
+    }
 
-        // Main workspace layout - similar to Mandelbulb3D interface
-        let workspace_height = available_size.y - 40.0; // Account for toolbar
+    /// Show fractal controls panel
+    fn show_fractal_controls(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Fractal Controls");
 
-        // Left panel - Scene/Fractal parameters (like Mandelbulb3D)
-        egui::SidePanel::left("scene_panel")
-            .default_width(280.0)
-            .show_inside(ui, |ui| {
-                ui.set_height(workspace_height);
-                self.show_scene_panel(ui);
+        ui.separator();
+
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            // Fractal selection with search/filter capability
+            ui.collapsing("Fractal Type", |ui| {
+                ui.label("Select a fractal formula:");
+                
+                // Add a search/filter box
+                let mut filter_text = String::new();
+                ui.text_edit_singleline(&mut filter_text);
+                
+                let mut new_selection = self.selected_fractal;
+                
+                // Create a copy of the fractal types to avoid borrowing issues
+                let fractal_types = self.fractal_types.clone();
+                
+                // Show filtered fractals
+                for (i, fractal_name) in fractal_types.iter().enumerate() {
+                    // Filter based on search text (if any)
+                    if filter_text.is_empty() || fractal_name.to_lowercase().contains(&filter_text.to_lowercase()) {
+                        if ui.selectable_label(self.selected_fractal == i, *fractal_name).clicked() {
+                            // Save current state for undo
+                            self.save_state_for_undo();
+                            
+                            new_selection = i;
+                        }
+                    }
+                }
+                
+                if new_selection != self.selected_fractal {
+                    self.selected_fractal = new_selection;
+                    self.reset_parameters_for_fractal_type(new_selection);
+                }
+                
+                ui.separator();
+                
+                // Show fractal category information
+                ui.label(egui::RichText::new("Fractal Categories:").strong());
+                ui.label("• Classic 2D: Mandelbrot, Julia, Burning Ship");
+                ui.label("• 3D Fractals: Mandelbulb, Mandelbox");
+                ui.label("• Quaternion: Quaternion Julia");
+                ui.label("• Modified: Nova, Phoenix, Buffalo");
+                ui.label("• Celtic Variations: Celtic, Perpendicular");
+                ui.label("• Conjugate: Mandelbar, Tricorn");
+                ui.label("• Artistic: Feather");
+                ui.label("• IFS Systems: Sierpinski, Koch Snowflake");
+                ui.label("• L-Systems: Dragon Curve, IFS Tree");
+                ui.label("• Chaotic: Lorenz, Rossler, Chen-Lee");
             });
 
-        // Right panel - Parameter inspector (like Mandelber)
-        egui::SidePanel::right("inspector_panel")
-            .default_width(320.0)
-            .show_inside(ui, |ui| {
-                ui.set_height(workspace_height);
-                self.show_inspector_panel(ui);
+            ui.separator();
+
+            // Quick parameters (like Mandelbulb3D)
+            ui.collapsing("Quick Parameters", |ui| {
+                ui.add(egui::Slider::new(&mut self.max_iterations, 10..=500).text("Iterations"));
+                ui.add(egui::Slider::new(&mut self.scale, 0.1..=10.0).text("Scale"));
+                ui.add(egui::Slider::new(&mut self.power, 2.0..=16.0).text("Power"));
+                ui.add(egui::Slider::new(&mut self.bailout, 1.0..=100.0).text("Bailout"));
+                ui.add(egui::Slider::new(&mut self.color_saturation, 0.0..=2.0).text("Color Saturation"));
             });
 
-        // Bottom panel - Timeline (when enabled)
-        if self.show_timeline {
-            egui::TopBottomPanel::bottom("timeline_panel")
-                .default_height(180.0)
-                .show_inside(ui, |ui| {
-                    self.show_timeline_panel(ui);
-                });
-        }
+            ui.separator();
 
-        // Central viewport - Main 3D view (like both applications)
-        egui::CentralPanel::default().show_inside(ui, |ui| {
-            let viewport_height = if self.show_timeline { workspace_height - 180.0 } else { workspace_height };
-            ui.set_height(viewport_height);
+            // Camera controls (like Mandelbulb3D)
+            ui.collapsing("Camera", |ui| {
+                ui.label("Position:");
+                ui.add(egui::DragValue::new(&mut self.position[0]).speed(0.1).prefix("X: "));
+                ui.add(egui::DragValue::new(&mut self.position[1]).speed(0.1).prefix("Y: "));
+                ui.add(egui::DragValue::new(&mut self.position[2]).speed(0.1).prefix("Z: "));
+                
+                ui.label("Rotation:");
+                ui.add(egui::DragValue::new(&mut self.rotation[0]).speed(1.0).prefix("X: "));
+                ui.add(egui::DragValue::new(&mut self.rotation[1]).speed(1.0).prefix("Y: "));
+                ui.add(egui::DragValue::new(&mut self.rotation[2]).speed(1.0).prefix("Z: "));
+                
+                if ui.button("Reset Camera").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    self.position = [0.0, 0.0, 0.0];
+                    self.rotation = [0.0, 0.0, 0.0];
+                }
+            });
+
+            ui.separator();
+
+            // Lighting (like Mandelbulb3D)
+            ui.collapsing("Lighting", |ui| {
+                ui.label("Lighting setup (TODO)");
+                if ui.button("Add Light").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // TODO: Add light
+                }
+                if ui.button("Reset Lighting").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // TODO: Reset lighting
+                }
+            });
+
+            ui.separator();
+
+            // Materials (like Mandelbulb3D)
+            ui.collapsing("Materials", |ui| {
+                ui.label("Material editor (TODO)");
+                if ui.button("New Material").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // TODO: Create material
+                }
+                if ui.button("Reset Materials").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // TODO: Reset materials
+                }
+            });
             
-            // Show 3D fractal viewport
-            let size = ui.available_size();
-            self.show_3d_viewport(ui, size);
+            ui.separator();
+
+            // Code Editor (like TouchDesigner)
+            ui.collapsing("📝 Code Editor", |ui| {
+                ui.label("Fractal formula code editor");
+                if ui.button("Open External Editor").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    // This would launch an external editor in a real implementation
+                    ui.label("External editor would open here...");
+                }
+                
+                ui.separator();
+                
+                // Simple code editor placeholder
+                egui::ScrollArea::vertical()
+                    .max_height(200.0)
+                    .show(ui, |ui| {
+                        ui.add(
+                            egui::TextEdit::multiline(&mut String::new())
+                                .font(egui::TextStyle::Monospace)
+                                .code_editor()
+                                .desired_width(f32::INFINITY)
+                                .desired_rows(10)
+                                .hint_text("// Fractal formula code would go here...")
+                        );
+                    });
+            });
         });
     }
 
-    /// Show 3D fractal viewport
-    fn show_3d_viewport(&mut self, ui: &mut egui::Ui, size: egui::Vec2) {
-        let (rect, _response) = ui.allocate_exact_size(size, egui::Sense::hover());
-        let painter = ui.painter();
+    /// Show node editor panel
+    fn show_node_editor(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Node Editor");
+        ui.separator();
+        
+        // Get available size for the node editor
+        let size = ui.available_rect_before_wrap().size();
+        
+        // Call node editor with context
+        self.node_editor.show(ui, size);
+    }
 
+    /// Show fractal viewport
+    fn show_fractal_viewport(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        let (rect, _response) = ui.allocate_exact_size(ui.available_size(), egui::Sense::hover());
+        
         // Try to get WGPU render state for GPU rendering
         if self.has_wgpu_support {
-            // We have access to WGPU - we can render to a texture and display it
-            // For now, we'll show a placeholder with GPU info
-            painter.rect_filled(
-                rect,
-                4.0,
-                egui::Color32::from_rgb(30, 35, 45),
-            );
-            
-            // Show GPU rendering info
-            painter.text(
-                rect.center(),
-                egui::Align2::CENTER_CENTER,
-                "🎮 GPU Rendering Active\nFractal Viewport",
-                egui::FontId::proportional(16.0),
-                egui::Color32::from_rgb(180, 200, 220),
-            );
+            // If we have a renderer, display it
+            if let Some(renderer) = &mut self.fractal_renderer {
+                // Actually render a frame
+                let screen_size = ctx.input(|i| i.screen_rect.size());
+                let width = screen_size.x as u32;
+                let height = screen_size.y as u32;
+                
+                // Render a frame and get the texture
+                match renderer.render_frame_to_texture(self.time, (width, height), ctx) {
+                    Ok(texture_id) => {
+                        // Display the texture
+                        let painter = ui.painter();
+                        painter.image(
+                            texture_id,
+                            rect,
+                            egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+                            egui::Color32::WHITE,
+                        );
+                        
+                        // Show overlay information
+                        let align_left = egui::Align2::LEFT_TOP;
+                        painter.text(
+                            rect.min + egui::vec2(10.0, 10.0),
+                            align_left,
+                            format!("Resolution: {}×{}", width, height),
+                            egui::FontId::proportional(14.0),
+                            egui::Color32::from_rgb(255, 255, 255),
+                        );
+                        
+                        painter.text(
+                            rect.min + egui::vec2(10.0, 30.0),
+                            align_left,
+                            format!("Time: {:.1}s | Fractal: {}", self.time, self.fractal_types[self.selected_fractal]),
+                            egui::FontId::proportional(14.0),
+                            egui::Color32::from_rgb(255, 255, 255),
+                        );
+                    }
+                    Err(e) => {
+                        // Renderer error
+                        let painter = ui.painter();
+                        painter.rect_filled(
+                            rect,
+                            4.0,
+                            egui::Color32::from_rgb(50, 30, 30),
+                        );
+                        
+                        let align_center = egui::Align2::CENTER_CENTER;
+                        painter.text(
+                            rect.center() - egui::vec2(0.0, 20.0),
+                            align_center,
+                            "❌ GPU Rendering Error",
+                            egui::FontId::proportional(18.0),
+                            egui::Color32::from_rgb(220, 100, 100),
+                        );
+                        
+                        painter.text(
+                            rect.center() + egui::vec2(0.0, 20.0),
+                            align_center,
+                            format!("{}", e),
+                            egui::FontId::proportional(12.0),
+                            egui::Color32::from_rgb(200, 180, 180),
+                        );
+                    }
+                }
+            } else {
+                // Renderer not initialized
+                let painter = ui.painter();
+                painter.rect_filled(
+                    rect,
+                    4.0,
+                    egui::Color32::from_rgb(30, 35, 45),
+                );
+                
+                let align_center = egui::Align2::CENTER_CENTER;
+                painter.text(
+                    rect.center() - egui::vec2(0.0, 20.0),
+                    align_center,
+                    "🎮 GPU Available",
+                    egui::FontId::proportional(18.0),
+                    egui::Color32::from_rgb(180, 200, 220),
+                );
+                
+                painter.text(
+                    rect.center() + egui::vec2(0.0, 20.0),
+                    align_center,
+                    "Initializing Renderer...",
+                    egui::FontId::proportional(14.0),
+                    egui::Color32::from_rgb(180, 200, 220),
+                );
+            }
         } else {
             // Fallback to CPU rendering or placeholder
+            let painter = ui.painter();
             painter.rect_filled(
                 rect,
                 4.0,
@@ -523,383 +1364,25 @@ impl FractalStudioApp {
             painter.line_segment([front_bottom_right, back_bottom_right], egui::Stroke::new(1.0, egui::Color32::from_rgb(150, 150, 180)));
 
             // Label
+            let align_center = egui::Align2::CENTER_CENTER;
             painter.text(
                 rect.center() + egui::vec2(0.0, 100.0),
-                egui::Align2::CENTER_CENTER,
-                "3D Fractal Viewport\n(GPU Rendering Integration)",
+                align_center,
+                "3D Fractal Viewport\n(GPU Not Available)",
                 egui::FontId::proportional(14.0),
                 egui::Color32::from_rgb(180, 180, 200),
             );
-        }
-    }
-
-    /// Render fractal to viewport
-    fn render_fractal_to_viewport(&mut self, ui: &mut egui::Ui, size: egui::Vec2) {
-        let (rect, _response) = ui.allocate_exact_size(size, egui::Sense::hover());
-        let painter = ui.painter();
-
-        // More aggressive performance optimization
-        let quality_factor = 4; // Render every 4th pixel for much better performance
-        let width = (rect.width() as usize) / quality_factor;
-        let height = (rect.height() as usize) / quality_factor;
-
-        // Only render if we have reasonable dimensions
-        if width > 0 && height > 0 {
-            // Create a temporary texture to store fractal data
-            let mut pixels: Vec<egui::Color32> = Vec::with_capacity(width * height);
             
-            for y in 0..height {
-                for x in 0..width {
-                    let uv_x = (x as f32 * quality_factor as f32 / rect.width() - 0.5) * 4.0 / self.zoom + self.offset_x;
-                    let uv_y = (y as f32 * quality_factor as f32 / rect.height() - 0.5) * 4.0 / self.zoom + self.offset_y;
-
-                    let color = match self.selected_fractal_type {
-                        0 => self.compute_mandelbrot_pixel(uv_x, uv_y),
-                        1 => self.compute_julia_pixel(uv_x, uv_y),
-                        2 => self.compute_mandelbulb_pixel(uv_x, uv_y, (height - y) as f32 / height as f32),
-                        _ => self.compute_mandelbrot_pixel(uv_x, uv_y),
-                    };
-                    
-                    pixels.push(color);
-                }
-            }
-
-            // Draw the pixels with scaling
-            for (i, color) in pixels.iter().enumerate() {
-                let x = (i % width) as f32 * quality_factor as f32;
-                let y = (i / width) as f32 * quality_factor as f32;
-                let pixel_pos = rect.min + egui::vec2(x, y);
-                
-                painter.rect_filled(
-                    egui::Rect::from_min_size(pixel_pos, egui::vec2(quality_factor as f32, quality_factor as f32)),
-                    0.0,
-                    *color,
-                );
-            }
-        }
-
-        // Draw grid overlay
-        self.draw_viewport_grid(painter, rect);
-        
-        // Draw performance info
-        painter.text(
-            rect.left_top() + egui::vec2(10.0, 10.0),
-            egui::Align2::LEFT_TOP,
-            format!("Quality: 1/{}", quality_factor),
-            egui::FontId::default(),
-            egui::Color32::WHITE,
-        );
-    }
-
-    /// Compute Mandelbrot set color for pixel
-    fn compute_mandelbrot_pixel(&self, x: f32, y: f32) -> egui::Color32 {
-        let mut zx = 0.0;
-        let mut zy = 0.0;
-        let mut iteration = 0;
-        
-        // Limit iterations for UI responsiveness
-        let max_iterations = self.iterations.min(100);
-
-        while zx * zx + zy * zy < self.bailout && iteration < max_iterations {
-            let xtemp = zx * zx - zy * zy + x;
-            zy = 2.0 * zx * zy + y;
-            zx = xtemp;
-            iteration += 1;
-        }
-
-        if iteration == max_iterations {
-            egui::Color32::BLACK
-        } else {
-            let t = iteration as f32 / max_iterations as f32;
-            let hue = (self.color_offset + t * self.color_scale) % 1.0;
-            self.hsv_to_rgb(hue, 0.8, 1.0)
-        }
-    }
-
-    /// Compute Julia set color for pixel
-    fn compute_julia_pixel(&self, x: f32, y: f32) -> egui::Color32 {
-        let mut zx = x;
-        let mut zy = y;
-        let mut iteration = 0;
-        
-        // Limit iterations for UI responsiveness
-        let max_iterations = self.iterations.min(100);
-
-        while zx * zx + zy * zy < self.bailout && iteration < max_iterations {
-            let xtemp = zx * zx - zy * zy + self.julia_c_real;
-            zy = 2.0 * zx * zy + self.julia_c_imag;
-            zx = xtemp;
-            iteration += 1;
-        }
-
-        if iteration == max_iterations {
-            egui::Color32::BLACK
-        } else {
-            let t = iteration as f32 / max_iterations as f32;
-            let hue = (self.color_offset + t * self.color_scale) % 1.0;
-            self.hsv_to_rgb(hue, 0.8, 1.0)
-        }
-    }
-
-    /// Compute Mandelbulb color for pixel (simplified 2D slice)
-    fn compute_mandelbulb_pixel(&self, x: f32, y: f32, z: f32) -> egui::Color32 {
-        let mut px = x;
-        let mut py = y;
-        let mut pz = z;
-        let mut r = 0.0;
-        let mut iteration = 0;
-        
-        // Limit iterations for UI responsiveness
-        let max_iterations = self.iterations.min(50);
-
-        while iteration < max_iterations {
-            r = (px * px + py * py + pz * pz).sqrt();
-            if r > self.bailout {
-                break;
-            }
-
-            // Convert to polar coordinates
-            let theta = (pz / r).acos();
-            let phi = py.atan2(px);
-
-            // Scale and rotate
-            let zr = r.powf(self.power);
-            let theta_new = theta * self.power;
-            let phi_new = phi * self.power;
-
-            // Convert back to cartesian
-            px = zr * theta_new.sin() * phi_new.cos();
-            py = zr * theta_new.sin() * phi_new.sin();
-            pz = zr * theta_new.cos();
-
-            px += x;
-            py += y;
-            pz += z;
-
-            iteration += 1;
-        }
-
-        if iteration == max_iterations {
-            egui::Color32::BLACK
-        } else {
-            let t = iteration as f32 / max_iterations as f32;
-            let hue = (self.color_offset + t * self.color_scale) % 1.0;
-            self.hsv_to_rgb(hue, 0.8, 1.0)
-        }
-    }
-
-    /// Convert HSV to RGB color
-    fn hsv_to_rgb(&self, h: f32, s: f32, v: f32) -> egui::Color32 {
-        let c = v * s;
-        let x = c * (1.0 - ((h * 6.0) % 2.0 - 1.0).abs());
-        let m = v - c;
-
-        let (r, g, b) = if h < 1.0/6.0 {
-            (c, x, 0.0)
-        } else if h < 2.0/6.0 {
-            (x, c, 0.0)
-        } else if h < 3.0/6.0 {
-            (0.0, c, x)
-        } else if h < 4.0/6.0 {
-            (0.0, x, c)
-        } else if h < 5.0/6.0 {
-            (x, 0.0, c)
-        } else {
-            (c, 0.0, x)
-        };
-
-        egui::Color32::from_rgb(
-            ((r + m) * 255.0) as u8,
-            ((g + m) * 255.0) as u8,
-            ((b + m) * 255.0) as u8,
-        )
-    }
-
-    /// Draw viewport grid (like professional 3D software)
-    fn draw_viewport_grid(&self, painter: &egui::Painter, rect: egui::Rect) {
-        let grid_color = egui::Color32::from_rgb(60, 70, 85);
-        let grid_size = 50.0;
-
-        // Vertical lines
-        let start_x = rect.left();
-        let end_x = rect.right();
-        let start_y = rect.top();
-        let end_y = rect.bottom();
-
-        let mut x = start_x;
-        while x <= end_x {
-            painter.line_segment(
-                [egui::pos2(x, start_y), egui::pos2(x, end_y)],
-                egui::Stroke::new(1.0, grid_color),
+            // Show overlay information
+            let align_left = egui::Align2::LEFT_TOP;
+            painter.text(
+                rect.min + egui::vec2(10.0, 10.0),
+                align_left,
+                format!("Time: {:.1}s | Fractal: {}", self.time, self.fractal_types[self.selected_fractal]),
+                egui::FontId::proportional(14.0),
+                egui::Color32::from_rgb(255, 255, 255),
             );
-            x += grid_size;
         }
-
-        // Horizontal lines
-        let mut y = start_y;
-        while y <= end_y {
-            painter.line_segment(
-                [egui::pos2(start_x, y), egui::pos2(end_x, y)],
-                egui::Stroke::new(1.0, grid_color),
-            );
-            y += grid_size;
-        }
-
-        // Center lines (emphasized)
-        painter.line_segment(
-            [egui::pos2(rect.center().x, start_y), egui::pos2(rect.center().x, end_y)],
-            egui::Stroke::new(2.0, egui::Color32::from_rgb(100, 120, 140)),
-        );
-        painter.line_segment(
-            [egui::pos2(start_x, rect.center().y), egui::pos2(end_x, rect.center().y)],
-            egui::Stroke::new(2.0, egui::Color32::from_rgb(100, 120, 140)),
-        );
-    }
-
-    /// Show scene/fractal panel (like Mandelbulb3D left panel)
-    fn show_scene_panel(&mut self, ui: &mut egui::Ui) {
-        ui.heading("🌌 Scene");
-
-        ui.separator();
-
-        egui::ScrollArea::vertical().show(ui, |ui| {
-            // Fractal selection
-            ui.collapsing("Fractal Type", |ui| {
-                let mut new_selection = self.selected_fractal_type;
-                for (i, fractal_name) in self.fractal_types.iter().enumerate() {
-                    if ui.selectable_label(self.selected_fractal_type == i, *fractal_name).clicked() {
-                        new_selection = i;
-                    }
-                }
-                if new_selection != self.selected_fractal_type {
-                    self.selected_fractal_type = new_selection;
-                    self.reset_parameters_for_fractal_type(new_selection);
-                }
-            });
-
-            ui.separator();
-
-            // Quick parameters (like Mandelbulb3D)
-            ui.collapsing("Quick Parameters", |ui| {
-                ui.add(egui::Slider::new(&mut self.iterations, 10..=500).text("Iterations"));
-                ui.add(egui::Slider::new(&mut self.zoom, 0.1..=10.0).text("Zoom"));
-                ui.add(egui::Slider::new(&mut self.power, 2.0..=16.0).text("Power"));
-            });
-
-            ui.separator();
-
-            // Camera controls (like Mandelber)
-            ui.collapsing("Camera", |ui| {
-                ui.label("Camera controls (TODO)");
-                if ui.button("Reset Camera").clicked() {
-                    // TODO: Reset camera
-                }
-            });
-
-            ui.separator();
-
-            // Lighting (like Mandelbulb3D)
-            ui.collapsing("Lighting", |ui| {
-                ui.label("Lighting setup (TODO)");
-                if ui.button("Add Light").clicked() {
-                    // TODO: Add light
-                }
-            });
-
-            ui.separator();
-
-            // Materials (like Mandelber)
-            ui.collapsing("Materials", |ui| {
-                ui.label("Material editor (TODO)");
-                if ui.button("New Material").clicked() {
-                    // TODO: Create material
-                }
-            });
-            
-            ui.separator();
-
-            // Code Editor (like TouchDesigner)
-            ui.collapsing("📝 Code Editor", |ui| {
-                ui.label("Fractal formula code editor");
-                if ui.button("Open External Editor").clicked() {
-                    // This would launch an external editor in a real implementation
-                    ui.label("External editor would open here...");
-                }
-                
-                ui.separator();
-                
-                // Simple code editor placeholder
-                egui::ScrollArea::vertical()
-                    .max_height(200.0)
-                    .show(ui, |ui| {
-                        ui.add(
-                            egui::TextEdit::multiline(&mut String::new())
-                                .font(egui::TextStyle::Monospace)
-                                .code_editor()
-                                .desired_width(f32::INFINITY)
-                                .desired_rows(10)
-                                .hint_text("// Fractal formula code would go here...")
-                        );
-                    });
-            });
-        });
-    }
-
-    /// Show inspector panel (like Mandelber right panel)
-    fn show_inspector_panel(&mut self, ui: &mut egui::Ui) {
-        ui.heading("🔧 Inspector");
-
-        ui.separator();
-
-        egui::ScrollArea::vertical().show(ui, |ui| {
-            // Fractal-specific parameters
-            ui.collapsing("Fractal Parameters", |ui| {
-                match self.selected_fractal_type {
-                    0 => { self.show_mandelbrot_parameters(ui); },
-                    1 => { self.show_julia_parameters(ui); },
-                    2 => { self.show_mandelbulb_parameters(ui); },
-                    _ => { ui.label("Parameters for this fractal type"); },
-                }
-            });
-
-            ui.separator();
-
-            // Color parameters (like Mandelbulb3D)
-            ui.collapsing("Coloring", |ui| {
-                ui.add(egui::Slider::new(&mut self.color_offset, 0.0..=6.28).text("Color Offset"));
-                ui.add(egui::Slider::new(&mut self.color_scale, 0.1..=5.0).text("Color Scale"));
-                if ui.button("Random Colors").clicked() {
-                    self.color_offset = rand::random::<f32>() * 6.28;
-                    self.color_scale = 0.5 + rand::random::<f32>() * 2.0;
-                }
-            });
-
-            ui.separator();
-
-            // Animation parameters
-            ui.collapsing("Animation", |ui| {
-                ui.checkbox(&mut self.show_timeline, "Show Timeline");
-                ui.add(egui::Slider::new(&mut self.time, 0.0..=100.0).text("Time"));
-                if ui.button("Reset Time").clicked() {
-                    self.time = 0.0;
-                }
-            });
-
-            ui.separator();
-
-            // Render settings (like Mandelber)
-            ui.collapsing("Render Settings", |ui| {
-                ui.add(egui::Slider::new(&mut self.bailout, 2.0..=100.0).text("Bailout"));
-                if ui.button("High Quality").clicked() {
-                    self.iterations = 200;
-                    self.bailout = 16.0;
-                }
-                if ui.button("Fast Preview").clicked() {
-                    self.iterations = 50;
-                    self.bailout = 4.0;
-                }
-            });
-        });
     }
 
     /// Show timeline panel
@@ -915,53 +1398,861 @@ impl FractalStudioApp {
             if ui.button("⏯").clicked() {
                 // TODO: Implement play/pause
             }
+            if ui.button("⏹").clicked() {
+                // TODO: Implement stop
+            }
+            if ui.button("⏭").clicked() {
+                self.time += 1.0;
+            }
             ui.label(format!("Time: {:.2}s", self.time));
+            
+            // Add a slider for time control
+            ui.add(egui::Slider::new(&mut self.time, 0.0..=100.0).text("Time"));
         });
 
-        // TODO: Implement keyframe timeline
-        ui.label("(Timeline implementation pending)");
+        // Simple timeline visualization
+        let timeline_rect = ui.available_rect_before_wrap();
+        let timeline_height = 100.0;
+        let timeline_rect = egui::Rect::from_min_size(
+            timeline_rect.min,
+            egui::Vec2::new(timeline_rect.width(), timeline_height)
+        );
+        
+        ui.allocate_ui_at_rect(timeline_rect, |ui| {
+            let painter = ui.painter();
+            
+            // Draw timeline background
+            painter.rect_filled(
+                timeline_rect,
+                4.0,
+                egui::Color32::from_rgb(30, 30, 40),
+            );
+            
+            // Draw time marker
+            let marker_x = timeline_rect.min.x + (self.time / 100.0) * timeline_rect.width();
+            let marker_pos = egui::Pos2::new(marker_x, timeline_rect.center().y);
+            painter.circle_filled(
+                marker_pos,
+                8.0,
+                egui::Color32::from_rgb(100, 200, 255),
+            );
+            
+            // Draw time labels
+            for i in 0..=10 {
+                let x = timeline_rect.min.x + (i as f32 / 10.0) * timeline_rect.width();
+                let y = timeline_rect.max.y - 20.0;
+                painter.text(
+                    egui::Pos2::new(x, y),
+                    egui::Align2::CENTER_CENTER,
+                    format!("{}s", i * 10),
+                    egui::FontId::proportional(12.0),
+                    egui::Color32::from_rgb(200, 200, 200),
+                );
+            }
+        });
     }
 
-    /// Run the GUI application
-    pub fn run_gui() -> eframe::Result<()> {
-        // Set up logging for debugging
-        env_logger::init();
+    /// Show audio visualization panel
+    fn show_audio_visualization(&mut self, ui: &mut egui::Ui, audio_data: &crate::audio::AudioData) {
+        ui.heading("Audio Visualization");
+        ui.separator();
 
-        // Windows-specific options to fix visibility issues
-        // Based on common eframe/egui Windows issues and solutions
-        let options = eframe::NativeOptions {
-            viewport: egui::ViewportBuilder::default()
-                .with_inner_size([1400.0, 900.0])
-                .with_title("Fractal Shader Studio")
-                .with_visible(true) // Explicitly set visible
-                .with_active(true)  // Make it active/focused
-                .with_resizable(true)
-                .with_min_inner_size([800.0, 600.0])
-                .with_max_inner_size([1920.0, 1080.0])
-                .with_position(egui::Pos2::new(200.0, 200.0)) // Position away from corner
-                .with_transparent(false) // Disable transparency
-                .with_decorations(true), // Enable window decorations
-            renderer: eframe::Renderer::Wgpu, // Use WGPU renderer
-            ..Default::default()
-        };
+        // Show audio levels
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new("Volume:").strong());
+            ui.add(egui::ProgressBar::new(audio_data.volume).animate(true));
+            ui.label(format!("{:.2}", audio_data.volume));
+        });
 
-        log::info!("Starting Fractal Shader Studio GUI application");
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new("Bass:").strong());
+            ui.add(egui::ProgressBar::new(audio_data.bass_level).animate(true));
+            ui.label(format!("{:.2}", audio_data.bass_level));
+        });
 
-        eframe::run_native(
-            "Fractal Shader Studio",
-            options,
-            Box::new(|cc| {
-                log::info!("GUI context created successfully");
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new("Mid:").strong());
+            ui.add(egui::ProgressBar::new(audio_data.mid_level).animate(true));
+            ui.label(format!("{:.2}", audio_data.mid_level));
+        });
 
-                // Additional Windows-specific setup from online solutions
-                let ctx = &cc.egui_ctx;
-                ctx.set_pixels_per_point(1.0); // Ensure proper scaling
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new("Treble:").strong());
+            ui.add(egui::ProgressBar::new(audio_data.treble_level).animate(true));
+            ui.label(format!("{:.2}", audio_data.treble_level));
+        });
 
-                // Force a repaint to ensure window is visible
-                ctx.request_repaint();
+        ui.separator();
 
-                Ok(Box::new(FractalStudioApp::new(cc)))
-            }),
-        )
+        // Show beat detection
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new("Beat:").strong());
+            let beat_color = if audio_data.beat > 0.5 {
+                egui::Color32::from_rgb(255, 100, 100)
+            } else {
+                egui::Color32::from_rgb(100, 255, 100)
+            };
+            ui.add(egui::ProgressBar::new(audio_data.beat).animate(true).fill(beat_color));
+            ui.label(format!("{:.2}", audio_data.beat));
+        });
+
+        ui.separator();
+
+        // Show spectrum visualization
+        ui.label("Frequency Spectrum:");
+        let spectrum_rect = ui.available_rect_before_wrap();
+        let spectrum_height = 100.0;
+        let spectrum_rect = egui::Rect::from_min_size(
+            spectrum_rect.min,
+            egui::Vec2::new(spectrum_rect.width(), spectrum_height)
+        );
+        
+        ui.allocate_ui_at_rect(spectrum_rect, |ui| {
+            let painter = ui.painter();
+            
+            // Draw spectrum background
+            painter.rect_filled(
+                spectrum_rect,
+                4.0,
+                egui::Color32::from_rgb(25, 25, 35),
+            );
+            
+            // Draw spectrum bars
+            let bar_width = spectrum_rect.width() / audio_data.spectrum.len() as f32;
+            for (i, &value) in audio_data.spectrum.iter().enumerate() {
+                let x = spectrum_rect.min.x + i as f32 * bar_width;
+                let bar_height = value * spectrum_rect.height();
+                let bar_rect = egui::Rect::from_min_size(
+                    egui::Pos2::new(x, spectrum_rect.max.y - bar_height),
+                    egui::Vec2::new(bar_width - 1.0, bar_height)
+                );
+                
+                // Color based on frequency
+                let color_value = (i as f32 / audio_data.spectrum.len() as f32 * 255.0) as u8;
+                let bar_color = egui::Color32::from_rgb(color_value, 200, 255 - color_value);
+                
+                painter.rect_filled(bar_rect, 1.0, bar_color);
+            }
+        });
+
+        ui.separator();
+
+        // Show waveform visualization
+        ui.label("Waveform:");
+        let waveform_rect = ui.available_rect_before_wrap();
+        let waveform_height = 80.0;
+        let waveform_rect = egui::Rect::from_min_size(
+            waveform_rect.min,
+            egui::Vec2::new(waveform_rect.width(), waveform_height)
+        );
+        
+        ui.allocate_ui_at_rect(waveform_rect, |ui| {
+            let painter = ui.painter();
+            
+            // Draw waveform background
+            painter.rect_filled(
+                waveform_rect,
+                4.0,
+                egui::Color32::from_rgb(30, 30, 40),
+            );
+            
+            // Draw waveform line
+            if !audio_data.waveform.is_empty() {
+                let mut points = Vec::new();
+                let step = waveform_rect.width() / audio_data.waveform.len() as f32;
+                
+                for (i, &value) in audio_data.waveform.iter().enumerate() {
+                    let x = waveform_rect.min.x + i as f32 * step;
+                    let y = waveform_rect.center().y - value * waveform_rect.height() / 2.0;
+                    points.push(egui::Pos2::new(x, y));
+                }
+                
+                painter.add(egui::Shape::line(
+                    points,
+                    egui::Stroke::new(2.0, egui::Color32::from_rgb(100, 200, 255))
+                ));
+            }
+        });
     }
+
+    /// Create a snapshot of the current application state
+    fn create_snapshot(&self) -> AppStateSnapshot {
+        AppStateSnapshot {
+            time: self.time,
+            selected_fractal: self.selected_fractal,
+            max_iterations: self.max_iterations,
+            bailout: self.bailout,
+            power: self.power,
+            scale: self.scale,
+            position: self.position,
+            rotation: self.rotation,
+            color_saturation: self.color_saturation,
+            current_workspace: self.current_workspace,
+        }
+    }
+
+    /// Restore application state from a snapshot
+    fn restore_snapshot(&mut self, snapshot: &AppStateSnapshot) {
+        self.time = snapshot.time;
+        self.selected_fractal = snapshot.selected_fractal;
+        self.max_iterations = snapshot.max_iterations;
+        self.bailout = snapshot.bailout;
+        self.power = snapshot.power;
+        self.scale = snapshot.scale;
+        self.position = snapshot.position;
+        self.rotation = snapshot.rotation;
+        self.color_saturation = snapshot.color_saturation;
+        self.current_workspace = snapshot.current_workspace;
+    }
+
+    /// Save current state to undo stack
+    fn save_state_for_undo(&mut self) {
+        // Limit the size of the undo stack
+        if self.undo_stack.len() >= self.max_undo_steps {
+            self.undo_stack.remove(0);
+        }
+        
+        self.undo_stack.push(self.create_snapshot());
+        // Clear redo stack when new action is performed
+        self.redo_stack.clear();
+    }
+
+    /// Undo the last action
+    fn undo(&mut self) {
+        if let Some(snapshot) = self.undo_stack.pop() {
+            // Save current state to redo stack
+            self.redo_stack.push(self.create_snapshot());
+            // Restore the previous state
+            self.restore_snapshot(&snapshot);
+        }
+    }
+
+    /// Redo the last undone action
+    fn redo(&mut self) {
+        if let Some(snapshot) = self.redo_stack.pop() {
+            // Save current state to undo stack
+            self.undo_stack.push(self.create_snapshot());
+            // Restore the redone state
+            self.restore_snapshot(&snapshot);
+        }
+    }
+
+    /// Reset parameters based on fractal type
+    fn reset_parameters_for_fractal_type(&mut self, fractal_type: usize) {
+        match fractal_type {
+            0 => { // Mandelbrot
+                self.max_iterations = 100;
+                self.scale = 1.0;
+                self.power = 2.0;
+                self.bailout = 4.0;
+                self.position = [-0.5, 0.0, 0.0];
+            }
+            1 => { // Mandelbulb
+                self.max_iterations = 50;
+                self.scale = 1.0;
+                self.power = 8.0;
+                self.bailout = 4.0;
+                self.position = [0.0, 0.0, 0.0];
+            }
+            2 => { // Mandelbox
+                self.max_iterations = 20;
+                self.scale = 1.0;
+                self.power = 2.0;
+                self.bailout = 4.0;
+                self.position = [0.0, 0.0, 0.0];
+            }
+            3 => { // Quaternion Julia
+                self.max_iterations = 100;
+                self.scale = 1.0;
+                self.power = 2.0;
+                self.bailout = 4.0;
+                self.position = [0.0, 0.0, 0.0];
+            }
+            4 => { // Burning Ship
+                self.max_iterations = 100;
+                self.scale = 1.0;
+                self.power = 2.0;
+                self.bailout = 4.0;
+                self.position = [-0.5, -0.5, 0.0];
+            }
+            5 => { // Nova
+                self.max_iterations = 100;
+                self.scale = 1.0;
+                self.power = 2.0;
+                self.bailout = 4.0;
+                self.position = [0.0, 0.0, 0.0];
+            }
+            6 => { // Phoenix
+                self.max_iterations = 100;
+                self.scale = 1.0;
+                self.power = 2.0;
+                self.bailout = 4.0;
+                self.position = [0.0, 0.0, 0.0];
+            }
+            7 => { // Buffalo
+                self.max_iterations = 100;
+                self.scale = 1.0;
+                self.power = 2.0;
+                self.bailout = 4.0;
+                self.position = [0.0, 0.0, 0.0];
+            }
+            8 => { // Celtic
+                self.max_iterations = 100;
+                self.scale = 1.0;
+                self.power = 2.0;
+                self.bailout = 4.0;
+                self.position = [0.0, 0.0, 0.0];
+            }
+            9 => { // Perpendicular Mandelbrot
+                self.max_iterations = 100;
+                self.scale = 1.0;
+                self.power = 2.0;
+                self.bailout = 4.0;
+                self.position = [0.0, 0.0, 0.0];
+            }
+            10 => { // Mandelbar
+                self.max_iterations = 100;
+                self.scale = 1.0;
+                self.power = 2.0;
+                self.bailout = 4.0;
+                self.position = [0.0, 0.0, 0.0];
+            }
+            11 => { // Tricorn
+                self.max_iterations = 100;
+                self.scale = 1.0;
+                self.power = 2.0;
+                self.bailout = 4.0;
+                self.position = [0.0, 0.0, 0.0];
+            }
+            12 => { // Feather
+                self.max_iterations = 100;
+                self.scale = 1.0;
+                self.power = 2.0;
+                self.bailout = 4.0;
+                self.position = [0.0, 0.0, 0.0];
+            }
+            13 => { // Sierpinski
+                self.max_iterations = 100;
+                self.scale = 1.0;
+                self.power = 2.0;
+                self.bailout = 4.0;
+                self.position = [0.0, 0.0, 0.0];
+            }
+            14 => { // Koch Snowflake
+                self.max_iterations = 100;
+                self.scale = 1.0;
+                self.power = 2.0;
+                self.bailout = 4.0;
+                self.position = [0.0, 0.0, 0.0];
+            }
+            15 => { // Dragon Curve
+                self.max_iterations = 100;
+                self.scale = 1.0;
+                self.power = 2.0;
+                self.bailout = 4.0;
+                self.position = [0.0, 0.0, 0.0];
+            }
+            16 => { // IFS Tree
+                self.max_iterations = 100;
+                self.scale = 1.0;
+                self.power = 2.0;
+                self.bailout = 4.0;
+                self.position = [0.0, 0.0, 0.0];
+            }
+            17 => { // Lorenz Attractor
+                self.max_iterations = 100;
+                self.scale = 1.0;
+                self.power = 2.0;
+                self.bailout = 4.0;
+                self.position = [0.0, 0.0, 0.0];
+            }
+            18 => { // Rossler Attractor
+                self.max_iterations = 100;
+                self.scale = 1.0;
+                self.power = 2.0;
+                self.bailout = 4.0;
+                self.position = [0.0, 0.0, 0.0];
+            }
+            19 => { // Chen-Lee Attractor
+                self.max_iterations = 100;
+                self.scale = 1.0;
+                self.power = 2.0;
+                self.bailout = 4.0;
+                self.position = [0.0, 0.0, 0.0];
+            }
+            _ => {}
+        }
+    }
+    
+    /// Show MIDI controls panel
+    fn show_midi_controls(&mut self, ui: &mut egui::Ui, midi_controller: &crate::audio::MidiController) {
+        ui.heading("MIDI Controls");
+        ui.separator();
+
+        // Show current MIDI mappings
+        ui.label(egui::RichText::new("MIDI Mappings:").strong());
+        
+        egui::ScrollArea::vertical().max_height(200.0).show(ui, |ui| {
+            for (_, mapping) in &midi_controller.mappings {
+                ui.horizontal(|ui| {
+                    ui.label(egui::RichText::new(&mapping.parameter_name).monospace());
+                    ui.label(format!("Channel: {}", mapping.channel));
+                    ui.label(format!("Controller: {}", mapping.controller));
+                    ui.label(format!("Range: {:.1} - {:.1}", mapping.min_value, mapping.max_value));
+                    
+                    // Show current value if available
+                    if let Some(value) = midi_controller.current_values.get(&mapping.parameter_name) {
+                        ui.label(egui::RichText::new(format!("Value: {:.2}", value)).strong());
+                    }
+                });
+                ui.separator();
+            }
+        });
+
+        ui.separator();
+
+        // Show current MIDI values
+        ui.label(egui::RichText::new("Current MIDI Values:").strong());
+        
+        egui::ScrollArea::vertical().max_height(150.0).show(ui, |ui| {
+            for (param_name, value) in &midi_controller.current_values {
+                ui.horizontal(|ui| {
+                    ui.label(egui::RichText::new(param_name).monospace());
+                    ui.add(egui::ProgressBar::new(*value / 10.0).animate(true)); // Normalize for display
+                    ui.label(format!("{:.2}", value));
+                });
+            }
+        });
+
+        ui.separator();
+
+        // Add mapping controls
+        ui.collapsing("Add MIDI Mapping", |ui| {
+            ui.label("Create new MIDI parameter mappings:");
+            
+            // TODO: Implement MIDI mapping creation UI
+            ui.label("MIDI mapping creation would go here");
+        });
+    }
+
+    /// Show OSC controls panel
+    fn show_osc_controls(&mut self, ui: &mut egui::Ui, osc_controller: &crate::osc::OscController) {
+        ui.heading("OSC Controls");
+        ui.separator();
+
+        // Show OSC server status
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new("OSC Server:").strong());
+            ui.label("Running on port 8000");
+            if ui.button("Stop Server").clicked() {
+                // TODO: Implement OSC server stop
+            }
+        });
+
+        ui.separator();
+
+        // Show current OSC mappings
+        ui.label(egui::RichText::new("OSC Mappings:").strong());
+        
+        egui::ScrollArea::vertical().max_height(200.0).show(ui, |ui| {
+            for (_, mapping) in &osc_controller.mappings {
+                ui.horizontal(|ui| {
+                    ui.label(egui::RichText::new(&mapping.osc_address).monospace());
+                    ui.label(egui::RichText::new("→").weak());
+                    ui.label(egui::RichText::new(&mapping.parameter_name).monospace());
+                    ui.label(format!("Range: {:.1} - {:.1}", mapping.min_value, mapping.max_value));
+                    
+                    // Show current value if available
+                    if let Some(value) = osc_controller.current_values.get(&mapping.parameter_name) {
+                        ui.label(egui::RichText::new(format!("Value: {:.2}", value)).strong());
+                    }
+                });
+                ui.separator();
+            }
+        });
+
+        ui.separator();
+
+        // Show current OSC values
+        ui.label(egui::RichText::new("Current OSC Values:").strong());
+        
+        egui::ScrollArea::vertical().max_height(150.0).show(ui, |ui| {
+            for (param_name, value) in &osc_controller.current_values {
+                ui.horizontal(|ui| {
+                    ui.label(egui::RichText::new(param_name).monospace());
+                    ui.add(egui::ProgressBar::new(*value / 10.0).animate(true)); // Normalize for display
+                    ui.label(format!("{:.2}", value));
+                });
+            }
+        });
+
+        ui.separator();
+
+        // Add mapping controls
+        ui.collapsing("Add OSC Mapping", |ui| {
+            ui.label("Create new OSC parameter mappings:");
+            
+            // TODO: Implement OSC mapping creation UI
+            ui.label("OSC mapping creation would go here");
+        });
+    }
+
+    /// Show gesture controls panel
+    fn show_gesture_controls(&mut self, ui: &mut egui::Ui, gesture_controller: &crate::gesture::GestureController) {
+        ui.heading("Gesture Controls");
+        ui.separator();
+
+        // Show gesture device status
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new("Devices:").strong());
+            if gesture_controller.is_leap_motion_available {
+                ui.label(egui::RichText::new("Leap Motion: Connected").color(egui::Color32::GREEN));
+            } else {
+                ui.label(egui::RichText::new("Leap Motion: Not Connected").color(egui::Color32::RED));
+            }
+            if gesture_controller.is_mediapipe_available {
+                ui.label(egui::RichText::new("MediaPipe: Connected").color(egui::Color32::GREEN));
+            } else {
+                ui.label(egui::RichText::new("MediaPipe: Not Connected").color(egui::Color32::RED));
+            }
+        });
+
+        ui.separator();
+
+        // Show current gesture mappings
+        ui.label(egui::RichText::new("Gesture Mappings:").strong());
+        
+        egui::ScrollArea::vertical().max_height(200.0).show(ui, |ui| {
+            for (_, mapping) in &gesture_controller.parameter_mappings {
+                ui.horizontal(|ui| {
+                    ui.label(egui::RichText::new(&mapping.gesture_name).monospace());
+                    ui.label(egui::RichText::new("→").weak());
+                    ui.label(egui::RichText::new(&mapping.parameter_name).monospace());
+                    ui.label(format!("Range: {:.1} - {:.1}", mapping.min_value, mapping.max_value));
+                    ui.label(format!("Sensitivity: {:.1}", mapping.sensitivity));
+                    
+                    // Show if inverted
+                    if mapping.invert {
+                        ui.label(egui::RichText::new("(Inverted)").weak());
+                    }
+                });
+                ui.separator();
+            }
+        });
+
+        ui.separator();
+
+        // Show current active gestures
+        ui.label(egui::RichText::new("Active Gestures:").strong());
+        
+        // Get current gesture data
+        let gesture_data = gesture_controller.gesture_data.lock().unwrap();
+        
+        egui::ScrollArea::vertical().max_height(150.0).show(ui, |ui| {
+            for (gesture_name, value) in &gesture_data.active_gestures {
+                ui.horizontal(|ui| {
+                    ui.label(egui::RichText::new(gesture_name).monospace());
+                    ui.add(egui::ProgressBar::new(*value).animate(true));
+                    ui.label(format!("{:.2}", value));
+                });
+            }
+            
+            // Show hand positions if available
+            if !gesture_data.hand_positions.is_empty() {
+                ui.separator();
+                ui.label(egui::RichText::new("Hand Positions:").strong());
+                for (i, hand) in gesture_data.hand_positions.iter().enumerate() {
+                    ui.label(format!("Hand {}: ({:.2}, {:.2}, {:.2})", i, hand.palm_position[0], hand.palm_position[1], hand.palm_position[2]));
+                }
+            }
+        });
+
+        ui.separator();
+
+        // Add mapping controls
+        ui.collapsing("Add Gesture Mapping", |ui| {
+            ui.label("Create new gesture parameter mappings:");
+            
+            // TODO: Implement gesture mapping creation UI
+            ui.label("Gesture mapping creation would go here");
+        });
+    }
+}
+
+impl FractalStudioApp {
+    pub fn update(&mut self, ctx: &egui::Context, audio_data: Option<&crate::audio::AudioData>, midi_controller: Option<&crate::audio::MidiController>, osc_controller: Option<&crate::osc::OscController>, gesture_controller: Option<&crate::gesture::GestureController>) {
+        log::debug!("Update started");
+        
+        // Update time for animations
+        self.time += ctx.input(|i| i.unstable_dt);
+
+        // Main UI layout
+        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
+            self.show_top_panel(ui);
+        });
+
+        // Show workspace-specific panels
+        match self.current_workspace {
+            WorkspaceView::Modeling => {
+                // Left panel for scene hierarchy and fractal controls
+                egui::SidePanel::left("left_panel")
+                    .default_width(250.0)
+                    .show(ctx, |ui| {
+                        ui.heading("Scene Hierarchy");
+                        ui.separator();
+                        // TODO: Show scene hierarchy
+                        ui.label("Scene objects would go here");
+                        
+                        ui.separator();
+                        ui.heading("Fractal Controls");
+                        ui.separator();
+                        self.show_fractal_controls(ui);
+                    });
+
+                // Right panel for properties and tools
+                egui::SidePanel::right("right_panel")
+                    .default_width(250.0)
+                    .show(ctx, |ui| {
+                        ui.heading("Properties");
+                        ui.separator();
+                        // TODO: Show selected object properties
+                        ui.label("Object properties would go here");
+                        
+                        ui.separator();
+                        ui.heading("Tools");
+                        ui.separator();
+                        ui.label("Modeling tools would go here");
+                        
+                        // Show audio visualization if audio data is available
+                        if let Some(audio) = audio_data {
+                            ui.separator();
+                            self.show_audio_visualization(ui, audio);
+                        }
+                        
+                        // Show MIDI controls if MIDI controller is available
+                        if let Some(midi) = midi_controller {
+                            ui.separator();
+                            self.show_midi_controls(ui, midi);
+                        }
+                    });
+
+                // Bottom panel for timeline
+                egui::TopBottomPanel::bottom("bottom_panel")
+                    .default_height(100.0)
+                    .show(ctx, |ui| {
+                        self.show_timeline_panel(ui);
+                    });
+
+                // Central panel for 3D viewport
+                egui::CentralPanel::default().show(ctx, |ui| {
+                    self.show_fractal_viewport(ui, ctx);
+                });
+            }
+            
+            WorkspaceView::Animation => {
+                // Left panel for scene hierarchy and keyframe controls
+                egui::SidePanel::left("left_panel")
+                    .default_width(250.0)
+                    .show(ctx, |ui| {
+                        ui.heading("Scene Hierarchy");
+                        ui.separator();
+                        // TODO: Show scene hierarchy
+                        ui.label("Scene objects would go here");
+                        
+                        ui.separator();
+                        ui.heading("Animation Controls");
+                        ui.separator();
+                        ui.label("Animation controls would go here");
+                    });
+
+                // Right panel for animation curves and properties
+                egui::SidePanel::right("right_panel")
+                    .default_width(250.0)
+                    .show(ctx, |ui| {
+                        ui.heading("Animation Curves");
+                        ui.separator();
+                        // TODO: Show animation curves
+                        ui.label("Animation curves would go here");
+                        
+                        ui.separator();
+                        ui.heading("Keyframe Properties");
+                        ui.separator();
+                        ui.label("Keyframe properties would go here");
+                        
+                        // Show audio visualization if audio data is available
+                        if let Some(audio) = audio_data {
+                            ui.separator();
+                            self.show_audio_visualization(ui, audio);
+                        }
+                        
+                        // Show MIDI controls if MIDI controller is available
+                        if let Some(midi) = midi_controller {
+                            ui.separator();
+                            self.show_midi_controls(ui, midi);
+                        }
+                        
+                        // Show OSC controls if OSC controller is available
+                        if let Some(osc) = osc_controller {
+                            ui.separator();
+                            self.show_osc_controls(ui, osc);
+                        }
+                        
+                        // Show gesture controls if gesture controller is available
+                        if let Some(gesture) = gesture_controller {
+                            ui.separator();
+                            self.show_gesture_controls(ui, gesture);
+                        }
+                    });
+
+                // Bottom panel for timeline
+                egui::TopBottomPanel::bottom("bottom_panel")
+                    .default_height(150.0)
+                    .show(ctx, |ui| {
+                        self.show_timeline_panel(ui);
+                    });
+
+                // Central panel for 3D viewport with animation preview
+                egui::CentralPanel::default().show(ctx, |ui| {
+                    self.show_fractal_viewport(ui, ctx);
+                });
+            }
+            
+            WorkspaceView::Rendering => {
+                // Left panel for scene hierarchy and render settings
+                egui::SidePanel::left("left_panel")
+                    .default_width(250.0)
+                    .show(ctx, |ui| {
+                        ui.heading("Scene Hierarchy");
+                        ui.separator();
+                        // TODO: Show scene hierarchy
+                        ui.label("Scene objects would go here");
+                        
+                        ui.separator();
+                        ui.heading("Render Settings");
+                        ui.separator();
+                        ui.label("Render settings would go here");
+                    });
+
+                // Right panel for material editor and render output
+                egui::SidePanel::right("right_panel")
+                    .default_width(250.0)
+                    .show(ctx, |ui| {
+                        ui.heading("Material Editor");
+                        ui.separator();
+                        // TODO: Show material editor
+                        ui.label("Material editor would go here");
+                        
+                        ui.separator();
+                        ui.heading("Render Output");
+                        ui.separator();
+                        ui.label("Render output would go here");
+                        
+                        // Show audio visualization if audio data is available
+                        if let Some(audio) = audio_data {
+                            ui.separator();
+                            self.show_audio_visualization(ui, audio);
+                        }
+                        
+                        // Show MIDI controls if MIDI controller is available
+                        if let Some(midi) = midi_controller {
+                            ui.separator();
+                            self.show_midi_controls(ui, midi);
+                        }
+                        
+                        // Show OSC controls if OSC controller is available
+                        if let Some(osc) = osc_controller {
+                            ui.separator();
+                            self.show_osc_controls(ui, osc);
+                        }
+                        
+                        // Show gesture controls if gesture controller is available
+                        if let Some(gesture) = gesture_controller {
+                            ui.separator();
+                            self.show_gesture_controls(ui, gesture);
+                        }
+                    });
+
+                // Bottom panel for render queue
+                egui::TopBottomPanel::bottom("bottom_panel")
+                    .default_height(120.0)
+                    .show(ctx, |ui| {
+                        ui.heading("Render Queue");
+                        ui.separator();
+                        ui.label("Render queue would go here");
+                    });
+
+                // Central panel for render viewport
+                egui::CentralPanel::default().show(ctx, |ui| {
+                    self.show_fractal_viewport(ui, ctx);
+                });
+            }
+            
+            WorkspaceView::NodeEditor => {
+                // Left panel for node library
+                egui::SidePanel::left("left_panel")
+                    .default_width(250.0)
+                    .show(ctx, |ui| {
+                        ui.heading("Node Library");
+                        ui.separator();
+                        // TODO: Show node library with categories
+                        ui.label("Fractal Nodes");
+                        ui.label("Math Nodes");
+                        ui.label("Color Nodes");
+                        ui.label("Animation Nodes");
+                        ui.label("Utility Nodes");
+                    });
+
+                // Right panel for node properties
+                egui::SidePanel::right("right_panel")
+                    .default_width(250.0)
+                    .show(ctx, |ui| {
+                        ui.heading("Node Properties");
+                        ui.separator();
+                        // TODO: Show selected node properties
+                        ui.label("Node properties would go here");
+                        
+                        // Show audio visualization if audio data is available
+                        if let Some(audio) = audio_data {
+                            ui.separator();
+                            self.show_audio_visualization(ui, audio);
+                        }
+                        
+                        // Show MIDI controls if MIDI controller is available
+                        if let Some(midi) = midi_controller {
+                            ui.separator();
+                            self.show_midi_controls(ui, midi);
+                        }
+                        
+                        // Show OSC controls if OSC controller is available
+                        if let Some(osc) = osc_controller {
+                            ui.separator();
+                            self.show_osc_controls(ui, osc);
+                        }
+                        
+                        // Show gesture controls if gesture controller is available
+                        if let Some(gesture) = gesture_controller {
+                            ui.separator();
+                            self.show_gesture_controls(ui, gesture);
+                        }
+                    });
+
+                // No bottom panel in node editor (or minimal status bar)
+
+                // Central panel for node editor canvas
+                egui::CentralPanel::default().show(ctx, |ui| {
+                    self.show_node_editor(ui);
+                });
+            }
+        }
+
+        log::debug!("Update completed");
+    }
+}
+
+/// Run the GUI application
+pub fn run_gui() -> Result<(), Box<dyn std::error::Error>> {
+    // This function is now a placeholder as the actual implementation is in gui.rs
+    // The Bevy-based GUI is started from src/gui.rs
+    log::info!("GUI functionality is implemented in the Bevy-based system");
+    Ok(())
 }

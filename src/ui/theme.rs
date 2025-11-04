@@ -298,21 +298,21 @@ impl ProfessionalThemes {
                     border: Color32::from_rgb(35, 42, 55),
                     border_radius: 8.0,
                     shadow: Shadow {
-                        offset: Vec2::new(0.0, 2.0),
-                        blur: 8.0,
-                        spread: 0.0,
-                        color: Color32::from_black_alpha(60),
+                        offset: [0, 2],
+                        blur: 8,
+                        spread: 0,
+                        color: Color32::from_black_alpha(80),
                     },
-                    padding: Margin::same(12.0),
+                    padding: Margin::same(12),
                 },
                 card: CardStyle {
                     background: Color32::from_rgb(22, 26, 32),
                     border: Color32::from_rgb(40, 48, 60),
                     border_radius: 10.0,
                     shadow: Shadow {
-                        offset: Vec2::new(0.0, 4.0),
-                        blur: 16.0,
-                        spread: 0.0,
+                        offset: [0, 4],
+                        blur: 16,
+                        spread: 0,
                         color: Color32::from_black_alpha(80),
                     },
                     elevation: 4.0,
@@ -522,9 +522,9 @@ impl ThemeManager {
         // Window styling
         visuals.window_shadow = if theme.effects.enable_shadows {
             Shadow {
-                offset: Vec2::new(0.0, 8.0),
-                blur: 24.0,
-                spread: 0.0,
+                offset: [0i8, 8i8],
+                blur: 24u8,
+                spread: 0u8,
                 color: Color32::from_black_alpha(128),
             }
 
@@ -570,7 +570,7 @@ impl ThemeManager {
     fn apply_spacing(&self, style: &mut Style, theme: &Theme) {
         let spacing = &theme.spacing;
         
-        style.spacing.window_margin = Margin::same(spacing.md as f32);
+        style.spacing.window_margin = Margin::same(spacing.md as i8);
         style.spacing.item_spacing = Vec2::new(spacing.element_spacing, spacing.element_spacing);
         style.spacing.button_padding = Vec2::new(spacing.sm, spacing.sm);
     }

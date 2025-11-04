@@ -4,9 +4,10 @@
 
 use nalgebra::{Matrix4, Vector3, Vector4};
 use std::collections::HashMap;
+use serde::{Deserialize, Serialize};
 
 /// Core fractal formula types
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum FractalFormula {
     /// Classic Mandelbrot set (2D)
     Mandelbrot {
@@ -66,7 +67,7 @@ pub enum FractalFormula {
 }
 
 /// Distance estimation result
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DistanceResult {
     pub distance: f32,
     pub iterations: u32,
@@ -75,7 +76,7 @@ pub struct DistanceResult {
 }
 
 /// Fractal rendering parameters
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FractalParameters {
     pub formula: FractalFormula,
     pub position: Vector3<f32>,
@@ -115,7 +116,7 @@ impl Default for FractalParameters {
 }
 
 /// Color mapping for fractal visualization
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ColorMapping {
     pub palette: Vec<Vector3<f32>>,
     pub cycle_speed: f32,
@@ -124,29 +125,8 @@ pub struct ColorMapping {
     pub contrast: f32,
 }
 
-impl Default for ColorMapping {
-    fn default() -> Self {
-        Self {
-            palette: vec![
-                Vector3::new(0.0, 0.0, 0.0),    // Black
-                Vector3::new(0.2, 0.0, 0.4),    // Dark purple
-                Vector3::new(0.4, 0.0, 0.8),    // Purple
-                Vector3::new(0.8, 0.2, 1.0),    // Light purple
-                Vector3::new(1.0, 0.4, 0.8),    // Pink
-                Vector3::new(1.0, 0.8, 0.4),    // Orange
-                Vector3::new(1.0, 1.0, 0.8),    // Yellow
-                Vector3::new(1.0, 1.0, 1.0),    // White
-            ],
-            cycle_speed: 1.0,
-            saturation: 1.0,
-            brightness: 1.0,
-            contrast: 1.0,
-        }
-    }
-}
-
 /// Lighting parameters
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LightingParameters {
     pub ambient_intensity: f32,
     pub diffuse_intensity: f32,
@@ -156,21 +136,8 @@ pub struct LightingParameters {
     pub light_color: Vector3<f32>,
 }
 
-impl Default for LightingParameters {
-    fn default() -> Self {
-        Self {
-            ambient_intensity: 0.2,
-            diffuse_intensity: 0.8,
-            specular_intensity: 0.5,
-            shininess: 32.0,
-            light_direction: Vector3::new(1.0, 1.0, 1.0).normalize(),
-            light_color: Vector3::new(1.0, 1.0, 1.0),
-        }
-    }
-}
-
 /// Volumetric rendering parameters
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VolumetricParameters {
     pub density: f32,
     pub absorption: f32,
@@ -181,38 +148,30 @@ pub struct VolumetricParameters {
     pub step_size: f32,
 }
 
-impl Default for VolumetricParameters {
-    fn default() -> Self {
-        Self {
-            density: 0.1,
-            absorption: 0.1,
-            scattering: 0.5,
-            fog_color: Vector3::new(0.8, 0.9, 1.0),
-            fog_density: 0.01,
-            max_steps: 100,
-            step_size: 0.01,
-        }
-    }
-}
-
 /// Rendering quality settings
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QualitySettings {
-    pub resolution: (u32, u32),
-    pub samples_per_pixel: u32,
-    pub max_ray_depth: u32,
-    pub adaptive_sampling: bool,
-    pub denoising: bool,
+    pub resolution: [u32; 2],
+    pub anti_aliasing: u32,
+    pub max_iterations: u32,
+    pub distance_threshold: f32,
+    pub normal_epsilon: f32,
+    pub shadow_quality: u32,
+    pub reflection_quality: u32,
+    pub refraction_quality: u32,
 }
 
 impl Default for QualitySettings {
     fn default() -> Self {
         Self {
-            resolution: (1920, 1080),
-            samples_per_pixel: 1,
-            max_ray_depth: 8,
-            adaptive_sampling: false,
-            denoising: false,
+            resolution: [1920, 1080],
+            anti_aliasing: 1,
+            max_iterations: 100,
+            distance_threshold: 0.001,
+            normal_epsilon: 0.001,
+            shadow_quality: 1,
+            reflection_quality: 1,
+            refraction_quality: 1,
         }
     }
 }
