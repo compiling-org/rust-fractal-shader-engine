@@ -12,7 +12,7 @@ mod export;
 mod benchmark;
 
 #[cfg(feature = "gui")]
-use fractal_generator::fractal::FractalParameters;
+use fractal_generator_lib::fractal::types::FractalParameters;
 
 fn main() {
     // Set up panic hook for better error reporting
@@ -128,7 +128,7 @@ fn run_compatibility_tests() {
     // Test fractal computation
     println!("  🌀 Fractal Computation Test:");
     #[cfg(feature = "gui")]
-    let params = fractal_generator::fractal::FractalParameters::default();
+    let params = fractal_generator_lib::fractal::types::FractalParameters::default();
     let start = std::time::Instant::now();
 
     for _ in 0..1000 {

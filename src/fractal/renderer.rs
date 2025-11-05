@@ -381,22 +381,88 @@ impl FractalRenderer {
         log::debug!("Submitting compute command buffer");
         wgpu_queue.submit(Some(encoder.finish()));
         
+        // Create a buffer to read the texture data back to CPU
+        let output_buffer = wgpu_device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Fractal Output Readback Buffer"),
+            size: (self.width * self.height * 4) as u64, // RGBA8 = 4 bytes per pixel
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
+
+        // Create a new encoder for the copy operation
+        let mut encoder = wgpu_device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Fractal Copy Encoder"),
+        });
+
+        // Copy texture to buffer - using a direct call with inline structs
+        encoder.copy_texture_to_buffer(
+            wgpu::TexelCopyTextureInfo {
+                texture: &self.output_texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            wgpu::TexelCopyBufferInfo {
+                buffer: &output_buffer,
+                layout: wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(self.width * 4),
+                    rows_per_image: Some(self.height),
+                },
+            },
+            wgpu::Extent3d {
+                width: self.width,
+                height: self.height,
+                depth_or_array_layers: 1,
+            },
+        );
+
+        // Submit the copy command
+        wgpu_queue.submit(Some(encoder.finish()));
+
+        // Map the buffer and read the data
+        let buffer_slice = output_buffer.slice(..);
+        let (sender, receiver) = futures::channel::oneshot::channel();
+        buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
+            let _ = sender.send(result);
+        });
+
+        // Wait for the buffer to be mapped
+        wgpu_device.poll(wgpu::PollType::Wait);
+        let result = pollster::block_on(receiver).unwrap();
+        result?;
+
+        // Get the data from the buffer
+        let data = buffer_slice.get_mapped_range();
+        let pixels: Vec<u8> = data.to_vec();
+        drop(data);
+        output_buffer.unmap();
+
+        // Convert the raw pixel data to egui::Color32
+        let width = resolution.0 as usize;
+        let height = resolution.1 as usize;
+        let mut color_pixels = Vec::with_capacity(width * height);
+        
+        for chunk in pixels.chunks_exact(4) {
+            color_pixels.push(egui::Color32::from_rgba_premultiplied(
+                chunk[0], chunk[1], chunk[2], chunk[3]
+            ));
+        }
+        
+        let color_image = egui::ColorImage::new([width, height], color_pixels);
+        
         // Return the texture ID for egui
         if let Some(texture_id) = self.egui_texture {
+            // Update the existing texture
+            let image_delta = egui::epaint::ImageDelta::full(color_image, egui::TextureOptions::default());
+            ctx.tex_manager().write().set(texture_id, image_delta);
             Ok(texture_id)
         } else {
             // Create a new texture ID
-            let pixels = vec![egui::Color32::BLACK; (resolution.0 as usize) * (resolution.1 as usize)];
-            let color_image = egui::ColorImage {
-                size: [resolution.0 as usize, resolution.1 as usize],
-                pixels,
-                ..Default::default()
-            };
-            
             let texture_id = ctx.tex_manager().write().alloc(
                 "fractal_viewport".to_string(),
                 egui::ImageData::Color(std::sync::Arc::new(color_image)),
-                Default::default(),
+                egui::TextureOptions::default(),
             );
             self.egui_texture = Some(texture_id);
             Ok(texture_id)

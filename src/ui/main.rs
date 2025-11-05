@@ -4,7 +4,7 @@
 //! integrating the GPU renderer with the user interface.
 
 use bevy::prelude::*;
-use bevy_egui::{EguiPlugin, EguiContexts};
+use bevy_egui::EguiContexts;
 use rfd::FileDialog;
 use crate::ui::node_editor::NodeEditor;
 use crate::fractal::FractalRenderer;
@@ -1212,6 +1212,27 @@ impl FractalStudioApp {
         if self.has_wgpu_support {
             // If we have a renderer, display it
             if let Some(renderer) = &mut self.fractal_renderer {
+                // Update renderer parameters before rendering
+                let mut params = crate::fractal::FractalParameters::default();
+                params.max_iterations = self.max_iterations;
+                params.bailout = self.bailout;
+                params.scale = self.scale;
+                params.position = nalgebra::Vector3::new(self.position[0], self.position[1], self.position[2]);
+                params.rotation = nalgebra::Vector3::new(self.rotation[0], self.rotation[1], self.rotation[2]);
+                params.color_saturation = self.color_saturation;
+                
+                // Set the fractal formula based on selection
+                params.formula = match self.selected_fractal {
+                    0 => crate::fractal::FractalFormula::Mandelbrot { center: [-0.5, 0.0], zoom: 1.0 },
+                    1 => crate::fractal::FractalFormula::Mandelbulb { power: self.power },
+                    2 => crate::fractal::FractalFormula::Mandelbox { scale: self.scale },
+                    3 => crate::fractal::FractalFormula::Julia { c: [-0.7, 0.27015], max_iterations: self.max_iterations },
+                    _ => crate::fractal::FractalFormula::Mandelbulb { power: self.power },
+                };
+                
+                // Update renderer with current parameters
+                renderer.update_parameters(&params);
+                
                 // Actually render a frame
                 let screen_size = ctx.input(|i| i.screen_rect.size());
                 let width = screen_size.x as u32;
@@ -1985,6 +2006,31 @@ impl FractalStudioApp {
         
         // Update time for animations
         self.time += ctx.input(|i| i.unstable_dt);
+        
+        // Update fractal renderer if available
+        if let Some(renderer) = &mut self.fractal_renderer {
+            // Update renderer parameters before rendering
+            let mut params = crate::fractal::FractalParameters::default();
+            params.max_iterations = self.max_iterations;
+            params.bailout = self.bailout;
+            params.scale = self.scale;
+            // params.power = self.power; // Removed - power is part of the formula
+            params.position = nalgebra::Vector3::new(self.position[0], self.position[1], self.position[2]);
+            params.rotation = nalgebra::Vector3::new(self.rotation[0], self.rotation[1], self.rotation[2]);
+            params.color_saturation = self.color_saturation;
+            
+            // Set the fractal formula based on selection
+            params.formula = match self.selected_fractal {
+                0 => crate::fractal::FractalFormula::Mandelbrot { center: [-0.5, 0.0], zoom: 1.0 },
+                1 => crate::fractal::FractalFormula::Mandelbulb { power: self.power },
+                2 => crate::fractal::FractalFormula::Mandelbox { scale: self.scale },
+                3 => crate::fractal::FractalFormula::Julia { c: [-0.7, 0.27015], max_iterations: self.max_iterations },
+                _ => crate::fractal::FractalFormula::Mandelbulb { power: self.power },
+            };
+            
+            // Update renderer with current parameters
+            renderer.update_parameters(&params);
+        }
 
         // Main UI layout
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {

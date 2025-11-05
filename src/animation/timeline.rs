@@ -119,7 +119,7 @@ impl TimelineProject {
         self.animation_controller.tracks.get(&track_id)
             .map(|track_type| match track_type {
                 AnimationTrackType::Float(track) => {
-                    track.keyframes.iter().enumerate().map(|(i, kf)| {
+                    track.keyframes.iter().map(|kf| {
                         TimelineKeyframe {
                             time: kf.time,
                             value: kf.value, // Assume normalized for display

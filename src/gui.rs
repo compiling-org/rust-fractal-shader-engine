@@ -13,10 +13,10 @@ use bevy::prelude::*;
 use bevy::render::renderer::{RenderDevice, RenderQueue};
 use bevy::window::{WindowResolution, WindowFocused};
 use bevy_egui::{EguiPlugin, EguiContexts};
-use fractal_generator::ui::FractalStudioApp;
-use fractal_generator::audio::AudioMidiSystem;
-use fractal_generator::osc::OscSystem;
-use fractal_generator::gesture::GestureController;
+use fractal_generator_lib::ui::FractalStudioApp;
+use fractal_generator_lib::audio::AudioMidiSystem;
+use fractal_generator_lib::osc::OscSystem;
+use fractal_generator_lib::gesture::GestureController;
 
 // Resource to hold the main application state
 #[derive(Resource)]
