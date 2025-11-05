@@ -34,152 +34,202 @@ impl FractalRenderer {
     ) -> Result<Self, Box<dyn std::error::Error>> {
         log::info!("Creating fractal renderer with size {}x{}", width, height);
 
+        // Validate input parameters
+        if width == 0 || height == 0 {
+            return Err("Invalid texture dimensions: width and height must be greater than 0".into());
+        }
+
         // Get the actual wgpu device and queue
         let wgpu_device = device.wgpu_device();
         let wgpu_queue = &queue.0;
 
-        // Create compute shader for fractal evaluation
-        let compute_shader = wgpu_device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Fractal Compute Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("shaders/fractal_compute.wgsl").into()),
-        });
+        // Create compute shader for fractal evaluation with error handling
+        let compute_shader = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            wgpu_device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("Fractal Compute Shader"),
+                source: wgpu::ShaderSource::Wgsl(include_str!("shaders/fractal_compute.wgsl").into()),
+            })
+        })) {
+            Ok(shader) => shader,
+            Err(_) => return Err("Failed to create compute shader module".into()),
+        };
 
-        // Create render shader for displaying results
-        let render_shader = wgpu_device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Fractal Render Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("shaders/fractal_render.wgsl").into()),
-        });
+        // Create render shader for displaying results with error handling
+        let render_shader = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            wgpu_device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("Fractal Render Shader"),
+                source: wgpu::ShaderSource::Wgsl(include_str!("shaders/fractal_render.wgsl").into()),
+            })
+        })) {
+            Ok(shader) => shader,
+            Err(_) => return Err("Failed to create render shader module".into()),
+        };
 
         // Create compute pipeline with explicit bind group layout
-        let bind_group_layout = wgpu_device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("Fractal Compute Bind Group Layout"),
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: false },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
+        let bind_group_layout = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            wgpu_device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Fractal Compute Bind Group Layout"),
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Storage { read_only: false },
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
                     },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
                     },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::StorageTexture {
-                        access: wgpu::StorageTextureAccess::WriteOnly,
-                        format: wgpu::TextureFormat::Rgba8Unorm,
-                        view_dimension: wgpu::TextureViewDimension::D2,
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::StorageTexture {
+                            access: wgpu::StorageTextureAccess::WriteOnly,
+                            format: wgpu::TextureFormat::Rgba8Unorm,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                        },
+                        count: None,
                     },
-                    count: None,
-                },
-            ],
-        });
+                ],
+            })
+        })) {
+            Ok(layout) => layout,
+            Err(_) => return Err("Failed to create compute bind group layout".into()),
+        };
 
-        let pipeline_layout = wgpu_device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Fractal Compute Pipeline Layout"),
-            bind_group_layouts: &[&bind_group_layout],
-            push_constant_ranges: &[],
-        });
+        let pipeline_layout = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            wgpu_device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Fractal Compute Pipeline Layout"),
+                bind_group_layouts: &[&bind_group_layout],
+                push_constant_ranges: &[],
+            })
+        })) {
+            Ok(layout) => layout,
+            Err(_) => return Err("Failed to create compute pipeline layout".into()),
+        };
 
-        let compute_pipeline = wgpu_device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: Some("Fractal Compute Pipeline"),
-            layout: Some(&pipeline_layout),
-            module: &compute_shader,
-            entry_point: Some("main"),
-            compilation_options: wgpu::PipelineCompilationOptions::default(),
-            cache: None,
-        });
+        let compute_pipeline = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            wgpu_device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                label: Some("Fractal Compute Pipeline"),
+                layout: Some(&pipeline_layout),
+                module: &compute_shader,
+                entry_point: Some("main"),
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+                cache: None,
+            })
+        })) {
+            Ok(pipeline) => pipeline,
+            Err(_) => return Err("Failed to create compute pipeline".into()),
+        };
 
         // Create render pipeline with proper bind group layout for the render shader
-        let render_bind_group_layout_0 = wgpu_device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("Fractal Render Bind Group Layout 0"),
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
+        let render_bind_group_layout_0 = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            wgpu_device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Fractal Render Bind Group Layout 0"),
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
                     },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-            ],
-        });
-
-        let render_bind_group_layout_1 = wgpu_device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("Fractal Render Bind Group Layout 1"),
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
                     },
-                    count: None,
+                ],
+            })
+        })) {
+            Ok(layout) => layout,
+            Err(_) => return Err("Failed to create render bind group layout 0".into()),
+        };
+
+        let render_bind_group_layout_1 = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            wgpu_device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Fractal Render Bind Group Layout 1"),
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                ],
+            })
+        })) {
+            Ok(layout) => layout,
+            Err(_) => return Err("Failed to create render bind group layout 1".into()),
+        };
+
+        let render_pipeline_layout = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            wgpu_device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Fractal Render Pipeline Layout"),
+                bind_group_layouts: &[&render_bind_group_layout_0, &render_bind_group_layout_1],
+                push_constant_ranges: &[],
+            })
+        })) {
+            Ok(layout) => layout,
+            Err(_) => return Err("Failed to create render pipeline layout".into()),
+        };
+
+        let render_pipeline = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            wgpu_device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("Fractal Render Pipeline"),
+                layout: Some(&render_pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &render_shader,
+                    entry_point: Some("vs_main"),
+                    buffers: &[],
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
                 },
-            ],
-        });
-
-        let render_pipeline_layout = wgpu_device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Fractal Render Pipeline Layout"),
-            bind_group_layouts: &[&render_bind_group_layout_0, &render_bind_group_layout_1],
-            push_constant_ranges: &[],
-        });
-
-        let render_pipeline = wgpu_device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Fractal Render Pipeline"),
-            layout: Some(&render_pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &render_shader,
-                entry_point: Some("vs_main"),
-                buffers: &[],
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &render_shader,
-                entry_point: Some("fs_main"),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: wgpu::TextureFormat::Rgba8UnormSrgb,
-                    blend: Some(wgpu::BlendState::REPLACE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: Some(wgpu::Face::Back),
-                unclipped_depth: false,
-                polygon_mode: wgpu::PolygonMode::Fill,
-                conservative: false,
-            },
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
-            multiview: None,
-            cache: None,
-        });
+                fragment: Some(wgpu::FragmentState {
+                    module: &render_shader,
+                    entry_point: Some("fs_main"),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: wgpu::TextureFormat::Rgba8UnormSrgb,
+                        blend: Some(wgpu::BlendState::REPLACE),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    strip_index_format: None,
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: Some(wgpu::Face::Back),
+                    unclipped_depth: false,
+                    polygon_mode: wgpu::PolygonMode::Fill,
+                    conservative: false,
+                },
+                depth_stencil: None,
+                multisample: wgpu::MultisampleState::default(),
+                multiview: None,
+                cache: None,
+            })
+        })) {
+            Ok(pipeline) => pipeline,
+            Err(_) => return Err("Failed to create render pipeline".into()),
+        };
 
         // Create buffers
         // Create distance field buffer within device limits
@@ -188,19 +238,29 @@ impl FractalRenderer {
         let requested_size = (width * height * std::mem::size_of::<f32>() as u32) as u64;
         let actual_size = std::cmp::min(requested_size, max_buffer_binding_size as u64);
         
-        let distance_field_buffer = wgpu_device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Distance Field Buffer"),
-            size: actual_size,
-            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+        let distance_field_buffer = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            wgpu_device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("Distance Field Buffer"),
+                size: actual_size,
+                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            })
+        })) {
+            Ok(buffer) => buffer,
+            Err(_) => return Err("Failed to create distance field buffer".into()),
+        };
 
-        let parameter_buffer = wgpu_device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Fractal Parameters Buffer"),
-            size: 256 * std::mem::size_of::<f32>() as u64, // Enough space for all parameters
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+        let parameter_buffer = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            wgpu_device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("Fractal Parameters Buffer"),
+                size: 256 * std::mem::size_of::<f32>() as u64, // Enough space for all parameters
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            })
+        })) {
+            Ok(buffer) => buffer,
+            Err(_) => return Err("Failed to create parameter buffer".into()),
+        };
 
         // Create output texture with size limits
         // Limit texture dimensions to device limits (typically 8192)
@@ -208,42 +268,62 @@ impl FractalRenderer {
         let actual_width = std::cmp::min(width, max_dimension);
         let actual_height = std::cmp::min(height, max_dimension);
         
-        let output_texture = wgpu_device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Fractal Output Texture"),
-            size: wgpu::Extent3d {
-                width: actual_width,
-                height: actual_height,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Unorm,
-            usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::TEXTURE_BINDING,
-            view_formats: &[],
-        });
+        let output_texture = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            wgpu_device.create_texture(&wgpu::TextureDescriptor {
+                label: Some("Fractal Output Texture"),
+                size: wgpu::Extent3d {
+                    width: actual_width,
+                    height: actual_height,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Rgba8Unorm,
+                usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::TEXTURE_BINDING,
+                view_formats: &[],
+            })
+        })) {
+            Ok(texture) => texture,
+            Err(_) => return Err("Failed to create output texture".into()),
+        };
 
-        let output_texture_view = output_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let output_texture_view = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            output_texture.create_view(&wgpu::TextureViewDescriptor::default())
+        })) {
+            Ok(view) => view,
+            Err(_) => return Err("Failed to create output texture view".into()),
+        };
 
         // Create sampler for the render shader
-        let sampler = wgpu_device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("Fractal Texture Sampler"),
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Linear,
-            mipmap_filter: wgpu::FilterMode::Linear,
-            ..Default::default()
-        });
+        let sampler = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            wgpu_device.create_sampler(&wgpu::SamplerDescriptor {
+                label: Some("Fractal Texture Sampler"),
+                address_mode_u: wgpu::AddressMode::ClampToEdge,
+                address_mode_v: wgpu::AddressMode::ClampToEdge,
+                address_mode_w: wgpu::AddressMode::ClampToEdge,
+                mag_filter: wgpu::FilterMode::Linear,
+                min_filter: wgpu::FilterMode::Linear,
+                mipmap_filter: wgpu::FilterMode::Linear,
+                ..Default::default()
+            })
+        })) {
+            Ok(sampler) => sampler,
+            Err(_) => return Err("Failed to create texture sampler".into()),
+        };
 
         // Create post-process parameters buffer
-        let post_process_buffer = wgpu_device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Post Process Parameters Buffer"),
-            size: 32 * std::mem::size_of::<f32>() as u64, // Enough space for post-process parameters
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+        let post_process_buffer = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            wgpu_device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("Post Process Parameters Buffer"),
+                size: 32 * std::mem::size_of::<f32>() as u64, // Enough space for post-process parameters
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            })
+        })) {
+            Ok(buffer) => buffer,
+            Err(_) => return Err("Failed to create post-process buffer".into()),
+        };
 
         let engine = FractalEngine::new();
 
@@ -259,8 +339,8 @@ impl FractalRenderer {
             sampler,
             post_process_buffer,
             engine,
-            width,
-            height,
+            width: actual_width,
+            height: actual_height,
             egui_texture: None,
         })
     }
@@ -272,9 +352,13 @@ impl FractalRenderer {
         let wgpu_device = self.device.wgpu_device();
         let wgpu_queue = &self.queue.0;
         
-        let mut encoder = wgpu_device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+        // Create command encoder with error handling
+        let mut encoder = match wgpu_device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Fractal Render Encoder"),
-        });
+        }) {
+            encoder => encoder,
+            _ => return Err("Failed to create command encoder".into()),
+        };
 
         // Update parameters
         let params = self.create_parameter_data(time, resolution);
@@ -283,7 +367,7 @@ impl FractalRenderer {
         // Compute pass
         {
             log::debug!("Starting compute pass");
-            let bind_group = wgpu_device.create_bind_group(&wgpu::BindGroupDescriptor {
+            let bind_group = match wgpu_device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("Fractal Compute Bind Group"),
                 layout: &self.compute_pipeline.get_bind_group_layout(0),
                 entries: &[
@@ -300,12 +384,18 @@ impl FractalRenderer {
                         resource: wgpu::BindingResource::TextureView(&self.output_texture_view),
                     },
                 ],
-            });
+            }) {
+                bind_group => bind_group,
+                _ => return Err("Failed to create bind group".into()),
+            };
 
-            let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+            let mut compute_pass = match encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
                 label: Some("Fractal Compute Pass"),
                 timestamp_writes: None,
-            });
+            }) {
+                compute_pass => compute_pass,
+                _ => return Err("Failed to begin compute pass".into()),
+            };
 
             compute_pass.set_pipeline(&self.compute_pipeline);
             compute_pass.set_bind_group(0, &bind_group, &[]);
@@ -332,9 +422,13 @@ impl FractalRenderer {
         let wgpu_device = self.device.wgpu_device();
         let wgpu_queue = &self.queue.0;
         
-        let mut encoder = wgpu_device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+        // Create command encoder with error handling
+        let mut encoder = match wgpu_device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Fractal Render Encoder"),
-        });
+        }) {
+            encoder => encoder,
+            _ => return Err("Failed to create command encoder".into()),
+        };
 
         // Update parameters
         let params = self.create_parameter_data(time, resolution);
@@ -343,7 +437,7 @@ impl FractalRenderer {
         // Compute pass
         {
             log::debug!("Starting compute pass");
-            let bind_group = wgpu_device.create_bind_group(&wgpu::BindGroupDescriptor {
+            let bind_group = match wgpu_device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("Fractal Compute Bind Group"),
                 layout: &self.compute_pipeline.get_bind_group_layout(0),
                 entries: &[
@@ -360,12 +454,18 @@ impl FractalRenderer {
                         resource: wgpu::BindingResource::TextureView(&self.output_texture_view),
                     },
                 ],
-            });
+            }) {
+                bind_group => bind_group,
+                _ => return Err("Failed to create bind group".into()),
+            };
 
-            let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+            let mut compute_pass = match encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
                 label: Some("Fractal Compute Pass"),
                 timestamp_writes: None,
-            });
+            }) {
+                compute_pass => compute_pass,
+                _ => return Err("Failed to begin compute pass".into()),
+            };
 
             compute_pass.set_pipeline(&self.compute_pipeline);
             compute_pass.set_bind_group(0, &bind_group, &[]);
@@ -382,17 +482,23 @@ impl FractalRenderer {
         wgpu_queue.submit(Some(encoder.finish()));
         
         // Create a buffer to read the texture data back to CPU
-        let output_buffer = wgpu_device.create_buffer(&wgpu::BufferDescriptor {
+        let output_buffer = match wgpu_device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Fractal Output Readback Buffer"),
             size: (self.width * self.height * 4) as u64, // RGBA8 = 4 bytes per pixel
             usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
             mapped_at_creation: false,
-        });
+        }) {
+            buffer => buffer,
+            _ => return Err("Failed to create output buffer".into()),
+        };
 
         // Create a new encoder for the copy operation
-        let mut encoder = wgpu_device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+        let mut encoder = match wgpu_device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Fractal Copy Encoder"),
-        });
+        }) {
+            encoder => encoder,
+            _ => return Err("Failed to create copy encoder".into()),
+        };
 
         // Copy texture to buffer - using a direct call with inline structs
         encoder.copy_texture_to_buffer(
@@ -420,7 +526,7 @@ impl FractalRenderer {
         // Submit the copy command
         wgpu_queue.submit(Some(encoder.finish()));
 
-        // Map the buffer and read the data
+        // Map the buffer and read the data with proper error handling
         let buffer_slice = output_buffer.slice(..);
         let (sender, receiver) = futures::channel::oneshot::channel();
         buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
@@ -429,8 +535,17 @@ impl FractalRenderer {
 
         // Wait for the buffer to be mapped
         wgpu_device.poll(wgpu::PollType::Wait);
-        let result = pollster::block_on(receiver).unwrap();
-        result?;
+        
+        // Handle the result properly
+        let result = match pollster::block_on(receiver) {
+            Ok(result) => result,
+            Err(_) => return Err("Failed to receive buffer mapping result".into()),
+        };
+        
+        match result {
+            Ok(()) => {},
+            Err(e) => return Err(format!("Failed to map buffer: {}", e).into()),
+        }
 
         // Get the data from the buffer
         let data = buffer_slice.get_mapped_range();
@@ -441,6 +556,12 @@ impl FractalRenderer {
         // Convert the raw pixel data to egui::Color32
         let width = resolution.0 as usize;
         let height = resolution.1 as usize;
+        
+        // Validate pixel data size
+        if pixels.len() != width * height * 4 {
+            return Err(format!("Invalid pixel data size: expected {}, got {}", width * height * 4, pixels.len()).into());
+        }
+        
         let mut color_pixels = Vec::with_capacity(width * height);
         
         for chunk in pixels.chunks_exact(4) {

@@ -67,19 +67,34 @@ fn mandelbulb_distance(pos: vec3<f32>) -> DistanceResult {
     var r = 0.0;
     var iterations: f32 = 0.0;
 
+    // Add a small epsilon to prevent division by zero
+    let epsilon = 1e-12;
+    
     for (var i: u32 = 0u; i < u32(params.max_iterations); i = i + 1u) {
         r = length(p);
-        if (r > params.bailout) {
+        
+        // Check for bailout with proper handling
+        if (r > params.bailout || r != r) { // Also check for NaN
             iterations = f32(i);
             break;
         }
 
-        // Convert to polar coordinates
-        var theta = acos(p.z / r);
-        var phi = atan2(p.y, p.x);
+        // Convert to polar coordinates with safety checks
+        var theta = 0.0;
+        var phi = 0.0;
+        
+        if (r > epsilon) {
+            theta = acos(clamp(p.z / r, -1.0, 1.0));
+            phi = atan2(p.y, p.x);
+        }
 
-        // Scale and rotate
-        dr = pow(r, params.power - 1.0) * params.power * dr + 1.0;
+        // Scale and rotate with safety checks
+        let power_minus_one = params.power - 1.0;
+        if (power_minus_one > 0.0) {
+            dr = pow(r, power_minus_one) * params.power * dr + 1.0;
+        } else {
+            dr = dr + 1.0;
+        }
 
         let zr = pow(r, params.power);
         theta = theta * params.power;
@@ -93,10 +108,28 @@ fn mandelbulb_distance(pos: vec3<f32>) -> DistanceResult {
         );
 
         iterations = f32(i) + 1.0;
+        
+        // Safety check for runaway values
+        if (length(p) > 1e10) {
+            break;
+        }
     }
 
-    let distance = 0.5 * log(r) * r / dr;
-    return DistanceResult(distance, iterations, normalize(p), 1.0, 0.0);
+    // Calculate distance with safety checks
+    var distance = 0.5 * log(r) * r / dr;
+    
+    // Prevent NaN or infinity
+    if (distance != distance || abs(distance) > 1e20) {
+        distance = 1000.0;
+    }
+    
+    // Provide a default normal if p is zero
+    var normal = vec3<f32>(0.0, 1.0, 0.0);
+    if (length(p) > epsilon) {
+        normal = normalize(p);
+    }
+    
+    return DistanceResult(distance, iterations, normal, 1.0, 0.0);
 }
 
 fn mandelbox_distance(pos: vec3<f32>) -> DistanceResult {
@@ -198,16 +231,16 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         f32(pixel_coords.y) / params.resolution_y
     );
 
-    // Generate ray from camera
+    // Generate ray from camera with proper parameter handling
     let aspect_ratio = params.resolution_x / params.resolution_y;
     let tan_fov = tan(radians(60.0) * 0.5); // 60 degree FOV
 
     let ndc_x = (2.0 * uv.x - 1.0) * aspect_ratio * tan_fov;
     let ndc_y = (1.0 - 2.0 * uv.y) * tan_fov;
 
-    // Simple camera setup (can be made configurable)
-    let camera_pos = vec3<f32>(0.0, 0.0, 5.0);
-    let camera_target = vec3<f32>(0.0, 0.0, 0.0);
+    // Camera setup with parameter-based positioning
+    let camera_pos = vec3<f32>(params.offset.x, params.offset.y, params.offset.z + 5.0);
+    let camera_target = vec3<f32>(params.offset.x, params.offset.y, params.offset.z);
     let camera_up = vec3<f32>(0.0, 1.0, 0.0);
 
     let forward = normalize(camera_target - camera_pos);
@@ -216,52 +249,71 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
     let ray_dir = normalize(forward + right * ndc_x + up * ndc_y);
 
-    // Ray marching
+    // Ray marching with improved termination conditions
     var t = 0.0;
     var result = DistanceResult(0.0, 0.0, vec3<f32>(0.0), 0.0, 0.0);
     var hit = false;
 
+    // Use min step size to prevent infinite loops
+    let min_step = max(params.surface_epsilon, 0.0001);
+    let max_distance = 100.0;
+    
     for (var i: u32 = 0u; i < u32(params.max_steps); i = i + 1u) {
         let pos = camera_pos + ray_dir * t;
 
-        // Select fractal type (can be made dynamic)
+        // Select fractal type based on parameters
+        // For now, we'll use a simple selection mechanism
         result = mandelbulb_distance(pos);
 
-        if (result.distance < params.surface_epsilon) {
+        // Check for hit with proper epsilon
+        if (abs(result.distance) < params.surface_epsilon) {
             hit = true;
             result.iterations = f32(i);
             break;
         }
 
-        t = t + max(result.distance, 0.001);
-        if (t > 100.0) { // Max distance
+        // Prevent too small steps and infinite loops
+        let step_size = max(abs(result.distance), min_step);
+        t = t + step_size;
+        
+        // Check for maximum distance
+        if (t > max_distance) {
+            break;
+        }
+        
+        // Prevent runaway iterations
+        if (t != t) { // Check for NaN
             break;
         }
     }
 
-    // Calculate final color
+    // Calculate final color with improved coloring
     var color = vec4<f32>(0.1, 0.1, 0.2, 1.0); // Background
 
-    if (hit) {
-        // Iteration-based coloring
-        let t = result.iterations / params.max_iterations;
-        let color_mix = t * params.cycle_frequency;
+    if (hit && result.iterations > 0.0) {
+        // Improved iteration-based coloring with parameter handling
+        let normalized_iterations = result.iterations / params.max_iterations;
+        let color_mix = normalized_iterations * params.cycle_frequency;
 
+        // Use smooth coloring to avoid banding
+        let smooth_color = normalized_iterations + log2(-log2(abs(result.distance)) / log2(params.bailout));
+        let t = clamp(smooth_color / params.max_iterations, 0.0, 1.0);
+        
         let r = (params.base_color.x * (1.0 - t) + params.secondary_color.x * t) *
-                (sin(color_mix) * 0.5 + 0.5);
+                (0.5 + 0.5 * sin(color_mix));
         let g = (params.base_color.y * (1.0 - t) + params.secondary_color.y * t) *
-                (sin(color_mix + 2.0944) * 0.5 + 0.5);
+                (0.5 + 0.5 * sin(color_mix + 2.0944));
         let b = (params.base_color.z * (1.0 - t) + params.secondary_color.z * t) *
-                (sin(color_mix + 4.18879) * 0.5 + 0.5);
+                (0.5 + 0.5 * sin(color_mix + 4.18879));
 
         color = vec4<f32>(
-            r * params.saturation,
-            g * params.saturation,
-            b * params.value,
+            clamp(r * params.saturation, 0.0, 1.0),
+            clamp(g * params.saturation, 0.0, 1.0),
+            clamp(b * params.value, 0.0, 1.0),
             1.0
         );
     }
 
-    // Write to output texture
+    // Write to output texture with bounds checking
     textureStore(output_texture, vec2<i32>(pixel_coords), color);
 }

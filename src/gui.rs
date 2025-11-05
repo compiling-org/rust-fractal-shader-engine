@@ -193,7 +193,12 @@ fn setup(
             );
         })) {
             log::error!("WGPU initialization panicked: {:?}", e);
+            // Set has_wgpu_support to false to prevent further attempts
+            app_state.app.has_wgpu_support = false;
         }
+    } else {
+        log::warn!("WGPU device or queue not available");
+        app_state.app.has_wgpu_support = false;
     }
     
     // Start OSC server on port 8000

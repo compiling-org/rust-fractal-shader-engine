@@ -136,20 +136,44 @@ impl FractalStudioApp {
         let actual_width = std::cmp::min(width, max_dimension);
         let actual_height = std::cmp::min(height, max_dimension);
         
+        // Ensure minimum dimensions
+        let safe_width = std::cmp::max(actual_width, 64);
+        let safe_height = std::cmp::max(actual_height, 64);
+        
         match FractalRenderer::new_with_wgpu_context(
             device,
             queue,
-            actual_width,
-            actual_height,
+            safe_width,
+            safe_height,
         ) {
             Ok(renderer) => {
                 self.fractal_renderer = Some(renderer);
                 self.has_wgpu_support = true;
-                log::info!("Fractal renderer initialized successfully");
+                log::info!("Fractal renderer initialized successfully with size {}x{}", safe_width, safe_height);
             }
             Err(e) => {
                 log::error!("Failed to initialize fractal renderer: {}", e);
                 self.has_wgpu_support = false;
+                
+                // Try with smaller dimensions as fallback
+                if safe_width > 512 || safe_height > 512 {
+                    log::info!("Trying with smaller dimensions (512x512)");
+                    match FractalRenderer::new_with_wgpu_context(
+                        device,
+                        queue,
+                        512,
+                        512,
+                    ) {
+                        Ok(renderer) => {
+                            self.fractal_renderer = Some(renderer);
+                            self.has_wgpu_support = true;
+                            log::info!("Fractal renderer initialized successfully with fallback size 512x512");
+                        }
+                        Err(e) => {
+                            log::error!("Failed to initialize fractal renderer with fallback size: {}", e);
+                        }
+                    }
+                }
             }
         }
     }
@@ -1279,7 +1303,7 @@ impl FractalStudioApp {
                         
                         let align_center = egui::Align2::CENTER_CENTER;
                         painter.text(
-                            rect.center() - egui::vec2(0.0, 20.0),
+                            rect.center() - egui::vec2(0.0, 30.0),
                             align_center,
                             "❌ GPU Rendering Error",
                             egui::FontId::proportional(18.0),
@@ -1287,11 +1311,47 @@ impl FractalStudioApp {
                         );
                         
                         painter.text(
-                            rect.center() + egui::vec2(0.0, 20.0),
+                            rect.center() - egui::vec2(0.0, 10.0),
                             align_center,
                             format!("{}", e),
                             egui::FontId::proportional(12.0),
                             egui::Color32::from_rgb(200, 180, 180),
+                        );
+                        
+                        // Offer a retry option
+                        let retry_rect = egui::Rect::from_center_size(
+                            rect.center() + egui::vec2(0.0, 20.0),
+                            egui::Vec2::new(100.0, 30.0)
+                        );
+                        
+                        if ui.interact(retry_rect, egui::Id::new("retry_button"), egui::Sense::click()).clicked() {
+                            // Attempt to reinitialize the renderer
+                            self.has_wgpu_support = false;
+                            self.viewport_texture = None;
+                            self.fractal_renderer = None;
+                        }
+                        
+                        painter.rect_filled(
+                            retry_rect,
+                            4.0,
+                            egui::Color32::from_rgb(70, 70, 100),
+                        );
+                        
+                        painter.text(
+                            retry_rect.center(),
+                            egui::Align2::CENTER_CENTER,
+                            "Retry",
+                            egui::FontId::proportional(14.0),
+                            egui::Color32::WHITE,
+                        );
+                        
+                        // Show additional help information
+                        painter.text(
+                            rect.center() + egui::vec2(0.0, 50.0),
+                            align_center,
+                            "Try resizing the window or restarting the application",
+                            egui::FontId::proportional(10.0),
+                            egui::Color32::from_rgb(180, 180, 200),
                         );
                     }
                 }

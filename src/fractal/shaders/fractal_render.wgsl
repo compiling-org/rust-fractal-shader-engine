@@ -49,12 +49,28 @@ struct PostProcessParams {
 
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
-    var color = textureSample(fractal_texture, texture_sampler, input.uv);
+    // Sample texture with bounds checking
+    var color = vec4<f32>(0.0, 0.0, 0.0, 1.0);
+    
+    // Check UV bounds to prevent sampling issues
+    if (input.uv.x >= 0.0 && input.uv.x <= 1.0 && input.uv.y >= 0.0 && input.uv.y <= 1.0) {
+        color = textureSample(fractal_texture, texture_sampler, input.uv);
+    } else {
+        // Return a default color for out-of-bounds sampling
+        color = vec4<f32>(0.1, 0.1, 0.2, 1.0);
+    }
 
-    // Apply post-processing effects
-    color = apply_bloom(color, input.uv);
-    color = apply_vignette(color, input.uv);
-    color = apply_color_grading(color);
+    // Apply post-processing effects with parameter validation
+    // Check for valid finite values
+    if (color.r == color.r && color.g == color.g && color.b == color.b && 
+        abs(color.r) < 1000000.0 && abs(color.g) < 1000000.0 && abs(color.b) < 1000000.0) {
+        color = apply_bloom(color, input.uv);
+        color = apply_vignette(color, input.uv);
+        color = apply_color_grading(color);
+    } else {
+        // Return a safe default color if NaN or infinity is detected
+        color = vec4<f32>(0.5, 0.0, 0.0, 1.0);
+    }
 
     return color;
 }
@@ -66,35 +82,36 @@ fn apply_bloom(color: vec4<f32>, uv: vec2<f32>) -> vec4<f32> {
     }
 
     // Simple 5-tap blur for bloom approximation
-    // Using constant indexing to avoid WGSL validation errors
     var bloom_color = vec3<f32>(0.0);
+    var sample_count = 0.0;
     
-    // Sample 0
-    let sample_uv_0 = clamp(uv + vec2<f32>(0.0, 0.0) * post_params.bloom_intensity, vec2<f32>(0.0), vec2<f32>(1.0));
-    let sample_color_0 = textureSample(fractal_texture, texture_sampler, sample_uv_0).rgb;
-    bloom_color = bloom_color + sample_color_0;
+    // Define sample offsets
+    let offsets = array<vec2<f32>, 5>(
+        vec2<f32>(0.0, 0.0),
+        vec2<f32>(0.01, 0.0),
+        vec2<f32>(-0.01, 0.0),
+        vec2<f32>(0.0, 0.01),
+        vec2<f32>(0.0, -0.01)
+    );
     
-    // Sample 1
-    let sample_uv_1 = clamp(uv + vec2<f32>(0.01, 0.0) * post_params.bloom_intensity, vec2<f32>(0.0), vec2<f32>(1.0));
-    let sample_color_1 = textureSample(fractal_texture, texture_sampler, sample_uv_1).rgb;
-    bloom_color = bloom_color + sample_color_1;
+    // Sample all offsets
+    for (var i = 0; i < 5; i = i + 1) {
+        let sample_uv = clamp(uv + offsets[i] * post_params.bloom_intensity, vec2<f32>(0.0), vec2<f32>(1.0));
+        // Check bounds before sampling
+        if (sample_uv.x >= 0.0 && sample_uv.x <= 1.0 && sample_uv.y >= 0.0 && sample_uv.y <= 1.0) {
+            let sample_color = textureSample(fractal_texture, texture_sampler, sample_uv).rgb;
+            // Check for valid values
+            if (sample_color.r == sample_color.r && sample_color.g == sample_color.g && sample_color.b == sample_color.b) {
+                bloom_color = bloom_color + sample_color;
+                sample_count = sample_count + 1.0;
+            }
+        }
+    }
     
-    // Sample 2
-    let sample_uv_2 = clamp(uv + vec2<f32>(-0.01, 0.0) * post_params.bloom_intensity, vec2<f32>(0.0), vec2<f32>(1.0));
-    let sample_color_2 = textureSample(fractal_texture, texture_sampler, sample_uv_2).rgb;
-    bloom_color = bloom_color + sample_color_2;
-    
-    // Sample 3
-    let sample_uv_3 = clamp(uv + vec2<f32>(0.0, 0.01) * post_params.bloom_intensity, vec2<f32>(0.0), vec2<f32>(1.0));
-    let sample_color_3 = textureSample(fractal_texture, texture_sampler, sample_uv_3).rgb;
-    bloom_color = bloom_color + sample_color_3;
-    
-    // Sample 4
-    let sample_uv_4 = clamp(uv + vec2<f32>(0.0, -0.01) * post_params.bloom_intensity, vec2<f32>(0.0), vec2<f32>(1.0));
-    let sample_color_4 = textureSample(fractal_texture, texture_sampler, sample_uv_4).rgb;
-    bloom_color = bloom_color + sample_color_4;
-    
-    bloom_color = bloom_color / 5.0;
+    // Average the samples
+    if (sample_count > 0.0) {
+        bloom_color = bloom_color / sample_count;
+    }
 
     // Add bloom to bright areas
     let luminance = dot(bloom_color, vec3<f32>(0.299, 0.587, 0.114));
