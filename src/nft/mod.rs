@@ -270,7 +270,7 @@ impl FilecoinClient {
         Ok(format!("filecoin_hash_{}", data.len())) // Placeholder
     }
 
-    pub fn mint_nft(&self, metadata: &NFTMetadata, content_hash: &str) -> Result<String, NFTError> {
+    pub fn mint_nft(&self, _metadata: &NFTMetadata, content_hash: &str) -> Result<String, NFTError> {
         // TODO: Implement NFT minting on Filecoin
         log::info!("Minting NFT on Filecoin with content hash: {}", content_hash);
         Ok(format!("filecoin_nft_{}", content_hash)) // Placeholder
@@ -291,7 +291,7 @@ impl NearClient {
         }
     }
 
-    pub fn mint_nft(&self, metadata: &NFTMetadata, content_hash: &str) -> Result<String, NFTError> {
+    pub fn mint_nft(&self, _metadata: &NFTMetadata, content_hash: &str) -> Result<String, NFTError> {
         // TODO: Implement NFT minting on NEAR
         log::info!("Minting NFT on NEAR with content hash: {}", content_hash);
         Ok(format!("near_nft_{}", content_hash)) // Placeholder

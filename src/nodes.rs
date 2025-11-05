@@ -262,9 +262,9 @@ impl NodeGraph {
     fn execute_fractal_generator(
         &self,
         fractal_type: &FractalType,
-        parameters: &HashMap<String, NodeParameter>,
-        inputs: &[(usize, NodeResult)],
-        context: &ExecutionContext,
+        _parameters: &HashMap<String, NodeParameter>,
+        _inputs: &[(usize, NodeResult)],
+        _context: &ExecutionContext,
     ) -> Option<NodeResult> {
         // Simplified fractal generation
         // In a real implementation, this would generate actual distance fields

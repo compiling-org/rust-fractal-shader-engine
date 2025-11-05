@@ -347,7 +347,7 @@ impl DistanceFieldOps {
     pub fn twist(distance: f32, point: Vector3<f32>, amount: f32) -> f32 {
         let c = (point.x * amount).cos();
         let s = (point.x * amount).sin();
-        let rotated_point = Vector3::new(
+        let _rotated_point = Vector3::new(
             c * point.x - s * point.z,
             point.y,
             s * point.x + c * point.z,

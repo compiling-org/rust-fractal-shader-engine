@@ -356,8 +356,8 @@ impl FractalRenderer {
         let mut encoder = match wgpu_device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Fractal Render Encoder"),
         }) {
-            encoder => encoder,
-            _ => return Err("Failed to create command encoder".into()),
+            Ok(encoder) => encoder,
+            Err(e) => return Err(format!("Failed to create command encoder: {:?}", e).into()),
         };
 
         // Update parameters
@@ -385,16 +385,16 @@ impl FractalRenderer {
                     },
                 ],
             }) {
-                bind_group => bind_group,
-                _ => return Err("Failed to create bind group".into()),
+                Ok(bind_group) => bind_group,
+                Err(e) => return Err(format!("Failed to create bind group: {:?}", e).into()),
             };
 
             let mut compute_pass = match encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
                 label: Some("Fractal Compute Pass"),
                 timestamp_writes: None,
             }) {
-                compute_pass => compute_pass,
-                _ => return Err("Failed to begin compute pass".into()),
+                Ok(compute_pass) => compute_pass,
+                Err(e) => return Err(format!("Failed to begin compute pass: {:?}", e).into()),
             };
 
             compute_pass.set_pipeline(&self.compute_pipeline);
@@ -488,16 +488,16 @@ impl FractalRenderer {
             usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
             mapped_at_creation: false,
         }) {
-            buffer => buffer,
-            _ => return Err("Failed to create output buffer".into()),
+            Ok(buffer) => buffer,
+            Err(e) => return Err(format!("Failed to create output buffer: {:?}", e).into()),
         };
 
         // Create a new encoder for the copy operation
         let mut encoder = match wgpu_device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Fractal Copy Encoder"),
         }) {
-            encoder => encoder,
-            _ => return Err("Failed to create copy encoder".into()),
+            Ok(encoder) => encoder,
+            Err(e) => return Err(format!("Failed to create copy encoder: {:?}", e).into()),
         };
 
         // Copy texture to buffer - using a direct call with inline structs
@@ -778,7 +778,7 @@ impl CPUFractalRenderer {
     }
     
     /// Calculate surface color
-    fn calculate_color(&self, point: Vector3<f32>, result: &DistanceResult) -> [f32; 3] {
+    fn calculate_color(&self, _point: Vector3<f32>, result: &DistanceResult) -> [f32; 3] {
         // Use color_palette and color_saturation instead of color_params
         if self.engine.parameters.color_palette.is_empty() {
             return [0.0, 0.0, 0.0];
