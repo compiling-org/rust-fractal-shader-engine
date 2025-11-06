@@ -110,6 +110,35 @@ cd modular-fractal-shader
 cargo build --release
 ```
 
+## Documentation Suite
+- `docs/DEVELOPMENT_PLAN.md` — Living product plan with phases and multi-goal tasks.
+- `docs/EVOLUTION_TRACKER.md` — Chronicle of growth across sprints/releases.
+- `docs/RELEASE_PLAN.md` — Versioning, criteria, and release checklist.
+- `docs/TESTING_QUALITY_PLAN.md` — Snapshot testing, performance, and quality gates.
+- `docs/DOCS_MAINTENANCE.md` — How and when to update documents.
+- See also: `docs/PROJECT_GOALS.md`, `docs/FEATURES_STATUS.md`, `docs/DEVELOPMENT_ROADMAP.md`, `docs/UI_UX_DESIGN_GUIDE.md`.
+
+All documents are living and must be updated at each sprint and release.
+
+### Docs-First Workflow (Required)
+
+- Every code change must update relevant docs in the same PR.
+- CI blocks PRs if required docs are missing or outdated.
+- Use the PR template to link to updated docs and explain rationale.
+- Install local Git hooks (Windows) from `scripts/` to preflight commit messages and basic checks.
+
+Required documentation updates per change:
+- `docs/CHANGELOG.md` — summarize changes with links
+- `docs/DEVELOPMENT_PLAN.md` — update scope/acceptance if features shift
+- `docs/ARCHITECTURE.md` — reflect any design changes
+- `docs/USAGE_GUIDE.md` — update behavior/UX if user flows change
+- `docs/ISSUES_TRACKER.md` — add/update tracked issues when discovering or fixing problems
+
+Track Current Issues:
+- Known problems and planned fixes live in `docs/ISSUES_TRACKER.md`.
+- When you discover a new issue or change an issue’s status, update the tracker in the same PR.
+- Keep repro steps and acceptance criteria precise; this makes triage and validation fast.
+
 ## 🎮 Usage
 
 ### Basic Usage
@@ -136,6 +165,15 @@ cargo run --example node_editor_demo
 ```bash
 cargo run --example fractal_demo
 ```
+
+### CLI Mesh Export (alpha)
+```bash
+# Export a placeholder OBJ mesh (cube) to exports/mesh.obj
+cargo run --bin mesh_export -- --output exports/mesh.obj --width 32 --height 32 --depth 32
+```
+- Current behavior exports a placeholder cube via the simplified marching cubes path.
+- Intended roadmap: load a `.fract` project, evaluate scene objects, and export meshes per object parameters.
+- Flags: `--output <path>`, `--width <w>`, `--height <h>`, `--depth <d>` (defaults: `exports/mesh.obj`, `32`, `32`, `32`).
 
 ### Web Deployment
 ```javascript
@@ -291,6 +329,26 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 2. Add tests for new features
 3. Update documentation
 4. Ensure cross-platform compatibility
+
+### Docs-First Workflow (Required)
+- All code changes must be paired with documentation updates.
+- CI includes a Docs Gate that fails PRs with code changes unless `docs/` files are updated.
+- PRs must link updated docs and acceptance criteria (see `.github/PULL_REQUEST_TEMPLATE.md`).
+- Commit messages should include a `Docs:` section or links to updated docs. Use `Doc-Exempt` only for trivial infra/typo commits.
+
+#### Install Git Hooks (Windows)
+- Install local hooks to enforce docs-first commits:
+  - PowerShell: `powershell -ExecutionPolicy Bypass -File scripts/install_hooks.ps1`
+  - Or: `pwsh -File scripts/install_hooks.ps1`
+- Hooks installed: `pre-commit` (blocks code-only commits), `commit-msg` (nudges to include docs context).
+
+#### Required Docs to Update
+- At least one of:
+  - `docs/DEVELOPMENT_PLAN.md`
+  - `docs/DEVELOPMENT_ROADMAP.md`
+  - `docs/GAP_ASSESSMENT.md`
+  - Relevant module plans (e.g., `docs/VR_XR_INTEGRATION_PLAN.md`, `docs/GESTURE_INPUT_PLAN.md`)
+- Reference: `docs/DOCS_MAINTENANCE.md` — Living Docs Protocol and automation.
 
 ## 📄 License
 

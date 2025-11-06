@@ -92,10 +92,11 @@
 - **❌ Smart Contracts**: No contract integration
 - **❌ Marketplace Integration**: No trading capabilities
 
-### ❌ NOT IMPLEMENTED - Export System
+### 🟡 PARTIALLY IMPLEMENTED - Export System
 - **❌ Video Recording**: No video encoding
 - **❌ Image Sequences**: No image export
-- **❌ Mesh Export**: No 3D mesh generation
+- **🟡 Mesh Export**: CLI `mesh_export` provides placeholder OBJ cube export
+  - Exports via simplified marching cubes path; not scene-driven yet
 - **❌ Voxel Export**: No voxel data export
 - **❌ Animation Export**: No keyframe export
 
