@@ -1,0 +1,212 @@
+   Compiling modular-fractal-shader v0.1.0 (C:\Users\vdmo-live\Documents\Dev\rust-fractal-shader\rust-fractal-shader-engine)
+warning: unused import: `bevy_egui::EguiContexts`
+ --> src\ui\main.rs:7:5
+  |
+7 | use bevy_egui::EguiContexts;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `Rounding`
+ --> src\ui\theme.rs:6:27
+  |
+6 | use egui::{Color32, Vec2, Rounding, Stroke, Style, Visuals, Margin, FontId, FontFamily};
+  |                           ^^^^^^^^
+
+warning: unused imports: `Primitive` and `Rgba`
+ --> src\ui\theme.rs:7:28
+  |
+7 | use egui::epaint::{Shadow, Primitive, Rgba};
+  |                            ^^^^^^^^^  ^^^^
+
+warning: unused imports: `Align2`, `FontFamily`, `Id`, `ScrollArea`, `Sense`, and `Shape`
+ --> src\ui\node_editor.rs:6:88
+  |
+6 | ...e, Painter, Stroke, FontId, RichText, FontFamily, Shape, Sense, Id, Rounding, Align2, ScrollArea};
+  |                                          ^^^^^^^^^^  ^^^^^  ^^^^^  ^^            ^^^^^^  ^^^^^^^^^^
+
+warning: unused import: `crate::nodes::*`
+ --> src\node_editor.rs:3:5
+  |
+3 | use crate::nodes::*;
+  |     ^^^^^^^^^^^^^^^
+
+warning: unused import: `std::collections::HashMap`
+ --> src\node_editor.rs:4:5
+  |
+4 | use std::collections::HashMap;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `Matrix4` and `Vector4`
+ --> src\fractal\types.rs:5:16
+  |
+5 | use nalgebra::{Matrix4, Vector3, Vector4};
+  |                ^^^^^^^           ^^^^^^^
+
+warning: unused import: `Vector4`
+ --> src\fractal\formulas.rs:7:34
+  |
+7 | use nalgebra::{Matrix4, Vector3, Vector4};
+  |                                  ^^^^^^^
+
+warning: unused import: `Vector4`
+ --> src\scene\mod.rs:6:34
+  |
+6 | use nalgebra::{Matrix4, Vector3, Vector4, UnitQuaternion};
+  |                                  ^^^^^^^
+
+warning: unused import: `Scalar`
+ --> src\animation\keyframe.rs:7:34
+  |
+7 | use nalgebra::{Vector3, Vector4, Scalar};
+  |                                  ^^^^^^
+
+warning: unused import: `std::collections::HashMap`
+ --> src\animation\timeline.rs:7:5
+  |
+7 | use std::collections::HashMap;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unnecessary parentheses around block return value
+   --> src\animation\mod.rs:241:21
+    |
+241 |                     (2.0_f32.powf(10.0 * t - 10.0))
+    |                     ^                             ^
+    |
+    = note: `#[warn(unused_parens)]` on by default
+help: remove these parentheses
+    |
+241 -                     (2.0_f32.powf(10.0 * t - 10.0))
+241 +                     2.0_f32.powf(10.0 * t - 10.0)
+    |
+
+warning: use of deprecated function `egui::menu::bar`: Use `egui::MenuBar::new().ui(` instead
+   --> src\ui\main.rs:199:21
+    |
+199 |         egui::menu::bar(ui, |ui| {
+    |                     ^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated type alias `egui::Rounding`: Renamed to CornerRadius
+ --> src\ui\theme.rs:6:27
+  |
+6 | use egui::{Color32, Vec2, Rounding, Stroke, Style, Visuals, Margin, FontId, FontFamily};
+  |                           ^^^^^^^^
+
+warning: use of deprecated type alias `egui::Rounding`: Renamed to CornerRadius
+ --> src\ui\node_editor.rs:6:118
+  |
+6 | use egui::{Color32, Pos2, Vec2, Rect, Ui, Response, Painter, Stroke, FontId, RichText, FontFamily, Shape, Sense, Id, Rounding, Align2, Sc...
+  |                                                                                                                      ^^^^^^^^
+
+warning: use of deprecated type alias `egui::Rounding`: Renamed to CornerRadius
+   --> src\ui\node_editor.rs:401:40
+    |
+401 |         painter.rect_filled(node_rect, Rounding::same(8), bg_color);
+    |                                        ^^^^^^^^
+
+error[E0277]: the trait bound `SizedTexture: From<egui::TextureId>` is not satisfied
+    --> src\ui\main.rs:1248:57
+     |
+1248 | ...                   ui.add(egui::Image::new(tex_id).fit_to_exact_size(preview_size));
+     |                              ---------------- ^^^^^^ the trait `From<egui::TextureId>` is not implemented for `SizedTexture`
+     |                              |
+     |                              required by a bound introduced by this call
+     |
+     = help: the following other types implement trait `From<T>`:
+               `SizedTexture` implements `From<&TextureHandle>`
+               `SizedTexture` implements `From<(egui::TextureId, egui::Vec2)>`
+     = note: required for `egui::TextureId` to implement `Into<SizedTexture>`
+     = note: required for `ImageSource<'_>` to implement `From<egui::TextureId>`
+     = note: 1 redundant requirement hidden
+     = note: required for `egui::TextureId` to implement `Into<ImageSource<'_>>`
+note: required by a bound in `egui::Image::<'a>::new`
+    --> C:\Users\vdmo-live\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\egui-0.32.3\src\widgets\image.rs:63:29
+     |
+  63 |     pub fn new(source: impl Into<ImageSource<'a>>) -> Self {
+     |                             ^^^^^^^^^^^^^^^^^^^^^ required by this bound in `Image::<'a>::new`
+
+warning: use of deprecated method `egui::Ui::allocate_ui_at_rect`: Use `allocate_new_ui` instead
+    --> src\ui\main.rs:1657:12
+     |
+1657 |         ui.allocate_ui_at_rect(timeline_rect, |ui| {
+     |            ^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated method `egui::Ui::allocate_ui_at_rect`: Use `allocate_new_ui` instead
+    --> src\ui\main.rs:1746:12
+     |
+1746 |         ui.allocate_ui_at_rect(spectrum_rect, |ui| {
+     |            ^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated method `egui::Ui::allocate_ui_at_rect`: Use `allocate_new_ui` instead
+    --> src\ui\main.rs:1785:12
+     |
+1785 |         ui.allocate_ui_at_rect(waveform_rect, |ui| {
+     |            ^^^^^^^^^^^^^^^^^^^
+
+warning: variable does not need to be mutable
+   --> src\osc.rs:294:13
+    |
+294 |         let mut data_start = (type_end + 4) & !3; // Align to 4-byte boundary
+    |             ----^^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` on by default
+
+warning: unused variable: `config`
+   --> src\ui\theme.rs:589:13
+    |
+589 |         let config = &theme.effects.glassmorphism;
+    |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_config`
+    |
+    = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `theme`
+   --> src\ui\theme.rs:601:21
+    |
+601 |         if let Some(theme) = self.themes.get(theme_name) {
+    |                     ^^^^^ help: if this is intentional, prefix it with an underscore: `_theme`
+
+warning: unused variable: `color_key`
+   --> src\ui\theme.rs:600:47
+    |
+600 |     pub fn get_color(&self, theme_name: &str, color_key: &str) -> Option<Color32> {
+    |                                               ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_color_key`
+
+warning: unused variable: `ui`
+   --> src\ui\node_editor.rs:745:41
+    |
+745 |     fn execute_node(&self, node: &Node, ui: &Ui) {
+    |                                         ^^ help: if this is intentional, prefix it with an underscore: `_ui`
+
+warning: unused variable: `from_output`
+   --> src\nodes.rs:226:37
+    |
+226 |             if let Some((from_node, from_output)) = input.connected_output {
+    |                                     ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_from_output`
+
+warning: unused variable: `parameters`
+   --> src\nodes.rs:306:9
+    |
+306 |         parameters: &HashMap<String, NodeParameter>,
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parameters`
+
+warning: unused variable: `wgpu_queue`
+  --> src\fractal\renderer.rs:44:13
+   |
+44 |         let wgpu_queue = &queue.0;
+   |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_wgpu_queue`
+
+warning: variable does not need to be mutable
+   --> src\scene\mod.rs:234:34
+    |
+234 |     pub fn add_object(&mut self, mut object: SceneObject) -> ObjectId {
+    |                                  ----^^^^^^
+    |                                  |
+    |                                  help: remove this `mut`
+
+For more information about this error, try `rustc --explain E0277`.
+warning: `modular-fractal-shader` (lib) generated 28 warnings
+error: could not compile `modular-fractal-shader` (lib) due to 1 previous error; 28 warnings emitted

@@ -431,7 +431,7 @@ impl FractalTimeline {
 
         // Timeline visualization
         let (timeline_rect, _) = ui.allocate_exact_size(
-            Vec2::new(ui.available_width(), height),
+        Vec2::new(ui.max_rect().width(), height),
             egui::Sense::click_and_drag()
         );
 

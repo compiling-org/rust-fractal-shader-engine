@@ -280,7 +280,9 @@ impl FractalRenderer {
                 sample_count: 1,
                 dimension: wgpu::TextureDimension::D2,
                 format: wgpu::TextureFormat::Rgba8Unorm,
-                usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::TEXTURE_BINDING,
+                usage: wgpu::TextureUsages::STORAGE_BINDING
+                    | wgpu::TextureUsages::TEXTURE_BINDING
+                    | wgpu::TextureUsages::COPY_SRC,
                 view_formats: &[],
             })
         })) {
@@ -353,12 +355,9 @@ impl FractalRenderer {
         let wgpu_queue = &self.queue.0;
         
         // Create command encoder with error handling
-        let mut encoder = match wgpu_device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+        let mut encoder = wgpu_device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Fractal Render Encoder"),
-        }) {
-            Ok(encoder) => encoder,
-            Err(e) => return Err(format!("Failed to create command encoder: {:?}", e).into()),
-        };
+        });
 
         // Update parameters
         let params = self.create_parameter_data(time, resolution);
@@ -367,7 +366,7 @@ impl FractalRenderer {
         // Compute pass
         {
             log::debug!("Starting compute pass");
-            let bind_group = match wgpu_device.create_bind_group(&wgpu::BindGroupDescriptor {
+            let bind_group = wgpu_device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("Fractal Compute Bind Group"),
                 layout: &self.compute_pipeline.get_bind_group_layout(0),
                 entries: &[
@@ -384,18 +383,12 @@ impl FractalRenderer {
                         resource: wgpu::BindingResource::TextureView(&self.output_texture_view),
                     },
                 ],
-            }) {
-                Ok(bind_group) => bind_group,
-                Err(e) => return Err(format!("Failed to create bind group: {:?}", e).into()),
-            };
+            });
 
-            let mut compute_pass = match encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+            let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
                 label: Some("Fractal Compute Pass"),
                 timestamp_writes: None,
-            }) {
-                Ok(compute_pass) => compute_pass,
-                Err(e) => return Err(format!("Failed to begin compute pass: {:?}", e).into()),
-            };
+            });
 
             compute_pass.set_pipeline(&self.compute_pipeline);
             compute_pass.set_bind_group(0, &bind_group, &[]);
@@ -417,113 +410,93 @@ impl FractalRenderer {
     
     /// Render a single frame and update the egui texture
     pub fn render_frame_to_texture(&mut self, time: f32, resolution: (u32, u32), ctx: &egui::Context) -> Result<egui::TextureId, Box<dyn std::error::Error>> {
-        log::debug!("Starting render frame with time: {}, resolution: {:?}", time, resolution);
-        
+        // Use requested preview resolution to reduce GPU and CPU workload
+        let (pw, ph) = (resolution.0.max(1), resolution.1.max(1));
+        log::debug!(
+            "Starting render frame with time: {}, preview resolution: {}x{}",
+            time, pw, ph
+        );
+
         let wgpu_device = self.device.wgpu_device();
         let wgpu_queue = &self.queue.0;
-        
-        // Create command encoder with error handling
-        let mut encoder = match wgpu_device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Fractal Render Encoder"),
-        }) {
-            encoder => encoder,
-            _ => return Err("Failed to create command encoder".into()),
-        };
 
-        // Update parameters
-        let params = self.create_parameter_data(time, resolution);
+        // Create a temporary output texture sized to the preview
+        let temp_output_texture = wgpu_device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Fractal Preview Output Texture"),
+            size: wgpu::Extent3d { width: pw, height: ph, depth_or_array_layers: 1 },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsages::COPY_SRC | wgpu::TextureUsages::STORAGE_BINDING,
+            view_formats: &[],
+        });
+        let temp_output_view = temp_output_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        // Create command encoder
+        let mut encoder = wgpu_device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Fractal Render Encoder"),
+        });
+
+        // Update parameters using preview resolution
+        let params = self.create_parameter_data(time, (pw, ph));
         wgpu_queue.write_buffer(&self.parameter_buffer, 0, bytemuck::cast_slice(&params));
 
-        // Compute pass
+        // Compute pass targeting the temporary texture
         {
-            log::debug!("Starting compute pass");
-            let bind_group = match wgpu_device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("Fractal Compute Bind Group"),
+            let bind_group = wgpu_device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("Fractal Compute Bind Group (Preview)"),
                 layout: &self.compute_pipeline.get_bind_group_layout(0),
                 entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: self.distance_field_buffer.as_entire_binding(),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: self.parameter_buffer.as_entire_binding(),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 2,
-                        resource: wgpu::BindingResource::TextureView(&self.output_texture_view),
-                    },
+                    wgpu::BindGroupEntry { binding: 0, resource: self.distance_field_buffer.as_entire_binding() },
+                    wgpu::BindGroupEntry { binding: 1, resource: self.parameter_buffer.as_entire_binding() },
+                    wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(&temp_output_view) },
                 ],
-            }) {
-                bind_group => bind_group,
-                _ => return Err("Failed to create bind group".into()),
-            };
+            });
 
-            let mut compute_pass = match encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-                label: Some("Fractal Compute Pass"),
+            let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("Fractal Compute Pass (Preview)"),
                 timestamp_writes: None,
-            }) {
-                compute_pass => compute_pass,
-                _ => return Err("Failed to begin compute pass".into()),
-            };
+            });
 
             compute_pass.set_pipeline(&self.compute_pipeline);
             compute_pass.set_bind_group(0, &bind_group, &[]);
-            
-            let work_groups_x = (self.width + 15) / 16;
-            let work_groups_y = (self.height + 15) / 16;
-            log::debug!("Dispatching compute workgroups: {} x {}", work_groups_x, work_groups_y);
+            let work_groups_x = (pw + 15) / 16;
+            let work_groups_y = (ph + 15) / 16;
             compute_pass.dispatch_workgroups(work_groups_x, work_groups_y, 1);
-            log::debug!("Compute pass completed");
         }
 
-        // Submit command buffer for compute pass
-        log::debug!("Submitting compute command buffer");
+        // Submit compute
         wgpu_queue.submit(Some(encoder.finish()));
-        
-        // Create a buffer to read the texture data back to CPU
-        let output_buffer = match wgpu_device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Fractal Output Readback Buffer"),
-            size: (self.width * self.height * 4) as u64, // RGBA8 = 4 bytes per pixel
+
+        // Prepare readback buffer sized to preview texture
+        let bytes_per_pixel: u32 = 4;
+        let unpadded_bytes_per_row: u32 = pw * bytes_per_pixel;
+        let align: u32 = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT; // 256
+        let padded_bytes_per_row: u32 = ((unpadded_bytes_per_row + align - 1) / align) * align;
+        let readback_size: u64 = (padded_bytes_per_row as u64) * (ph as u64);
+
+        let output_buffer = wgpu_device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Fractal Preview Readback Buffer"),
+            size: readback_size,
             usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
             mapped_at_creation: false,
-        }) {
-            Ok(buffer) => buffer,
-            Err(e) => return Err(format!("Failed to create output buffer: {:?}", e).into()),
-        };
+        });
 
-        // Create a new encoder for the copy operation
-        let mut encoder = match wgpu_device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Fractal Copy Encoder"),
-        }) {
-            Ok(encoder) => encoder,
-            Err(e) => return Err(format!("Failed to create copy encoder: {:?}", e).into()),
-        };
+        // Copy preview texture into readback buffer
+        let mut encoder = wgpu_device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Fractal Copy Encoder (Preview)"),
+        });
 
-        // Copy texture to buffer - using a direct call with inline structs
         encoder.copy_texture_to_buffer(
-            wgpu::TexelCopyTextureInfo {
-                texture: &self.output_texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
+            wgpu::TexelCopyTextureInfo { texture: &temp_output_texture, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
             wgpu::TexelCopyBufferInfo {
                 buffer: &output_buffer,
-                layout: wgpu::TexelCopyBufferLayout {
-                    offset: 0,
-                    bytes_per_row: Some(self.width * 4),
-                    rows_per_image: Some(self.height),
-                },
+                layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(padded_bytes_per_row), rows_per_image: Some(ph) },
             },
-            wgpu::Extent3d {
-                width: self.width,
-                height: self.height,
-                depth_or_array_layers: 1,
-            },
+            wgpu::Extent3d { width: pw, height: ph, depth_or_array_layers: 1 },
         );
 
-        // Submit the copy command
         wgpu_queue.submit(Some(encoder.finish()));
 
         // Map the buffer and read the data with proper error handling
@@ -547,19 +520,34 @@ impl FractalRenderer {
             Err(e) => return Err(format!("Failed to map buffer: {}", e).into()),
         }
 
-        // Get the data from the buffer
+        // Get the data from the buffer and strip row padding
         let data = buffer_slice.get_mapped_range();
-        let pixels: Vec<u8> = data.to_vec();
+        let mapped: &[u8] = &data;
+        let row_stride_src = padded_bytes_per_row as usize;
+        let row_stride_dst = unpadded_bytes_per_row as usize;
+        let mut pixels: Vec<u8> = vec![0u8; (row_stride_dst as u64 * ph as u64) as usize];
+        for row in 0..(ph as usize) {
+            let src_start = row * row_stride_src;
+            let dst_start = row * row_stride_dst;
+            let src_slice = &mapped[src_start..src_start + row_stride_dst];
+            pixels[dst_start..dst_start + row_stride_dst].copy_from_slice(src_slice);
+        }
         drop(data);
         output_buffer.unmap();
 
-        // Convert the raw pixel data to egui::Color32
-        let width = resolution.0 as usize;
-        let height = resolution.1 as usize;
+        // Convert the raw pixel data to egui::Color32 using internal texture size
+        let width = pw as usize;
+        let height = ph as usize;
         
         // Validate pixel data size
         if pixels.len() != width * height * 4 {
-            return Err(format!("Invalid pixel data size: expected {}, got {}", width * height * 4, pixels.len()).into());
+            return Err(format!(
+                "Invalid pixel data size: expected {} ({}x{}), got {}",
+                width * height * 4,
+                width,
+                height,
+                pixels.len()
+            ).into());
         }
         
         let mut color_pixels = Vec::with_capacity(width * height);
@@ -575,7 +563,10 @@ impl FractalRenderer {
         // Return the texture ID for egui
         if let Some(texture_id) = self.egui_texture {
             // Update the existing texture
-            let image_delta = egui::epaint::ImageDelta::full(color_image, egui::TextureOptions::default());
+            let image_delta = egui::epaint::ImageDelta::full(
+                egui::ImageData::Color(std::sync::Arc::new(color_image)),
+                egui::TextureOptions::default(),
+            );
             ctx.tex_manager().write().set(texture_id, image_delta);
             Ok(texture_id)
         } else {
@@ -686,6 +677,18 @@ impl FractalRenderer {
         params[30] = self.engine.quality_settings.max_iterations as f32;
         // Use normal_epsilon as surface_epsilon equivalent
         params[31] = self.engine.quality_settings.normal_epsilon;
+
+        // Fractal formula selector mapping
+        // 0: Mandelbrot, 1: Mandelbulb, 2: Mandelbox, 3: Julia, 4: Quaternion Julia
+        params[32] = match &self.engine.parameters.formula {
+            FractalFormula::Mandelbrot { .. } => 0.0,
+            FractalFormula::Mandelbulb { .. } => 1.0,
+            FractalFormula::Mandelbox { .. } => 2.0,
+            FractalFormula::Julia { .. } => 3.0,
+            FractalFormula::QuaternionJulia { .. } => 4.0,
+            // Fallback for unsupported in-shader formulas
+            _ => 0.0,
+        };
 
         params
     }

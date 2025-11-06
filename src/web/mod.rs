@@ -1,7 +1,7 @@
-odular-fractal-shader/src/web/mod.rs</path>
-<content lines="1-150">
+// Web module for WASM integration
 use wasm_bindgen::prelude::*;
-use web_sys::{console, window, HtmlCanvasElement, WebGlRenderingContext};
+use wasm_bindgen::JsCast;
+use web_sys::{console, window, HtmlCanvasElement, WebGlRenderingContext, WebGlProgram};
 use js_sys::Uint8Array;
 
 /// Web deployment and WASM/WebGPU integration
@@ -12,6 +12,7 @@ pub struct WebFractalStudio {
     fractal_engine: crate::fractal::engine::FractalEngine,
     animation_controller: crate::animation::AnimationController,
     last_frame_time: f64,
+    program: Option<WebGlProgram>,
 }
 
 #[wasm_bindgen]
@@ -23,19 +24,19 @@ impl WebFractalStudio {
 
         // Get canvas element
         let document = web_sys::window()
-            .ok_or("No window")?
+            .ok_or_else(|| JsValue::from_str("No window"))?
             .document()
-            .ok_or("No document")?;
+            .ok_or_else(|| JsValue::from_str("No document"))?;
 
         let canvas = document
             .get_element_by_id(canvas_id)
-            .ok_or("Canvas not found")?
+            .ok_or_else(|| JsValue::from_str("Canvas not found"))?
             .dyn_into::<HtmlCanvasElement>()?;
 
         // Get WebGL context
         let gl_context = canvas
             .get_context("webgl")?
-            .ok_or("WebGL not supported")?
+            .ok_or_else(|| JsValue::from_str("WebGL not supported"))?
             .dyn_into::<WebGlRenderingContext>()?;
 
         // Initialize fractal engine
@@ -52,13 +53,14 @@ impl WebFractalStudio {
             fractal_engine,
             animation_controller,
             last_frame_time: 0.0,
+            program: None,
         })
     }
 
     #[wasm_bindgen]
     pub fn load_isf_shader(&mut self, shader_source: &str) -> Result<(), JsValue> {
         // Parse ISF shader and convert to WebGL
-        let wgsl_code = crate::shader_converter::ShaderConverter::isf_to_wgsl(shader_source)
+        let wgsl_code = crate::ShaderConverter::isf_to_wgsl(shader_source)
             .map_err(|e| JsValue::from_str(&format!("Shader conversion failed: {}", e)))?;
 
         // Compile shader for WebGL
@@ -148,7 +150,7 @@ impl WebFractalStudio {
         log("Animation stopped");
     }
 
-    fn compile_webgl_shader(&self, wgsl_source: &str) -> Result<(), JsValue> {
+    fn compile_webgl_shader(&mut self, wgsl_source: &str) -> Result<(), JsValue> {
         // Convert WGSL to GLSL (simplified)
         let glsl_source = self.wgsl_to_glsl(wgsl_source)?;
 
@@ -170,6 +172,7 @@ impl WebFractalStudio {
         }
 
         self.gl_context.use_program(Some(&program));
+        self.program = Some(program);
         log("WebGL shader compiled and linked successfully");
 
         Ok(())
@@ -222,7 +225,10 @@ impl WebFractalStudio {
         let indices: [u16; 6] = [0, 1, 2, 1, 3, 2];
 
         // Create buffers
-        let vertex_buffer = self.gl_context.create_buffer().ok_or("Failed to create vertex buffer")?;
+        let vertex_buffer = self
+            .gl_context
+            .create_buffer()
+            .ok_or_else(|| JsValue::from_str("Failed to create vertex buffer"))?;
         self.gl_context.bind_buffer(WebGlRenderingContext::ARRAY_BUFFER, Some(&vertex_buffer));
         unsafe {
             let vert_array = js_sys::Float32Array::view(&vertices);
@@ -233,7 +239,10 @@ impl WebFractalStudio {
             );
         }
 
-        let index_buffer = self.gl_context.create_buffer().ok_or("Failed to create index buffer")?;
+        let index_buffer = self
+            .gl_context
+            .create_buffer()
+            .ok_or_else(|| JsValue::from_str("Failed to create index buffer"))?;
         self.gl_context.bind_buffer(WebGlRenderingContext::ELEMENT_ARRAY_BUFFER, Some(&index_buffer));
         unsafe {
             let index_array = js_sys::Uint16Array::view(&indices);
@@ -245,13 +254,14 @@ impl WebFractalStudio {
         }
 
         // Set up vertex attributes
-        let position_attrib = self.gl_context.get_attrib_location(self.gl_context.get_parameter(WebGlRenderingContext::CURRENT_PROGRAM).unwrap().as_ref(), "position") as u32;
+        let program = self.program.as_ref().ok_or_else(|| JsValue::from_str("No active WebGL program"))?;
+        let position_attrib = self.gl_context.get_attrib_location(program, "position") as u32;
         self.gl_context.vertex_attrib_pointer_with_i32(position_attrib, 3, WebGlRenderingContext::FLOAT, false, 0, 0);
         self.gl_context.enable_vertex_attrib_array(position_attrib);
 
         // Set uniforms
-        let time_uniform = self.gl_context.get_uniform_location(self.gl_context.get_parameter(WebGlRenderingContext::CURRENT_PROGRAM).unwrap().as_ref(), "time");
-        let resolution_uniform = self.gl_context.get_uniform_location(self.gl_context.get_parameter(WebGlRenderingContext::CURRENT_PROGRAM).unwrap().as_ref(), "resolution");
+        let time_uniform = self.gl_context.get_uniform_location(program, "time");
+        let resolution_uniform = self.gl_context.get_uniform_location(program, "resolution");
 
         if let Some(time_loc) = time_uniform {
             self.gl_context.uniform1f(Some(&time_loc), self.animation_controller.current_time());

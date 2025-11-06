@@ -16,6 +16,7 @@ pub mod shader_renderer;
 pub mod audio;
 pub mod gesture;
 pub mod osc;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod ui;
 pub mod nodes;
 pub mod node_editor;
@@ -35,12 +36,6 @@ pub mod web;
 pub use nft::BlockchainNFTIntegration;
 
 // Re-export web functionality when available
-#[cfg(target_arch = "wasm32")]
-pub use web::*;
-
-// Web support (only compiled for WASM targets)
-#[cfg(target_arch = "wasm32")]
-pub mod web;
 #[cfg(target_arch = "wasm32")]
 pub use web::*;
 

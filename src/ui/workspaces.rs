@@ -254,7 +254,7 @@ impl VisualEffects {
     pub fn apply_glassmorphism(&self, ui: &mut Ui, add_contents: impl FnOnce(&mut Ui)) {
         if self.glassmorphism_enabled {
             // Create a semi-transparent background with blur effect
-            let rect = ui.available_rect_before_wrap();
+        let rect = ui.max_rect();
 
             // Draw blurred background (simplified - in real implementation would use GPU blur)
             ui.painter().rect_filled(

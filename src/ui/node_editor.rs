@@ -520,7 +520,13 @@ impl NodeEditor {
                             );
 
                             if response.clicked() {
-                                self.add_node_from_template(template, canvas_rect.center());
+                                // Spawn near mouse position when available, otherwise near center
+                                let mouse_pos = ui.input(|i| i.pointer.hover_pos()).unwrap_or(canvas_rect.center());
+                                let world_pos = self.screen_to_world(mouse_pos, canvas_rect);
+                                // Apply a small offset based on current node count to avoid overlap
+                                let offset = egui::Vec2::new(20.0 * ((self.nodes.len() % 5) as f32), 20.0 * ((self.nodes.len() / 5) as f32));
+                                let spawn_pos = world_pos + offset;
+                                self.add_node_from_template(template, spawn_pos);
                             }
 
                             response.on_hover_text(&template.description);

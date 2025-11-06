@@ -7,6 +7,7 @@ use bevy::prelude::*;
 use bevy_egui::EguiContexts;
 use rfd::FileDialog;
 use crate::ui::node_editor::NodeEditor;
+use crate::ui::fractal_ui::FractalCodeEditor;
 use crate::fractal::FractalRenderer;
 use crate::project::FractalStudioProject;
 use std::sync::Arc;
@@ -18,17 +19,24 @@ pub struct FractalStudioApp {
     pub selected_fractal: usize,
     pub fractal_types: Vec<&'static str>,
     pub node_editor: NodeEditor,
+    pub code_editor: FractalCodeEditor,
 
     // GPU renderer
     pub fractal_renderer: Option<FractalRenderer>,
     pub viewport_texture: Option<egui::TextureId>,
     pub has_wgpu_support: bool,
+    // Panel visibility toggles
+    pub show_left_panel: bool,
+    pub show_right_panel: bool,
+    pub show_bottom_panel: bool,
 
     // Workspace management
     pub current_workspace: WorkspaceView,
 
     // Project management
     pub current_project: FractalStudioProject,
+    pub current_shader_path: Option<std::path::PathBuf>,
+    pub code_unsaved_changes: bool,
 
     // Default fractal parameters - reduced for better performance
     pub max_iterations: u32,
@@ -96,11 +104,18 @@ impl Default for FractalStudioApp {
                 "Chen-Lee Attractor",
             ],
             node_editor: NodeEditor::new(),
+            code_editor: FractalCodeEditor::new(),
             fractal_renderer: None,
             viewport_texture: None,
             has_wgpu_support: false,
+            // Panels: start with left and right visible to frame the canvas
+            show_left_panel: true,
+            show_right_panel: true,
+            show_bottom_panel: false,
             current_workspace: WorkspaceView::Modeling,
             current_project: FractalStudioProject::default(),
+            current_shader_path: None,
+            code_unsaved_changes: false,
             // Default fractal parameters - reduced for better performance
             max_iterations: 50,     // Reduced from 100
             bailout: 4.0,
@@ -141,8 +156,8 @@ impl FractalStudioApp {
         let safe_height = std::cmp::max(actual_height, 64);
         
         match FractalRenderer::new_with_wgpu_context(
-            device,
-            queue,
+            device.clone(),
+            queue.clone(),
             safe_width,
             safe_height,
         ) {
@@ -285,6 +300,83 @@ impl FractalStudioApp {
                     ui.close();
                 }
                 ui.separator();
+
+                // Shader file operations
+                ui.label("Shaders:");
+                if ui.button("New Shader").clicked() {
+                    self.save_state_for_undo();
+                    self.code_editor.code.clear();
+                    self.current_shader_path = None;
+                    self.code_unsaved_changes = false;
+                    log::info!("Created new shader document");
+                    ui.close();
+                }
+                if ui.button("Open Shader...").clicked() {
+                    self.save_state_for_undo();
+                    if let Some(path) = FileDialog::new()
+                        .add_filter("WGSL Shader", &["wgsl"]) 
+                        .add_filter("ISF Shader", &["fs"]) 
+                        .pick_file()
+                    {
+                        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+                        match std::fs::read_to_string(&path) {
+                            Ok(contents) => {
+                                if ext.eq_ignore_ascii_case("fs") {
+                                    match crate::ShaderConverter::isf_to_wgsl(&contents) {
+                                        Ok(wgsl) => {
+                                            self.code_editor.code = wgsl;
+                                            self.current_shader_path = Some(path.with_extension("wgsl"));
+                                            self.code_unsaved_changes = true;
+                                            log::info!("Converted ISF to WGSL and loaded into editor");
+                                        }
+                                        Err(e) => {
+                                            log::error!("ISF->WGSL conversion failed: {}", e);
+                                        }
+                                    }
+                                } else {
+                                    self.code_editor.code = contents;
+                                    self.current_shader_path = Some(path);
+                                    self.code_unsaved_changes = false;
+                                    log::info!("Loaded shader: {:?}", self.current_shader_path);
+                                }
+                            }
+                            Err(e) => log::error!("Failed to read shader file: {}", e),
+                        }
+                    }
+                    ui.close();
+                }
+                if ui.button("Save Shader").clicked() {
+                    let target_path = if let Some(ref p) = self.current_shader_path {
+                        p.clone()
+                    } else {
+                        match FileDialog::new().add_filter("WGSL Shader", &["wgsl"]).save_file() {
+                            Some(p) => p,
+                            None => { ui.close(); return; }
+                        }
+                    };
+                    match std::fs::write(&target_path, &self.code_editor.code) {
+                        Ok(_) => { 
+                            self.current_shader_path = Some(target_path.clone());
+                            self.code_unsaved_changes = false;
+                            log::info!("Saved shader to {:?}", target_path);
+                        }
+                        Err(e) => log::error!("Failed to save shader: {}", e),
+                    }
+                    ui.close();
+                }
+                if ui.button("Save Shader As...").clicked() {
+                    if let Some(path) = FileDialog::new().add_filter("WGSL Shader", &["wgsl"]).save_file() {
+                        match std::fs::write(&path, &self.code_editor.code) {
+                            Ok(_) => { 
+                                self.current_shader_path = Some(path.clone());
+                                self.code_unsaved_changes = false;
+                                log::info!("Saved shader as {:?}", path);
+                            }
+                            Err(e) => log::error!("Failed to save shader: {}", e),
+                        }
+                    }
+                    ui.close();
+                }
                 
                 // Import/Export
                 ui.menu_button("Import", |ui| {
@@ -532,33 +624,27 @@ impl FractalStudioApp {
                 
                 // Panels
                 ui.label("Panels:");
-                if ui.button("Show/Hide Left Panel").clicked() {
-                    // Save current state for undo
-                    self.save_state_for_undo();
-                    
-                    // Toggle left panel visibility
-                    log::info!("Toggle left panel");
-                    // TODO: Implement panel toggle
-                    ui.close();
-                }
-                if ui.button("Show/Hide Right Panel").clicked() {
-                    // Save current state for undo
-                    self.save_state_for_undo();
-                    
-                    // Toggle right panel visibility
-                    log::info!("Toggle right panel");
-                    // TODO: Implement panel toggle
-                    ui.close();
-                }
-                if ui.button("Show/Hide Bottom Panel").clicked() {
-                    // Save current state for undo
-                    self.save_state_for_undo();
-                    
-                    // Toggle bottom panel visibility
-                    log::info!("Toggle bottom panel");
-                    // TODO: Implement panel toggle
-                    ui.close();
-                }
+                ui.horizontal(|ui| {
+                    let mut left = self.show_left_panel;
+                    let mut right = self.show_right_panel;
+                    let mut bottom = self.show_bottom_panel;
+
+                    if ui.checkbox(&mut left, "Left").clicked() {
+                        self.save_state_for_undo();
+                        self.show_left_panel = left;
+                        log::info!("Left panel visibility: {}", left);
+                    }
+                    if ui.checkbox(&mut right, "Right").clicked() {
+                        self.save_state_for_undo();
+                        self.show_right_panel = right;
+                        log::info!("Right panel visibility: {}", right);
+                    }
+                    if ui.checkbox(&mut bottom, "Bottom").clicked() {
+                        self.save_state_for_undo();
+                        self.show_bottom_panel = bottom;
+                        log::info!("Bottom panel visibility: {}", bottom);
+                    }
+                });
                 ui.separator();
                 
                 if ui.button("Fullscreen").clicked() {
@@ -1054,6 +1140,42 @@ impl FractalStudioApp {
                 ui.label(format!("Time: {:.2}s", self.time));
             });
         });
+        // Quick-access workspace tabs and panel toggles
+        ui.horizontal(|ui| {
+            // Workspace tabs
+            let modeling = ui.selectable_value(&mut self.current_workspace, WorkspaceView::Modeling, "Modeling");
+            let animation = ui.selectable_value(&mut self.current_workspace, WorkspaceView::Animation, "Animation");
+            let rendering = ui.selectable_value(&mut self.current_workspace, WorkspaceView::Rendering, "Rendering");
+            let node_editor = ui.selectable_value(&mut self.current_workspace, WorkspaceView::NodeEditor, "Node Editor");
+
+            if modeling.clicked() || animation.clicked() || rendering.clicked() || node_editor.clicked() {
+                self.save_state_for_undo();
+            }
+
+            ui.separator();
+
+            // Quick panel toggles
+            let mut left = self.show_left_panel;
+            let mut right = self.show_right_panel;
+            let mut bottom = self.show_bottom_panel;
+
+            let left_resp = ui.checkbox(&mut left, "Left");
+            let right_resp = ui.checkbox(&mut right, "Right");
+            let bottom_resp = ui.checkbox(&mut bottom, "Bottom");
+
+            if left_resp.clicked() {
+                self.save_state_for_undo();
+                self.show_left_panel = left;
+            }
+            if right_resp.clicked() {
+                self.save_state_for_undo();
+                self.show_right_panel = right;
+            }
+            if bottom_resp.clicked() {
+                self.save_state_for_undo();
+                self.show_bottom_panel = bottom;
+            }
+        });
 
         ui.separator();
     }
@@ -1096,6 +1218,50 @@ impl FractalStudioApp {
                     self.reset_parameters_for_fractal_type(new_selection);
                 }
                 
+                // Lightweight preview to confirm selection, useful in Node Editor workspace
+                ui.separator();
+                ui.label(egui::RichText::new("Preview").strong());
+                if self.has_wgpu_support {
+                    if let Some(renderer) = &mut self.fractal_renderer {
+                        // Build parameters similar to viewport
+                        let mut params = crate::fractal::FractalParameters::default();
+                        params.max_iterations = self.max_iterations;
+                        params.bailout = self.bailout;
+                        params.scale = self.scale;
+                        params.position = nalgebra::Vector3::new(self.position[0], self.position[1], self.position[2]);
+                        params.rotation = nalgebra::Vector3::new(self.rotation[0], self.rotation[1], self.rotation[2]);
+                        params.color_saturation = self.color_saturation;
+                        params.formula = match self.selected_fractal {
+                            0 => crate::fractal::FractalFormula::Mandelbrot { center: [-0.5, 0.0], zoom: 1.0 },
+                            1 => crate::fractal::FractalFormula::Mandelbulb { power: self.power },
+                            2 => crate::fractal::FractalFormula::Mandelbox { scale: self.scale },
+                            3 => crate::fractal::FractalFormula::Julia { c: [-0.7, 0.27015], max_iterations: self.max_iterations },
+                            _ => crate::fractal::FractalFormula::Mandelbulb { power: self.power },
+                        };
+                        renderer.update_parameters(&params);
+
+                        let preview_size = egui::vec2(220.0, 150.0);
+                        let w = preview_size.x.max(1.0).round() as u32;
+                        let h = preview_size.y.max(1.0).round() as u32;
+                        match renderer.render_frame_to_texture(self.time, (w, h), ui.ctx()) {
+                            Ok(tex_id) => {
+                                ui.add(egui::Image::new((tex_id, preview_size)));
+                                ui.label(format!("{} • {}×{}", self.fractal_types[self.selected_fractal], w, h));
+                                if self.current_workspace == WorkspaceView::NodeEditor {
+                                    ui.label("Switch to Modeling/Rendering for the full viewport.");
+                                }
+                            }
+                            Err(_e) => {
+                                ui.label("Preview rendering failed.");
+                            }
+                        }
+                    } else {
+                        ui.label("Renderer not initialized.");
+                    }
+                } else {
+                    ui.label("GPU rendering not available.");
+                }
+
                 ui.separator();
                 
                 // Show fractal category information
@@ -1199,19 +1365,8 @@ impl FractalStudioApp {
                 
                 ui.separator();
                 
-                // Simple code editor placeholder
-                egui::ScrollArea::vertical()
-                    .max_height(200.0)
-                    .show(ui, |ui| {
-                        ui.add(
-                            egui::TextEdit::multiline(&mut String::new())
-                                .font(egui::TextStyle::Monospace)
-                                .code_editor()
-                                .desired_width(f32::INFINITY)
-                                .desired_rows(10)
-                                .hint_text("// Fractal formula code would go here...")
-                        );
-                    });
+                // Integrated code editor bound to app state
+                self.code_editor.show(ui);
             });
         });
     }
@@ -1222,7 +1377,7 @@ impl FractalStudioApp {
         ui.separator();
         
         // Get available size for the node editor
-        let size = ui.available_rect_before_wrap().size();
+        let size = ui.max_rect().size();
         
         // Call node editor with context
         self.node_editor.show(ui, size);
@@ -1230,7 +1385,7 @@ impl FractalStudioApp {
 
     /// Show fractal viewport
     fn show_fractal_viewport(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
-        let (rect, _response) = ui.allocate_exact_size(ui.available_size(), egui::Sense::hover());
+        let (rect, _response) = ui.allocate_exact_size(ui.max_rect().size(), egui::Sense::hover());
         
         // Try to get WGPU render state for GPU rendering
         if self.has_wgpu_support {
@@ -1257,10 +1412,10 @@ impl FractalStudioApp {
                 // Update renderer with current parameters
                 renderer.update_parameters(&params);
                 
-                // Actually render a frame
-                let screen_size = ctx.input(|i| i.screen_rect.size());
-                let width = screen_size.x as u32;
-                let height = screen_size.y as u32;
+                // Determine render target size from the allocated rect to avoid early ctx.input access
+                let size = rect.size();
+                let width = size.x.max(1.0).round() as u32;
+                let height = size.y.max(1.0).round() as u32;
                 
                 // Render a frame and get the texture
                 match renderer.render_frame_to_texture(self.time, (width, height), ctx) {
@@ -1492,7 +1647,7 @@ impl FractalStudioApp {
         });
 
         // Simple timeline visualization
-        let timeline_rect = ui.available_rect_before_wrap();
+        let timeline_rect = ui.max_rect();
         let timeline_height = 100.0;
         let timeline_rect = egui::Rect::from_min_size(
             timeline_rect.min,
@@ -1581,7 +1736,7 @@ impl FractalStudioApp {
 
         // Show spectrum visualization
         ui.label("Frequency Spectrum:");
-        let spectrum_rect = ui.available_rect_before_wrap();
+        let spectrum_rect = ui.max_rect();
         let spectrum_height = 100.0;
         let spectrum_rect = egui::Rect::from_min_size(
             spectrum_rect.min,
@@ -1620,7 +1775,7 @@ impl FractalStudioApp {
 
         // Show waveform visualization
         ui.label("Waveform:");
-        let waveform_rect = ui.available_rect_before_wrap();
+        let waveform_rect = ui.max_rect();
         let waveform_height = 80.0;
         let waveform_rect = egui::Rect::from_min_size(
             waveform_rect.min,
@@ -2065,7 +2220,9 @@ impl FractalStudioApp {
         log::debug!("Update started");
         
         // Update time for animations
-        self.time += ctx.input(|i| i.unstable_dt);
+        // Note: Avoid reading input delta directly here to prevent egui context panics
+        // when the context has not begun a frame yet in some integrations.
+        // Time progression is handled externally or by renderer updates.
         
         // Update fractal renderer if available
         if let Some(renderer) = &mut self.fractal_renderer {
@@ -2101,53 +2258,61 @@ impl FractalStudioApp {
         match self.current_workspace {
             WorkspaceView::Modeling => {
                 // Left panel for scene hierarchy and fractal controls
-                egui::SidePanel::left("left_panel")
-                    .default_width(250.0)
-                    .show(ctx, |ui| {
-                        ui.heading("Scene Hierarchy");
-                        ui.separator();
-                        // TODO: Show scene hierarchy
-                        ui.label("Scene objects would go here");
-                        
-                        ui.separator();
-                        ui.heading("Fractal Controls");
-                        ui.separator();
-                        self.show_fractal_controls(ui);
-                    });
+                if self.show_left_panel {
+                    egui::SidePanel::left("left_panel")
+                        .default_width(250.0)
+                        .show(ctx, |ui| {
+                            ui.heading("Scene Hierarchy");
+                            ui.separator();
+                            // TODO: Show scene hierarchy
+                            ui.label("Scene objects would go here");
+                            
+                            ui.separator();
+                            ui.heading("Fractal Controls");
+                            ui.separator();
+                            self.show_fractal_controls(ui);
+                        });
+                }
 
                 // Right panel for properties and tools
-                egui::SidePanel::right("right_panel")
-                    .default_width(250.0)
-                    .show(ctx, |ui| {
-                        ui.heading("Properties");
-                        ui.separator();
-                        // TODO: Show selected object properties
-                        ui.label("Object properties would go here");
-                        
-                        ui.separator();
-                        ui.heading("Tools");
-                        ui.separator();
-                        ui.label("Modeling tools would go here");
-                        
-                        // Show audio visualization if audio data is available
-                        if let Some(audio) = audio_data {
+                if self.show_right_panel {
+                    egui::SidePanel::right("right_panel")
+                        .min_width(250.0)
+                        .max_width(250.0)
+                        .resizable(false)
+                        .show(ctx, |ui| {
+                            ui.heading("Properties");
                             ui.separator();
-                            self.show_audio_visualization(ui, audio);
-                        }
-                        
-                        // Show MIDI controls if MIDI controller is available
-                        if let Some(midi) = midi_controller {
+                            // TODO: Show selected object properties
+                            ui.label("Object properties would go here");
+                            
                             ui.separator();
-                            self.show_midi_controls(ui, midi);
-                        }
-                    });
+                            ui.heading("Tools");
+                            ui.separator();
+                            ui.label("Modeling tools would go here");
+                            
+                            // Show audio visualization if audio data is available
+                            if let Some(audio) = audio_data {
+                                ui.separator();
+                                self.show_audio_visualization(ui, audio);
+                            }
+                            
+                            // Show MIDI controls if MIDI controller is available
+                            if let Some(midi) = midi_controller {
+                                ui.separator();
+                                self.show_midi_controls(ui, midi);
+                            }
+                        });
+                }
 
                 // Bottom panel for timeline
-                egui::TopBottomPanel::bottom("bottom_panel")
-                    .default_height(100.0)
-                    .show(ctx, |ui| {
-                        self.show_timeline_panel(ui);
-                    });
+                if self.show_bottom_panel {
+                    egui::TopBottomPanel::bottom("bottom_panel")
+                        .default_height(100.0)
+                        .show(ctx, |ui| {
+                            self.show_timeline_panel(ui);
+                        });
+                }
 
                 // Central panel for 3D viewport
                 egui::CentralPanel::default().show(ctx, |ui| {
@@ -2157,65 +2322,73 @@ impl FractalStudioApp {
             
             WorkspaceView::Animation => {
                 // Left panel for scene hierarchy and keyframe controls
-                egui::SidePanel::left("left_panel")
-                    .default_width(250.0)
-                    .show(ctx, |ui| {
-                        ui.heading("Scene Hierarchy");
-                        ui.separator();
-                        // TODO: Show scene hierarchy
-                        ui.label("Scene objects would go here");
-                        
-                        ui.separator();
-                        ui.heading("Animation Controls");
-                        ui.separator();
-                        ui.label("Animation controls would go here");
-                    });
+                if self.show_left_panel {
+                    egui::SidePanel::left("left_panel")
+                        .default_width(250.0)
+                        .show(ctx, |ui| {
+                            ui.heading("Scene Hierarchy");
+                            ui.separator();
+                            // TODO: Show scene hierarchy
+                            ui.label("Scene objects would go here");
+                            
+                            ui.separator();
+                            ui.heading("Animation Controls");
+                            ui.separator();
+                            ui.label("Animation controls would go here");
+                        });
+                }
 
                 // Right panel for animation curves and properties
-                egui::SidePanel::right("right_panel")
-                    .default_width(250.0)
-                    .show(ctx, |ui| {
-                        ui.heading("Animation Curves");
-                        ui.separator();
-                        // TODO: Show animation curves
-                        ui.label("Animation curves would go here");
-                        
-                        ui.separator();
-                        ui.heading("Keyframe Properties");
-                        ui.separator();
-                        ui.label("Keyframe properties would go here");
-                        
-                        // Show audio visualization if audio data is available
-                        if let Some(audio) = audio_data {
+                if self.show_right_panel {
+                    egui::SidePanel::right("right_panel")
+                        .min_width(250.0)
+                        .max_width(250.0)
+                        .resizable(false)
+                        .show(ctx, |ui| {
+                            ui.heading("Animation Curves");
                             ui.separator();
-                            self.show_audio_visualization(ui, audio);
-                        }
-                        
-                        // Show MIDI controls if MIDI controller is available
-                        if let Some(midi) = midi_controller {
+                            // TODO: Show animation curves
+                            ui.label("Animation curves would go here");
+                            
                             ui.separator();
-                            self.show_midi_controls(ui, midi);
-                        }
-                        
-                        // Show OSC controls if OSC controller is available
-                        if let Some(osc) = osc_controller {
+                            ui.heading("Keyframe Properties");
                             ui.separator();
-                            self.show_osc_controls(ui, osc);
-                        }
-                        
-                        // Show gesture controls if gesture controller is available
-                        if let Some(gesture) = gesture_controller {
-                            ui.separator();
-                            self.show_gesture_controls(ui, gesture);
-                        }
-                    });
+                            ui.label("Keyframe properties would go here");
+                            
+                            // Show audio visualization if audio data is available
+                            if let Some(audio) = audio_data {
+                                ui.separator();
+                                self.show_audio_visualization(ui, audio);
+                            }
+                            
+                            // Show MIDI controls if MIDI controller is available
+                            if let Some(midi) = midi_controller {
+                                ui.separator();
+                                self.show_midi_controls(ui, midi);
+                            }
+                            
+                            // Show OSC controls if OSC controller is available
+                            if let Some(osc) = osc_controller {
+                                ui.separator();
+                                self.show_osc_controls(ui, osc);
+                            }
+                            
+                            // Show gesture controls if gesture controller is available
+                            if let Some(gesture) = gesture_controller {
+                                ui.separator();
+                                self.show_gesture_controls(ui, gesture);
+                            }
+                        });
+                }
 
                 // Bottom panel for timeline
-                egui::TopBottomPanel::bottom("bottom_panel")
-                    .default_height(150.0)
-                    .show(ctx, |ui| {
-                        self.show_timeline_panel(ui);
-                    });
+                if self.show_bottom_panel {
+                    egui::TopBottomPanel::bottom("bottom_panel")
+                        .default_height(150.0)
+                        .show(ctx, |ui| {
+                            self.show_timeline_panel(ui);
+                        });
+                }
 
                 // Central panel for 3D viewport with animation preview
                 egui::CentralPanel::default().show(ctx, |ui| {
@@ -2225,67 +2398,75 @@ impl FractalStudioApp {
             
             WorkspaceView::Rendering => {
                 // Left panel for scene hierarchy and render settings
-                egui::SidePanel::left("left_panel")
-                    .default_width(250.0)
-                    .show(ctx, |ui| {
-                        ui.heading("Scene Hierarchy");
-                        ui.separator();
-                        // TODO: Show scene hierarchy
-                        ui.label("Scene objects would go here");
-                        
-                        ui.separator();
-                        ui.heading("Render Settings");
-                        ui.separator();
-                        ui.label("Render settings would go here");
-                    });
+                if self.show_left_panel {
+                    egui::SidePanel::left("left_panel")
+                        .default_width(250.0)
+                        .show(ctx, |ui| {
+                            ui.heading("Scene Hierarchy");
+                            ui.separator();
+                            // TODO: Show scene hierarchy
+                            ui.label("Scene objects would go here");
+                            
+                            ui.separator();
+                            ui.heading("Render Settings");
+                            ui.separator();
+                            ui.label("Render settings would go here");
+                        });
+                }
 
                 // Right panel for material editor and render output
-                egui::SidePanel::right("right_panel")
-                    .default_width(250.0)
-                    .show(ctx, |ui| {
-                        ui.heading("Material Editor");
-                        ui.separator();
-                        // TODO: Show material editor
-                        ui.label("Material editor would go here");
-                        
-                        ui.separator();
-                        ui.heading("Render Output");
-                        ui.separator();
-                        ui.label("Render output would go here");
-                        
-                        // Show audio visualization if audio data is available
-                        if let Some(audio) = audio_data {
+                if self.show_right_panel {
+                    egui::SidePanel::right("right_panel")
+                        .min_width(250.0)
+                        .max_width(250.0)
+                        .resizable(false)
+                        .show(ctx, |ui| {
+                            ui.heading("Material Editor");
                             ui.separator();
-                            self.show_audio_visualization(ui, audio);
-                        }
-                        
-                        // Show MIDI controls if MIDI controller is available
-                        if let Some(midi) = midi_controller {
+                            // TODO: Show material editor
+                            ui.label("Material editor would go here");
+                            
                             ui.separator();
-                            self.show_midi_controls(ui, midi);
-                        }
-                        
-                        // Show OSC controls if OSC controller is available
-                        if let Some(osc) = osc_controller {
+                            ui.heading("Render Output");
                             ui.separator();
-                            self.show_osc_controls(ui, osc);
-                        }
-                        
-                        // Show gesture controls if gesture controller is available
-                        if let Some(gesture) = gesture_controller {
-                            ui.separator();
-                            self.show_gesture_controls(ui, gesture);
-                        }
-                    });
+                            ui.label("Render output would go here");
+                            
+                            // Show audio visualization if audio data is available
+                            if let Some(audio) = audio_data {
+                                ui.separator();
+                                self.show_audio_visualization(ui, audio);
+                            }
+                            
+                            // Show MIDI controls if MIDI controller is available
+                            if let Some(midi) = midi_controller {
+                                ui.separator();
+                                self.show_midi_controls(ui, midi);
+                            }
+                            
+                            // Show OSC controls if OSC controller is available
+                            if let Some(osc) = osc_controller {
+                                ui.separator();
+                                self.show_osc_controls(ui, osc);
+                            }
+                            
+                            // Show gesture controls if gesture controller is available
+                            if let Some(gesture) = gesture_controller {
+                                ui.separator();
+                                self.show_gesture_controls(ui, gesture);
+                            }
+                        });
+                }
 
                 // Bottom panel for render queue
-                egui::TopBottomPanel::bottom("bottom_panel")
-                    .default_height(120.0)
-                    .show(ctx, |ui| {
-                        ui.heading("Render Queue");
-                        ui.separator();
-                        ui.label("Render queue would go here");
-                    });
+                if self.show_bottom_panel {
+                    egui::TopBottomPanel::bottom("bottom_panel")
+                        .default_height(120.0)
+                        .show(ctx, |ui| {
+                            ui.heading("Render Queue");
+                            ui.separator();
+                            ui.label("Render queue would go here");
+                        });
+                }
 
                 // Central panel for render viewport
                 egui::CentralPanel::default().show(ctx, |ui| {
@@ -2295,52 +2476,58 @@ impl FractalStudioApp {
             
             WorkspaceView::NodeEditor => {
                 // Left panel for node library
-                egui::SidePanel::left("left_panel")
-                    .default_width(250.0)
-                    .show(ctx, |ui| {
-                        ui.heading("Node Library");
-                        ui.separator();
-                        // TODO: Show node library with categories
-                        ui.label("Fractal Nodes");
-                        ui.label("Math Nodes");
-                        ui.label("Color Nodes");
-                        ui.label("Animation Nodes");
-                        ui.label("Utility Nodes");
-                    });
+                if self.show_left_panel {
+                    egui::SidePanel::left("left_panel")
+                        .default_width(250.0)
+                        .show(ctx, |ui| {
+                            ui.heading("Node Library");
+                            ui.separator();
+                            // TODO: Show node library with categories
+                            ui.label("Fractal Nodes");
+                            ui.label("Math Nodes");
+                            ui.label("Color Nodes");
+                            ui.label("Animation Nodes");
+                            ui.label("Utility Nodes");
+                        });
+                }
 
                 // Right panel for node properties
-                egui::SidePanel::right("right_panel")
-                    .default_width(250.0)
-                    .show(ctx, |ui| {
-                        ui.heading("Node Properties");
-                        ui.separator();
-                        // TODO: Show selected node properties
-                        ui.label("Node properties would go here");
-                        
-                        // Show audio visualization if audio data is available
-                        if let Some(audio) = audio_data {
+                if self.show_right_panel {
+                    egui::SidePanel::right("right_panel")
+                        .min_width(250.0)
+                        .max_width(250.0)
+                        .resizable(false)
+                        .show(ctx, |ui| {
+                            ui.heading("Node Properties");
                             ui.separator();
-                            self.show_audio_visualization(ui, audio);
-                        }
-                        
-                        // Show MIDI controls if MIDI controller is available
-                        if let Some(midi) = midi_controller {
-                            ui.separator();
-                            self.show_midi_controls(ui, midi);
-                        }
-                        
-                        // Show OSC controls if OSC controller is available
-                        if let Some(osc) = osc_controller {
-                            ui.separator();
-                            self.show_osc_controls(ui, osc);
-                        }
-                        
-                        // Show gesture controls if gesture controller is available
-                        if let Some(gesture) = gesture_controller {
-                            ui.separator();
-                            self.show_gesture_controls(ui, gesture);
-                        }
-                    });
+                            // TODO: Show selected node properties
+                            ui.label("Node properties would go here");
+                            
+                            // Show audio visualization if audio data is available
+                            if let Some(audio) = audio_data {
+                                ui.separator();
+                                self.show_audio_visualization(ui, audio);
+                            }
+                            
+                            // Show MIDI controls if MIDI controller is available
+                            if let Some(midi) = midi_controller {
+                                ui.separator();
+                                self.show_midi_controls(ui, midi);
+                            }
+                            
+                            // Show OSC controls if OSC controller is available
+                            if let Some(osc) = osc_controller {
+                                ui.separator();
+                                self.show_osc_controls(ui, osc);
+                            }
+                            
+                            // Show gesture controls if gesture controller is available
+                            if let Some(gesture) = gesture_controller {
+                                ui.separator();
+                                self.show_gesture_controls(ui, gesture);
+                            }
+                        });
+                }
 
                 // No bottom panel in node editor (or minimal status bar)
 

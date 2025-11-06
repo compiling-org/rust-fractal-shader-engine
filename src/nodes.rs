@@ -262,7 +262,7 @@ impl NodeGraph {
     fn execute_fractal_generator(
         &self,
         fractal_type: &FractalType,
-        _parameters: &HashMap<String, NodeParameter>,
+        parameters: &HashMap<String, NodeParameter>,
         _inputs: &[(usize, NodeResult)],
         _context: &ExecutionContext,
     ) -> Option<NodeResult> {

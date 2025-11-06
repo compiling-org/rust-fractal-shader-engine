@@ -24,6 +24,12 @@ fn main() {
         // Try to save any unsaved work here if possible
         eprintln!("Attempting to save current state...");
     }));
+
+    // Initialize logger so info/warn/error from the app are visible
+    // This helps confirm renderer and canvas status at runtime.
+    let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+        .is_test(false)
+        .try_init();
     
     let args: Vec<String> = std::env::args().collect();
 

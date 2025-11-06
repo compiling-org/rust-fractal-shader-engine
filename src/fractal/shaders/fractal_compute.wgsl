@@ -1,34 +1,49 @@
 // Fractal Compute Shader
 // GPU-accelerated distance field computation for real-time fractal rendering
 
-struct Params {
-    max_iterations: f32,
-    bailout: f32,
-    power: f32,
-    scale: f32,
-    offset: vec3<f32>,
-    rotation: vec3<f32>,
-    base_color: vec3<f32>,
-    secondary_color: vec3<f32>,
-    cycle_frequency: f32,
-    saturation: f32,
-    value: f32,
-    density: f32,
-    fog_color: vec3<f32>,
-    scattering: f32,
-    absorption: f32,
-    anisotropy: f32,
-    time: f32,
-    resolution_x: f32,
-    resolution_y: f32,
-    resolution_scale: f32,
-    max_steps: f32,
-    surface_epsilon: f32,
-};
+// Parameters are provided as a packed float array from the host to avoid
+// uniform-struct alignment mismatches between WGSL and Rust.
+// Index mapping:
+//  0: max_iterations
+//  1: bailout
+//  2: power
+//  3: scale
+//  4..6: offset.xyz
+//  7..9: rotation.xyz
+// 10..12: base_color.rgb
+// 13..15: secondary_color.rgb
+// 16: cycle_frequency
+// 17: saturation
+// 18: value
+// 19: density
+// 20..22: fog_color.rgb
+// 23: scattering
+// 24: absorption
+// 25: anisotropy
+// 26: time
+// 27: resolution_x
+// 28: resolution_y
+// 29: resolution_scale
+// 30: max_steps
+// 31: surface_epsilon
+// 32: formula_id (0: Mandelbrot, 1: Mandelbulb, 2: Mandelbox, 3: Julia, 4: Quaternion Julia)
 
 @group(0) @binding(0) var<storage, read_write> distance_field: array<f32>;
+struct Params {
+    data: array<vec4<f32>, 64>,
+};
 @group(0) @binding(1) var<uniform> params: Params;
 @group(0) @binding(2) var output_texture: texture_storage_2d<rgba8unorm, write>;
+
+fn param(index: u32) -> f32 {
+    let v = params.data[index / 4u];
+    let lane = index % 4u;
+    return select(
+        select(v.x, v.y, lane == 1u),
+        select(v.z, v.w, lane == 3u),
+        lane > 1u
+    );
+}
 
 struct DistanceResult {
     distance: f32,
@@ -38,19 +53,18 @@ struct DistanceResult {
     material_id: f32,
 };
 
-// Distance estimation functions for different fractal types
 fn mandelbrot_distance(pos: vec3<f32>) -> DistanceResult {
     // 2D Mandelbrot on XZ plane
-    let c = vec2<f32>(pos.x + params.offset.x, pos.z + params.offset.z);
+    let c = vec2<f32>(pos.x + param(4u), pos.z + param(6u));
     var z = vec2<f32>(0.0, 0.0);
     var iterations: f32 = 0.0;
 
-    for (var i: u32 = 0u; i < u32(params.max_iterations); i = i + 1u) {
-        if (dot(z, z) > params.bailout * params.bailout) {
+    for (var i: u32 = 0u; i < u32(param(0u)); i = i + 1u) {
+        if (dot(z, z) > param(1u) * param(1u)) {
+            iterations = f32(i);
             break;
         }
 
-        // z = z² + c
         let x = z.x * z.x - z.y * z.y + c.x;
         let y = 2.0 * z.x * z.y + c.y;
         z = vec2<f32>(x, y);
@@ -62,7 +76,7 @@ fn mandelbrot_distance(pos: vec3<f32>) -> DistanceResult {
 }
 
 fn mandelbulb_distance(pos: vec3<f32>) -> DistanceResult {
-    var p = pos + params.offset;
+    var p = pos + vec3<f32>(param(4u), param(5u), param(6u));
     var dr = 1.0;
     var r = 0.0;
     var iterations: f32 = 0.0;
@@ -70,11 +84,11 @@ fn mandelbulb_distance(pos: vec3<f32>) -> DistanceResult {
     // Add a small epsilon to prevent division by zero
     let epsilon = 1e-12;
     
-    for (var i: u32 = 0u; i < u32(params.max_iterations); i = i + 1u) {
+    for (var i: u32 = 0u; i < u32(param(0u)); i = i + 1u) {
         r = length(p);
         
         // Check for bailout with proper handling
-        if (r > params.bailout || r != r) { // Also check for NaN
+        if (r > param(1u) || r != r) { // Also check for NaN
             iterations = f32(i);
             break;
         }
@@ -89,17 +103,17 @@ fn mandelbulb_distance(pos: vec3<f32>) -> DistanceResult {
         }
 
         // Scale and rotate with safety checks
-        let power_minus_one = params.power - 1.0;
+        let power_minus_one = param(2u) - 1.0;
         if (power_minus_one > 0.0) {
-            dr = pow(r, power_minus_one) * params.power * dr + 1.0;
+            dr = pow(r, power_minus_one) * param(2u) * dr + 1.0;
         } else {
             dr = dr + 1.0;
         }
 
-        let zr = pow(r, params.power);
-        theta = theta * params.power;
-        phi = phi * params.power;
+        theta = theta * param(2u);
+        phi = phi * param(2u);
 
+        let zr = pow(r, param(2u));
         // Convert back to cartesian
         p = zr * vec3<f32>(
             sin(theta) * cos(phi),
@@ -133,11 +147,11 @@ fn mandelbulb_distance(pos: vec3<f32>) -> DistanceResult {
 }
 
 fn mandelbox_distance(pos: vec3<f32>) -> DistanceResult {
-    var p = pos + params.offset;
+    var p = pos + vec3<f32>(param(4u), param(5u), param(6u));
     var dz = 1.0;
     var iterations: f32 = 0.0;
 
-    for (var i: u32 = 0u; i < u32(params.max_iterations); i = i + 1u) {
+    for (var i: u32 = 0u; i < u32(param(0u)); i = i + 1u) {
         // Box fold
         if (p.x > 1.0) {
             p.x = 2.0 - p.x;
@@ -170,11 +184,11 @@ fn mandelbox_distance(pos: vec3<f32>) -> DistanceResult {
         }
 
         // Scale and translate
-        p = p * params.scale + pos;
-        dz = dz * abs(params.scale) + 1.0;
+        p = p * param(3u) + pos;
+        dz = dz * abs(param(3u)) + 1.0;
 
         let r = length(p);
-        if (r > params.bailout) {
+        if (r > param(1u)) {
             iterations = f32(i);
             break;
         }
@@ -192,9 +206,9 @@ fn quaternion_julia_distance(pos: vec3<f32>) -> DistanceResult {
     let c = vec4<f32>(-0.2, 0.8, 0.0, 0.0); // Julia constant
     var iterations: f32 = 0.0;
 
-    for (var i: u32 = 0u; i < u32(params.max_iterations); i = i + 1u) {
+    for (var i: u32 = 0u; i < u32(param(0u)); i = i + 1u) {
         let magnitude2 = dot(q, q);
-        if (magnitude2 > params.bailout * params.bailout) {
+        if (magnitude2 > param(1u) * param(1u)) {
             iterations = f32(i);
             break;
         }
@@ -215,105 +229,135 @@ fn quaternion_julia_distance(pos: vec3<f32>) -> DistanceResult {
     return DistanceResult(distance, iterations, normalize(q.xyz), 1.0, 0.0);
 }
 
-// Main compute shader entry point
 @compute @workgroup_size(16, 16, 1)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let pixel_coords = vec2<u32>(global_id.x, global_id.y);
 
     // Check bounds
-    if (pixel_coords.x >= u32(params.resolution_x) || pixel_coords.y >= u32(params.resolution_y)) {
+    if (pixel_coords.x >= u32(param(27u)) || pixel_coords.y >= u32(param(28u))) {
         return;
     }
 
-    // Convert pixel coordinates to world space
+    // Normalized pixel coordinates
     let uv = vec2<f32>(
-        f32(pixel_coords.x) / params.resolution_x,
-        f32(pixel_coords.y) / params.resolution_y
+        f32(pixel_coords.x) / param(27u),
+        f32(pixel_coords.y) / param(28u)
     );
 
-    // Generate ray from camera with proper parameter handling
-    let aspect_ratio = params.resolution_x / params.resolution_y;
-    let tan_fov = tan(radians(60.0) * 0.5); // 60 degree FOV
+    // Decide path by formula: 2D fractals render per-pixel; others use ray marching
+    let fid = i32(param(32u));
 
-    let ndc_x = (2.0 * uv.x - 1.0) * aspect_ratio * tan_fov;
-    let ndc_y = (1.0 - 2.0 * uv.y) * tan_fov;
+    var color = vec4<f32>(0.1, 0.1, 0.2, 1.0); // Default background
 
-    // Camera setup with parameter-based positioning
-    let camera_pos = vec3<f32>(params.offset.x, params.offset.y, params.offset.z + 5.0);
-    let camera_target = vec3<f32>(params.offset.x, params.offset.y, params.offset.z);
-    let camera_up = vec3<f32>(0.0, 1.0, 0.0);
+    if (fid == 0 || fid == 3) {
+        // 2D Mandelbrot / Julia rendering in screen space
+        // Map UV to complex plane with simple scaling and offset
+        let aspect = param(27u) / param(28u);
+        let scale = max(param(3u), 0.0001);
+        let x = (uv.x - 0.5) * 3.0 * aspect / scale + param(4u);
+        let y = (uv.y - 0.5) * 2.0 / scale + param(5u);
 
-    let forward = normalize(camera_target - camera_pos);
-    let right = normalize(cross(camera_up, forward));
-    let up = cross(forward, right);
+        var z = vec2<f32>(0.0, 0.0);
+        var c = vec2<f32>(x, y);
 
-    let ray_dir = normalize(forward + right * ndc_x + up * ndc_y);
-
-    // Ray marching with improved termination conditions
-    var t = 0.0;
-    var result = DistanceResult(0.0, 0.0, vec3<f32>(0.0), 0.0, 0.0);
-    var hit = false;
-
-    // Use min step size to prevent infinite loops
-    let min_step = max(params.surface_epsilon, 0.0001);
-    let max_distance = 100.0;
-    
-    for (var i: u32 = 0u; i < u32(params.max_steps); i = i + 1u) {
-        let pos = camera_pos + ray_dir * t;
-
-        // Select fractal type based on parameters
-        // For now, we'll use a simple selection mechanism
-        result = mandelbulb_distance(pos);
-
-        // Check for hit with proper epsilon
-        if (abs(result.distance) < params.surface_epsilon) {
-            hit = true;
-            result.iterations = f32(i);
-            break;
+        if (fid == 3) {
+            // Use rotation.xy as Julia constant to allow UI tweaks
+            c = vec2<f32>(param(7u), param(8u));
+            z = vec2<f32>(x, y);
         }
 
-        // Prevent too small steps and infinite loops
-        let step_size = max(abs(result.distance), min_step);
-        t = t + step_size;
-        
-        // Check for maximum distance
-        if (t > max_distance) {
-            break;
+        var iter: u32 = 0u;
+        for (var i: u32 = 0u; i < u32(param(0u)); i = i + 1u) {
+            // z = z^2 + c
+            let zx2 = z.x * z.x - z.y * z.y;
+            let zy2 = 2.0 * z.x * z.y;
+            z = vec2<f32>(zx2, zy2) + c;
+
+            if (dot(z, z) > param(1u) * param(1u)) {
+                iter = i;
+                break;
+            }
+            iter = i;
         }
-        
-        // Prevent runaway iterations
-        if (t != t) { // Check for NaN
-            break;
+
+        // Smooth coloring based on iterations
+        let normalized = f32(iter) / max(param(0u), 1.0);
+        let mixv = normalized * param(16u);
+        let r = (param(10u) * (1.0 - normalized) + param(13u) * normalized) *
+                (0.5 + 0.5 * sin(mixv));
+        let g = (param(11u) * (1.0 - normalized) + param(14u) * normalized) *
+                (0.5 + 0.5 * sin(mixv + 2.0944));
+        let b = (param(12u) * (1.0 - normalized) + param(15u) * normalized) *
+                (0.5 + 0.5 * sin(mixv + 4.18879));
+
+        // Interior points go darker
+        let interior = select(0.0, 1.0, iter >= u32(param(0u) - 1.0));
+        color = vec4<f32>(
+            clamp(r * param(17u) * (1.0 - 0.8 * interior), 0.0, 1.0),
+            clamp(g * param(17u) * (1.0 - 0.8 * interior), 0.0, 1.0),
+            clamp(b * param(18u) * (1.0 - 0.8 * interior), 0.0, 1.0),
+            1.0
+        );
+    } else {
+        // 3D / distance-estimated fractals via ray marching
+        let aspect_ratio = param(27u) / param(28u);
+        let tan_fov = tan(radians(60.0) * 0.5);
+        let ndc_x = (2.0 * uv.x - 1.0) * aspect_ratio * tan_fov;
+        let ndc_y = (1.0 - 2.0 * uv.y) * tan_fov;
+
+        let camera_pos = vec3<f32>(param(4u), param(5u), param(6u) + 5.0);
+        let camera_target = vec3<f32>(param(4u), param(5u), param(6u));
+        let camera_up = vec3<f32>(0.0, 1.0, 0.0);
+        let forward = normalize(camera_target - camera_pos);
+        let right = normalize(cross(camera_up, forward));
+        let up = cross(forward, right);
+        let ray_dir = normalize(forward + right * ndc_x + up * ndc_y);
+
+        var t = 0.0;
+        var result = DistanceResult(0.0, 0.0, vec3<f32>(0.0), 0.0, 0.0);
+        let min_step = max(param(31u), 0.0001);
+        let max_distance = 100.0;
+
+        for (var i: u32 = 0u; i < u32(param(30u)); i = i + 1u) {
+            let pos = camera_pos + ray_dir * t;
+
+            if (fid == 1) {
+                result = mandelbulb_distance(pos);
+            } else if (fid == 2) {
+                result = mandelbox_distance(pos);
+            } else if (fid == 4) {
+                result = quaternion_julia_distance(pos);
+            } else {
+                result = mandelbulb_distance(pos);
+            }
+
+            if (abs(result.distance) < param(31u)) {
+                result.iterations = f32(i);
+                break;
+            }
+
+            let step_size = max(abs(result.distance), min_step);
+            t = t + step_size;
+            if (t > max_distance || t != t) {
+                break;
+            }
         }
-    }
 
-    // Calculate final color with improved coloring
-    var color = vec4<f32>(0.1, 0.1, 0.2, 1.0); // Background
-
-    if (hit && result.iterations > 0.0) {
-        // Improved iteration-based coloring with parameter handling
-        let normalized_iterations = result.iterations / params.max_iterations;
-        let color_mix = normalized_iterations * params.cycle_frequency;
-
-        // Use smooth coloring to avoid banding
-        let smooth_color = normalized_iterations + log2(-log2(abs(result.distance)) / log2(params.bailout));
-        let t = clamp(smooth_color / params.max_iterations, 0.0, 1.0);
-        
-        let r = (params.base_color.x * (1.0 - t) + params.secondary_color.x * t) *
+        let normalized_iterations = result.iterations / max(param(0u), 1.0);
+        let color_mix = normalized_iterations * param(16u);
+        let r = (param(10u) * (1.0 - normalized_iterations) + param(13u) * normalized_iterations) *
                 (0.5 + 0.5 * sin(color_mix));
-        let g = (params.base_color.y * (1.0 - t) + params.secondary_color.y * t) *
+        let g = (param(11u) * (1.0 - normalized_iterations) + param(14u) * normalized_iterations) *
                 (0.5 + 0.5 * sin(color_mix + 2.0944));
-        let b = (params.base_color.z * (1.0 - t) + params.secondary_color.z * t) *
+        let b = (param(12u) * (1.0 - normalized_iterations) + param(15u) * normalized_iterations) *
                 (0.5 + 0.5 * sin(color_mix + 4.18879));
 
         color = vec4<f32>(
-            clamp(r * params.saturation, 0.0, 1.0),
-            clamp(g * params.saturation, 0.0, 1.0),
-            clamp(b * params.value, 0.0, 1.0),
+            clamp(r * param(17u), 0.0, 1.0),
+            clamp(g * param(17u), 0.0, 1.0),
+            clamp(b * param(18u), 0.0, 1.0),
             1.0
         );
     }
-
-    // Write to output texture with bounds checking
     textureStore(output_texture, vec2<i32>(pixel_coords), color);
 }

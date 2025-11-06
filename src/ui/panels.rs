@@ -522,7 +522,7 @@ impl PerformancePanel {
 
                 // Performance graph (simplified)
                 ui.label("Performance History:");
-                let available_size = ui.available_size();
+        let available_size = ui.max_rect().size();
                 let graph_rect = egui::Rect::from_min_size(
                     ui.cursor().min,
                     egui::vec2(available_size.x, 60.0)
@@ -600,7 +600,7 @@ impl ViewportPanel {
             .stroke(egui::Stroke::new(2.0, self.theme.border))
             .rounding(egui::Rounding::same(4.0))
             .show(ui, |ui| {
-                let available_size = ui.available_size();
+        let available_size = ui.max_rect().size();
                 let viewport_rect = egui::Rect::from_min_size(
                     ui.cursor().min,
                     available_size

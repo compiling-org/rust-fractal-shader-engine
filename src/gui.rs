@@ -10,9 +10,10 @@
 //! - Camera cleanup is performed on application exit
 
 use bevy::prelude::*;
+use std::any::Any;
 use bevy::render::renderer::{RenderDevice, RenderQueue};
 use bevy::window::{WindowResolution, WindowFocused};
-use bevy_egui::{EguiPlugin, EguiContexts};
+use bevy_egui::{EguiPlugin, EguiContexts, EguiContext, PrimaryEguiContext};
 use fractal_generator_lib::ui::FractalStudioApp;
 use fractal_generator_lib::audio::AudioMidiSystem;
 use fractal_generator_lib::osc::OscSystem;
@@ -47,6 +48,11 @@ pub struct GestureResource {
 pub struct CameraState {
     pub entity: Option<Entity>,
     pub is_focused: bool,
+}
+
+#[derive(Resource, Default)]
+pub struct UiRunState {
+    pub frames_since_start: u32,
 }
 
 impl Default for FractalStudioAppState {
@@ -101,8 +107,10 @@ impl Plugin for FractalStudioGuiPlugin {
             .init_resource::<OscResource>()
             .init_resource::<GestureResource>()
             .init_resource::<CameraState>()
+            .init_resource::<UiRunState>()
             .add_systems(Startup, setup)
-            .add_systems(Update, update)
+            // Run UI in the bevy_egui primary context pass to ensure it's inside an egui frame
+            .add_systems(bevy_egui::EguiPrimaryContextPass, update)
             .add_systems(Update, handle_window_focus)
             .add_systems(PostUpdate, maintain_camera)
             .add_systems(Last, cleanup_camera_on_exit)
@@ -128,6 +136,7 @@ pub fn run_gui() -> Result<(), Box<dyn std::error::Error>> {
                 primary_window: Some(Window {
                     title: "Fractal Shader Studio".to_string(),
                     resolution: WindowResolution::new(1400, 900),
+                    present_mode: bevy::window::PresentMode::Immediate,
                     ..default()
                 }),
                 ..default()
@@ -227,43 +236,56 @@ fn setup(
 }
 
 fn update(
-    mut egui_context: EguiContexts,
+    mut egui_contexts: EguiContexts,
     mut app_state: ResMut<FractalStudioAppState>,
     audio_midi: Res<AudioMidiResource>,
     mut osc_resource: ResMut<OscResource>,
     gesture_resource: Res<GestureResource>,
-) {
-    // Get the egui context
-    match egui_context.ctx_mut() {
-        Ok(ctx) => {
-            // Process OSC messages
-            if let Err(e) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                osc_resource.system.process_messages();
-            })) {
-                log::error!("OSC processing panicked: {:?}", e);
-            }
-            
-            // Get current audio data
-            let audio_data = audio_midi.system.get_audio_data();
-            
-            // Update the main application with all control data
-            // Wrap in panic catch to prevent crashes
-            if let Err(e) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                app_state.app.update(ctx, Some(&audio_data), Some(&audio_midi.system.midi_controller), Some(&osc_resource.system.controller), Some(&gesture_resource.controller));
-            })) {
-                log::error!("Application update panicked: {:?}", e);
-            }
-        },
-        Err(e) => {
-            // Log the error but don't panic - this can happen during window focus changes
-            log::warn!("Failed to get egui context: {}", e);
-        }
+    mut ui_run_state: ResMut<UiRunState>,
+    camera_state: Res<CameraState>,
+ ) -> bevy::ecs::error::Result {
+    // Obtain the egui context; will error if not initialised yet
+    let ctx = egui_contexts.ctx_mut()?;
+
+    // Skip the very first frame to avoid egui lifecycle race conditions
+    if ui_run_state.frames_since_start == 0 {
+        ui_run_state.frames_since_start += 1;
+        return Ok(());
     }
+
+    // Proceed with UI even if window focus info is unavailable.
+    // Focus handling is kept for camera maintenance only.
+    // Process OSC messages
+    if let Err(e) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        osc_resource.system.process_messages();
+    })) {
+        log::error!("OSC processing panicked: {:?}", e);
+    }
+
+    // Get current audio data
+    let audio_data = audio_midi.system.get_audio_data();
+
+    // Update the main application with all control data
+    if let Err(e) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        app_state.app.update(&ctx, Some(&audio_data), Some(&audio_midi.system.midi_controller), Some(&osc_resource.system.controller), Some(&gesture_resource.controller));
+    })) {
+        // Try to extract a meaningful panic message
+        let msg = if let Some(s) = e.downcast_ref::<&str>() {
+            s.to_string()
+        } else if let Some(s) = e.downcast_ref::<String>() {
+            s.clone()
+        } else {
+            "Unknown panic payload".to_string()
+        };
+        log::error!("Application update panicked: {}", msg);
+    }
+
+    Ok(())
 }
 
 /// Handle window focus events to prevent camera-related panics
 fn handle_window_focus(
-    mut focus_events: MessageReader<WindowFocused>,
+    mut focus_events: EventReader<WindowFocused>,
     mut camera_state: ResMut<CameraState>,
     mut commands: Commands,
 ) {
@@ -290,7 +312,7 @@ fn handle_window_focus(
 
 /// Cleanup camera on exit to prevent issues
 fn cleanup_camera_on_exit(
-    mut exit_events: MessageReader<AppExit>,
+    mut exit_events: EventReader<AppExit>,
     camera_state: Res<CameraState>,
     mut commands: Commands,
 ) {
@@ -353,4 +375,10 @@ fn validate_camera_state(
             break;
         }
     }
+}
+/// Run condition: only execute UI update when the primary egui context exists
+fn has_primary_egui_ctx(
+    query: Query<Entity, (With<EguiContext>, With<PrimaryEguiContext>)>
+) -> bool {
+    !query.is_empty()
 }
