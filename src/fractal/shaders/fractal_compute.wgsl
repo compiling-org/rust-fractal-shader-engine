@@ -26,7 +26,8 @@
 // 29: resolution_scale
 // 30: max_steps
 // 31: surface_epsilon
-// 32: formula_id (0: Mandelbrot, 1: Mandelbulb, 2: Mandelbox, 3: Julia, 4: Quaternion Julia)
+// 32: formula_id (1: Mandelbulb, 2: Mandelbox, 4: Quaternion Julia)
+// 33: fov_degrees
 
 @group(0) @binding(0) var<storage, read_write> distance_field: array<f32>;
 struct Params {
@@ -38,11 +39,14 @@ struct Params {
 fn param(index: u32) -> f32 {
     let v = params.data[index / 4u];
     let lane = index % 4u;
-    return select(
-        select(v.x, v.y, lane == 1u),
-        select(v.z, v.w, lane == 3u),
-        lane > 1u
-    );
+    if (lane == 0u) {
+        return v.x;
+    } else if (lane == 1u) {
+        return v.y;
+    } else if (lane == 2u) {
+        return v.z;
+    }
+    return v.w;
 }
 
 struct DistanceResult {
@@ -53,30 +57,51 @@ struct DistanceResult {
     material_id: f32,
 };
 
-fn mandelbrot_distance(pos: vec3<f32>) -> DistanceResult {
-    // 2D Mandelbrot on XZ plane
-    let c = vec2<f32>(pos.x + param(4u), pos.z + param(6u));
-    var z = vec2<f32>(0.0, 0.0);
-    var iterations: f32 = 0.0;
-
-    for (var i: u32 = 0u; i < u32(param(0u)); i = i + 1u) {
-        if (dot(z, z) > param(1u) * param(1u)) {
-            iterations = f32(i);
-            break;
-        }
-
-        let x = z.x * z.x - z.y * z.y + c.x;
-        let y = 2.0 * z.x * z.y + c.y;
-        z = vec2<f32>(x, y);
-        iterations = iterations + 1.0;
+// Helper to evaluate a single formula id at a point
+fn eval_formula(fid: i32, p: vec3<f32>) -> f32 {
+    if (fid == 1) {
+        return mandelbulb_distance(p).distance;
+    } else if (fid == 2) {
+        return mandelbox_distance(p).distance;
+    } else if (fid == 4) {
+        return quaternion_julia_distance(p).distance;
     }
-
-    let distance = abs(pos.y); // Distance from XZ plane
-    return DistanceResult(distance, iterations, vec3<f32>(0.0, sign(pos.y), 0.0), 1.0, 0.0);
+    return mandelbulb_distance(p).distance;
 }
 
+// Smooth min (union) per IQ
+fn smin(a: f32, b: f32, k: f32) -> f32 {
+    let h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+    return mix(b, a, h) - k * h * (1.0 - h);
+}
+
+// Smooth max (intersection)
+fn smax(a: f32, b: f32, k: f32) -> f32 {
+    return -smin(-a, -b, k);
+}
+
+// Combine two distances with a mode
+fn combine2(a: f32, b: f32, mode: i32, k: f32) -> f32 {
+    if (mode == 0) { // Union
+        return min(a, b);
+    } else if (mode == 1) { // Intersection
+        return max(a, b);
+    } else if (mode == 2) { // Subtraction A - B
+        return max(a, -b);
+    } else if (mode == 3) { // Smooth Union
+        return smin(a, b, k);
+    } else if (mode == 4) { // Smooth Intersection
+        return smax(a, b, k);
+    } else if (mode == 5) { // Smooth Subtraction
+        return smax(a, -b, k);
+    }
+    return min(a, b);
+}
+
+
 fn mandelbulb_distance(pos: vec3<f32>) -> DistanceResult {
-    var p = pos + vec3<f32>(param(4u), param(5u), param(6u));
+    // Evaluate at world position; translation is handled by caller
+    var p = pos;
     var dr = 1.0;
     var r = 0.0;
     var iterations: f32 = 0.0;
@@ -147,7 +172,8 @@ fn mandelbulb_distance(pos: vec3<f32>) -> DistanceResult {
 }
 
 fn mandelbox_distance(pos: vec3<f32>) -> DistanceResult {
-    var p = pos + vec3<f32>(param(4u), param(5u), param(6u));
+    // Evaluate at world position; translation is handled by caller
+    var p = pos;
     var dz = 1.0;
     var iterations: f32 = 0.0;
 
@@ -201,9 +227,10 @@ fn mandelbox_distance(pos: vec3<f32>) -> DistanceResult {
 }
 
 fn quaternion_julia_distance(pos: vec3<f32>) -> DistanceResult {
-    // Convert 3D point to quaternion (w=0)
+    // Convert 3D point to quaternion (w=0), evaluated at world position
     var q = vec4<f32>(pos.x, pos.y, pos.z, 0.0);
-    let c = vec4<f32>(-0.2, 0.8, 0.0, 0.0); // Julia constant
+    // Julia constant from params: use rotation.xyz to carry c
+    let c = vec4<f32>(param(7u), param(8u), param(9u), 0.0);
     var iterations: f32 = 0.0;
 
     for (var i: u32 = 0u; i < u32(param(0u)); i = i + 1u) {
@@ -244,68 +271,17 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         f32(pixel_coords.y) / param(28u)
     );
 
-    // Decide path by formula: 2D fractals render per-pixel; others use ray marching
     let fid = i32(param(32u));
-
     var color = vec4<f32>(0.1, 0.1, 0.2, 1.0); // Default background
-
-    if (fid == 0 || fid == 3) {
-        // 2D Mandelbrot / Julia rendering in screen space
-        // Map UV to complex plane with simple scaling and offset
-        let aspect = param(27u) / param(28u);
-        let scale = max(param(3u), 0.0001);
-        let x = (uv.x - 0.5) * 3.0 * aspect / scale + param(4u);
-        let y = (uv.y - 0.5) * 2.0 / scale + param(5u);
-
-        var z = vec2<f32>(0.0, 0.0);
-        var c = vec2<f32>(x, y);
-
-        if (fid == 3) {
-            // Use rotation.xy as Julia constant to allow UI tweaks
-            c = vec2<f32>(param(7u), param(8u));
-            z = vec2<f32>(x, y);
-        }
-
-        var iter: u32 = 0u;
-        for (var i: u32 = 0u; i < u32(param(0u)); i = i + 1u) {
-            // z = z^2 + c
-            let zx2 = z.x * z.x - z.y * z.y;
-            let zy2 = 2.0 * z.x * z.y;
-            z = vec2<f32>(zx2, zy2) + c;
-
-            if (dot(z, z) > param(1u) * param(1u)) {
-                iter = i;
-                break;
-            }
-            iter = i;
-        }
-
-        // Smooth coloring based on iterations
-        let normalized = f32(iter) / max(param(0u), 1.0);
-        let mixv = normalized * param(16u);
-        let r = (param(10u) * (1.0 - normalized) + param(13u) * normalized) *
-                (0.5 + 0.5 * sin(mixv));
-        let g = (param(11u) * (1.0 - normalized) + param(14u) * normalized) *
-                (0.5 + 0.5 * sin(mixv + 2.0944));
-        let b = (param(12u) * (1.0 - normalized) + param(15u) * normalized) *
-                (0.5 + 0.5 * sin(mixv + 4.18879));
-
-        // Interior points go darker
-        let interior = select(0.0, 1.0, iter >= u32(param(0u) - 1.0));
-        color = vec4<f32>(
-            clamp(r * param(17u) * (1.0 - 0.8 * interior), 0.0, 1.0),
-            clamp(g * param(17u) * (1.0 - 0.8 * interior), 0.0, 1.0),
-            clamp(b * param(18u) * (1.0 - 0.8 * interior), 0.0, 1.0),
-            1.0
-        );
-    } else {
+    {
         // 3D / distance-estimated fractals via ray marching
         let aspect_ratio = param(27u) / param(28u);
-        let tan_fov = tan(radians(60.0) * 0.5);
+        let tan_fov = tan(radians(param(33u)) * 0.5);
         let ndc_x = (2.0 * uv.x - 1.0) * aspect_ratio * tan_fov;
         let ndc_y = (1.0 - 2.0 * uv.y) * tan_fov;
 
-        let camera_pos = vec3<f32>(param(4u), param(5u), param(6u) + 5.0);
+        // Camera looks toward the translation offset; world-space evaluation
+        let camera_pos = vec3<f32>(param(4u), param(5u), param(6u) + 3.0);
         let camera_target = vec3<f32>(param(4u), param(5u), param(6u));
         let camera_up = vec3<f32>(0.0, 1.0, 0.0);
         let forward = normalize(camera_target - camera_pos);
@@ -314,29 +290,31 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         let ray_dir = normalize(forward + right * ndc_x + up * ndc_y);
 
         var t = 0.0;
+        var hit = false;
         var result = DistanceResult(0.0, 0.0, vec3<f32>(0.0), 0.0, 0.0);
         let min_step = max(param(31u), 0.0001);
-        let max_distance = 100.0;
+        let max_distance = 50.0;
 
         for (var i: u32 = 0u; i < u32(param(30u)); i = i + 1u) {
-            let pos = camera_pos + ray_dir * t;
-
-            if (fid == 1) {
-                result = mandelbulb_distance(pos);
-            } else if (fid == 2) {
-                result = mandelbox_distance(pos);
-            } else if (fid == 4) {
-                result = quaternion_julia_distance(pos);
-            } else {
-                result = mandelbulb_distance(pos);
-            }
+            let pos_world = camera_pos + ray_dir * t;
+            // Compute distance at world position compensating translation
+            let d = distance_only(fid, pos_world);
+            result.distance = d;
 
             if (abs(result.distance) < param(31u)) {
                 result.iterations = f32(i);
+                // Estimate normal at hit position
+                result.normal = estimate_normal(fid, pos_world);
+                hit = true;
                 break;
             }
 
-            let step_size = max(abs(result.distance), min_step);
+            // Per-formula step tuning: smaller factor for Mandelbox to resolve fine detail
+            var step_factor = 0.9;
+            if (fid == 2) {
+                step_factor = 0.6;
+            }
+            let step_size = max(abs(result.distance) * step_factor, min_step);
             t = t + step_size;
             if (t > max_distance || t != t) {
                 break;
@@ -345,19 +323,133 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
         let normalized_iterations = result.iterations / max(param(0u), 1.0);
         let color_mix = normalized_iterations * param(16u);
-        let r = (param(10u) * (1.0 - normalized_iterations) + param(13u) * normalized_iterations) *
+        var r = (param(10u) * (1.0 - normalized_iterations) + param(13u) * normalized_iterations) *
                 (0.5 + 0.5 * sin(color_mix));
-        let g = (param(11u) * (1.0 - normalized_iterations) + param(14u) * normalized_iterations) *
+        var g = (param(11u) * (1.0 - normalized_iterations) + param(14u) * normalized_iterations) *
                 (0.5 + 0.5 * sin(color_mix + 2.0944));
-        let b = (param(12u) * (1.0 - normalized_iterations) + param(15u) * normalized_iterations) *
+        var b = (param(12u) * (1.0 - normalized_iterations) + param(15u) * normalized_iterations) *
                 (0.5 + 0.5 * sin(color_mix + 4.18879));
 
-        color = vec4<f32>(
-            clamp(r * param(17u), 0.0, 1.0),
-            clamp(g * param(17u), 0.0, 1.0),
-            clamp(b * param(18u), 0.0, 1.0),
-            1.0
-        );
+        // Fallback palette if host-provided palette is zero
+        let palette_sum = param(10u) + param(11u) + param(12u) + param(13u) + param(14u) + param(15u);
+        if (palette_sum == 0.0) {
+            let hue = fract(normalized_iterations);
+            let k = 6.2831853 * hue;
+            r = 0.3 + 0.7 * (0.5 + 0.5 * sin(k));
+            g = 0.3 + 0.7 * (0.5 + 0.5 * sin(k + 2.0944));
+            b = 0.3 + 0.7 * (0.5 + 0.5 * sin(k + 4.18879));
+        }
+
+        if (hit) {
+            // Lighting and material from params:
+            // 41..43: light_dir (xyz), 44..46: light_color (rgb), 47: intensity
+            // 48: metallic, 49: roughness
+            let light_dir = normalize(vec3<f32>(param(41u), param(42u), param(43u)));
+            let light_color = vec3<f32>(param(44u), param(45u), param(46u));
+            let light_intensity = max(param(47u), 0.0);
+            let metallic = clamp(param(48u), 0.0, 1.0);
+            let roughness = clamp(param(49u), 0.0, 1.0);
+
+            let nrm = normalize(result.normal);
+            let diff = clamp(dot(nrm, light_dir), 0.0, 1.0);
+
+            // Ambient occlusion to bring out creases
+            let ao = estimate_ao(fid, camera_pos + ray_dir * t, nrm);
+
+            // Base albedo from palette
+            let base = vec3<f32>(r * param(17u), g * param(17u), b * param(18u));
+
+            // Diffuse term, modulated by light color and intensity
+            let ambient = base * 0.15;
+            let diffuse = base * diff * light_color * (0.85 * light_intensity);
+
+            // Specular: Blinn-Phong with roughness controlling exponent
+            let view_dir = normalize(-ray_dir);
+            let half_vec = normalize(light_dir + view_dir);
+            let shininess = mix(4.0, 64.0, 1.0 - roughness);
+            let spec = pow(max(dot(nrm, half_vec), 0.0), shininess) * (0.25 * metallic * light_intensity);
+            let spec_rgb = light_color * spec;
+
+            var rgb = clamp((ambient + diffuse + spec_rgb) * ao, vec3<f32>(0.0), vec3<f32>(1.0));
+            // Gamma correction
+            rgb = vec3<f32>(pow(rgb.x, 1.0 / 2.2), pow(rgb.y, 1.0 / 2.2), pow(rgb.z, 1.0 / 2.2));
+            color = vec4<f32>(rgb, 1.0);
+        } else {
+            // Background gradient for sky
+            color = vec4<f32>(0.1 + 0.25 * uv.x, 0.1 + 0.25 * uv.y, 0.25, 1.0);
+        }
     }
     textureStore(output_texture, vec2<i32>(pixel_coords), color);
+}
+
+// Helper: get distance at world position by compensating translation
+fn distance_only(fid_local: i32, pos_world: vec3<f32>) -> f32 {
+    // Translate to local object space
+    let translated = pos_world - vec3<f32>(param(4u), param(5u), param(6u));
+
+    // If combiner is active, evaluate multiple formulas and combine
+    if (param(34u) > 0.5) {
+        let f1 = i32(param(35u));
+        let f2 = i32(param(36u));
+        let f3 = i32(param(37u));
+
+        var d1 = 1e6;
+        if (f1 != 0) {
+            d1 = eval_formula(f1, translated);
+        }
+        var d2 = 1e6;
+        if (f2 != 0) {
+            d2 = eval_formula(f2, translated);
+        }
+        var d3 = 1e6;
+        if (f3 != 0) {
+            d3 = eval_formula(f3, translated);
+        }
+
+        let mode = i32(param(38u));
+        let k = max(param(40u), 1e-4);
+        let blend = clamp(param(39u), 0.0, 1.0);
+
+        var d12 = combine2(d1, d2, mode, k);
+        var d123 = combine2(d12, d3, mode, k);
+        // Simple blending to bias towards the first two vs third
+        return mix(d12, d123, blend);
+    }
+
+    // Single formula path
+    if (fid_local == 1) {
+        return mandelbulb_distance(translated).distance;
+    } else if (fid_local == 2) {
+        return mandelbox_distance(translated).distance;
+    } else if (fid_local == 4) {
+        return quaternion_julia_distance(translated).distance;
+    }
+    return mandelbulb_distance(translated).distance;
+}
+
+// Estimate surface normal via distance field gradient
+fn estimate_normal(fid_local: i32, pos_world: vec3<f32>) -> vec3<f32> {
+    let e = max(param(31u) * 2.0, 0.0005);
+    let dx = distance_only(fid_local, pos_world + vec3<f32>(e, 0.0, 0.0)) -
+             distance_only(fid_local, pos_world - vec3<f32>(e, 0.0, 0.0));
+    let dy = distance_only(fid_local, pos_world + vec3<f32>(0.0, e, 0.0)) -
+             distance_only(fid_local, pos_world - vec3<f32>(0.0, e, 0.0));
+    let dz = distance_only(fid_local, pos_world + vec3<f32>(0.0, 0.0, e)) -
+             distance_only(fid_local, pos_world - vec3<f32>(0.0, 0.0, e));
+    return normalize(vec3<f32>(dx, dy, dz));
+}
+
+// Estimate simple ambient occlusion by sampling along the normal
+fn estimate_ao(fid_local: i32, pos_world: vec3<f32>, nrm: vec3<f32>) -> f32 {
+    let eps = max(param(31u), 0.0001);
+    var occ = 0.0;
+    var weight = 1.0;
+    for (var i: i32 = 1; i <= 4; i = i + 1) {
+        let t = f32(i) * eps * 2.5;
+        let d = distance_only(fid_local, pos_world + nrm * t);
+        occ = occ + (t - d) * weight;
+        weight = weight * 0.7;
+    }
+    let ao = clamp(1.0 - occ * 0.5, 0.0, 1.0);
+    return ao;
 }
