@@ -370,3 +370,9 @@ fn main() -> eframe::Result<()> {
 - **Memory Pooling**: Reuse UI component instances
 
 This guide provides a comprehensive overview of the frontend architecture and development practices for the Fractal Shader Studio. The UI is designed to be both powerful and intuitive, providing professional tools for fractal creation and manipulation.
+### Camera Controls
+
+- Location: Left panels in `Rendering` and `Shader Loader` workspaces under "Camera".
+- FOV: Adjust with a slider (`10°–120°`), immediately updates renderer FOV.
+- Target: Edit X/Y/Z via drag values; updates renderer `camera_target` and pseudo‑3D direction.
+- Persistence: `camera_target` is included in app snapshots and restored on undo/redo.

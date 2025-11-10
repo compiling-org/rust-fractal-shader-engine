@@ -1,0 +1,255 @@
+[
+  {
+    "severity": "Pass",
+    "message": "No duplicate egui Viewport window",
+    "path": "C:\\Users\\kapil\\compiling\\modular-fractal-shader\\src\\gui.rs",
+    "lines": []
+  },
+  {
+    "severity": "Pass",
+    "message": "Bevy Image.data set via Some(..)",
+    "path": "C:\\Users\\kapil\\compiling\\modular-fractal-shader\\src\\gui.rs",
+    "lines": [
+      538,
+      571
+    ]
+  },
+  {
+    "severity": "Warn",
+    "message": "egui context retrieval found; guard Option to avoid panics",
+    "path": "C:\\Users\\kapil\\compiling\\modular-fractal-shader\\src\\gui.rs",
+    "lines": [
+      435
+    ]
+  },
+  {
+    "severity": "Pass",
+    "message": "EguiPlugin reference present",
+    "path": "C:\\Users\\kapil\\compiling\\modular-fractal-shader\\src\\gui.rs",
+    "lines": [
+      16,
+      282
+    ]
+  },
+  {
+    "severity": "Pass",
+    "message": "CentralPanel calls show_fractal_viewport",
+    "path": "C:\\Users\\kapil\\compiling\\modular-fractal-shader\\src\\ui\\main.rs",
+    "lines": [
+      2007,
+      3420,
+      3499,
+      3702,
+      3888
+    ]
+  },
+  {
+    "severity": "Pass",
+    "message": "WGPU support flag and initializer present",
+    "path": "C:\\Users\\kapil\\compiling\\modular-fractal-shader\\src\\ui\\main.rs",
+    "lines": [
+      271
+    ]
+  },
+  {
+    "severity": "Info",
+    "message": "No request_repaint calls detected; Bevy egui may rely on frame events",
+    "path": "C:\\Users\\kapil\\compiling\\modular-fractal-shader\\src\\ui\\main.rs",
+    "lines": []
+  },
+  {
+    "severity": "Pass",
+    "message": "render_frame_to_view present",
+    "path": "C:\\Users\\kapil\\compiling\\modular-fractal-shader\\src\\fractal\\renderer.rs",
+    "lines": [
+      586
+    ]
+  },
+  {
+    "severity": "Pass",
+    "message": "render_frame_to_texture present",
+    "path": "C:\\Users\\kapil\\compiling\\modular-fractal-shader\\src\\fractal\\renderer.rs",
+    "lines": [
+      834
+    ]
+  },
+  {
+    "severity": "Warn",
+    "message": "unwrap() calls found; prefer graceful handling",
+    "path": "C:\\Users\\kapil\\compiling\\modular-fractal-shader\\src\\ui\\main.rs",
+    "lines": [
+      3121
+    ]
+  },
+  {
+    "severity": "Warn",
+    "message": "unwrap() calls found; prefer graceful handling",
+    "path": "C:\\Users\\kapil\\compiling\\modular-fractal-shader\\src\\animation\\keyframe.rs",
+    "lines": [
+      107,
+      111,
+      115,
+      119
+    ]
+  },
+  {
+    "severity": "Warn",
+    "message": "unwrap() calls found; prefer graceful handling",
+    "path": "C:\\Users\\kapil\\compiling\\modular-fractal-shader\\src\\animation\\mod.rs",
+    "lines": [
+      175
+    ]
+  },
+  {
+    "severity": "Warn",
+    "message": "unwrap() calls found; prefer graceful handling",
+    "path": "C:\\Users\\kapil\\compiling\\modular-fractal-shader\\src\\animation\\timeline.rs",
+    "lines": [
+      199
+    ]
+  },
+  {
+    "severity": "Warn",
+    "message": "unwrap() calls found; prefer graceful handling",
+    "path": "C:\\Users\\kapil\\compiling\\modular-fractal-shader\\src\\audio.rs",
+    "lines": [
+      50,
+      119
+    ]
+  },
+  {
+    "severity": "Warn",
+    "message": "unwrap() calls found; prefer graceful handling",
+    "path": "C:\\Users\\kapil\\compiling\\modular-fractal-shader\\src\\bin\\ui_analyzer.rs",
+    "lines": [
+      80,
+      88,
+      89,
+      99,
+      100,
+      110,
+      121,
+      122,
+      132,
+      133,
+      143,
+      150,
+      159,
+      160,
+      181,
+      205,
+      206,
+      232
+    ]
+  },
+  {
+    "severity": "Warn",
+    "message": "unwrap() calls found; prefer graceful handling",
+    "path": "C:\\Users\\kapil\\compiling\\modular-fractal-shader\\src\\fractal\\engine.rs",
+    "lines": [
+      93
+    ]
+  },
+  {
+    "severity": "Warn",
+    "message": "unwrap() calls found; prefer graceful handling",
+    "path": "C:\\Users\\kapil\\compiling\\modular-fractal-shader\\src\\gesture.rs",
+    "lines": [
+      129,
+      163,
+      280
+    ]
+  },
+  {
+    "severity": "Warn",
+    "message": "unwrap() calls found; prefer graceful handling",
+    "path": "C:\\Users\\kapil\\compiling\\modular-fractal-shader\\src\\lib.rs",
+    "lines": [
+      989,
+      1004,
+      1013,
+      1040
+    ]
+  },
+  {
+    "severity": "Warn",
+    "message": "unwrap() calls found; prefer graceful handling",
+    "path": "C:\\Users\\kapil\\compiling\\modular-fractal-shader\\src\\node_editor.rs",
+    "lines": [
+      243
+    ]
+  },
+  {
+    "severity": "Warn",
+    "message": "unwrap() calls found; prefer graceful handling",
+    "path": "C:\\Users\\kapil\\compiling\\modular-fractal-shader\\src\\osc.rs",
+    "lines": [
+      227,
+      232,
+      356,
+      363,
+      368
+    ]
+  },
+  {
+    "severity": "Warn",
+    "message": "unwrap() calls found; prefer graceful handling",
+    "path": "C:\\Users\\kapil\\compiling\\modular-fractal-shader\\src\\rendering\\mod.rs",
+    "lines": [
+      30
+    ]
+  },
+  {
+    "severity": "Warn",
+    "message": "unwrap() calls found; prefer graceful handling",
+    "path": "C:\\Users\\kapil\\compiling\\modular-fractal-shader\\src\\shader_renderer.rs",
+    "lines": [
+      55
+    ]
+  },
+  {
+    "severity": "Warn",
+    "message": "unwrap() calls found; prefer graceful handling",
+    "path": "C:\\Users\\kapil\\compiling\\modular-fractal-shader\\src\\ui\\main.rs",
+    "lines": [
+      3121
+    ]
+  },
+  {
+    "severity": "Warn",
+    "message": "unwrap() calls found; prefer graceful handling",
+    "path": "C:\\Users\\kapil\\compiling\\modular-fractal-shader\\src\\web_canvas2d.rs",
+    "lines": [
+      31,
+      33,
+      37,
+      43,
+      105,
+      107,
+      229,
+      231,
+      238
+    ]
+  },
+  {
+    "severity": "Warn",
+    "message": "unwrap() calls found; prefer graceful handling",
+    "path": "C:\\Users\\kapil\\compiling\\modular-fractal-shader\\src\\web_interface.rs",
+    "lines": [
+      29,
+      32,
+      38,
+      265,
+      272,
+      277,
+      278,
+      282,
+      300,
+      301,
+      302,
+      341,
+      345,
+      346
+    ]
+  }
+]

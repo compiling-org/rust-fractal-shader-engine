@@ -1,0 +1,42 @@
+name: Docs Gate
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  enforce-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine changed files
+        id: diff
+        run: |
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.sha }}"
+          echo "Base: $BASE_SHA Head: $HEAD_SHA"
+          git diff --name-only "$BASE_SHA" "$HEAD_SHA" > changed_files.txt
+          echo "Changed files:" && cat changed_files.txt
+          CODE_CHANGED=$(grep -E '^(src/|assets/shaders/|examples/|web/|scripts/|Cargo.toml|README.md)' changed_files.txt || true)
+          DOCS_CHANGED=$(grep -E '^docs/' changed_files.txt || true)
+          echo "code_changed<<EOF" >> $GITHUB_OUTPUT
+          echo "$CODE_CHANGED" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "docs_changed<<EOF" >> $GITHUB_OUTPUT
+          echo "$DOCS_CHANGED" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Fail if code changed without docs changes
+        if: ${{ steps.diff.outputs.code_changed != '' && steps.diff.outputs.docs_changed == '' }}
+        run: |
+          echo "Docs Gate: Code changes detected but no docs changes under docs/." >&2
+          echo "Please update relevant documents (plans, roadmap, gap assessment, guides)." >&2
+          exit 1
+
+      - name: Pass if no enforcement needed
+        if: ${{ steps.diff.outputs.code_changed == '' || steps.diff.outputs.docs_changed != '' }}
+        run: echo "Docs Gate passed."

@@ -33,70 +33,85 @@ impl BatchShaderConverter {
         Ok(converted_files)
     }
 
-    /// Convert ISF shader content to WGSL
+    /// Convert ISF shader content to WGSL (advanced fractal-aware)
     pub fn convert_isf_to_wgsl(isf_content: &str) -> Result<String, Box<dyn std::error::Error>> {
-        let mut wgsl_source = String::new();
+        fn wgsl_header() -> String {
+            let mut h = String::new();
+            h.push_str("// Auto-generated WGSL header\n");
+            h.push_str("@group(0) @binding(0) var<uniform> time: f32;\n");
+            h.push_str("@group(0) @binding(1) var<uniform> resolution: vec2<f32>;\n");
+            h.push_str("@group(0) @binding(2) var<uniform> mouse: vec2<f32>;\n");
+            h.push_str("@group(0) @binding(3) var input_texture: texture_2d<f32>;\n");
+            h.push_str("@group(0) @binding(4) var texture_sampler: sampler;\n\n");
+            h.push_str("fn modf(x: f32, y: f32) -> f32 { x - y * floor(x / y) }\n");
+            h.push_str("fn mod2(x: vec2<f32>, y: vec2<f32>) -> vec2<f32> { x - y * floor(x / y) }\n");
+            h.push_str("fn mod3(x: vec3<f32>, y: vec3<f32>) -> vec3<f32> { x - y * floor(x / y) }\n");
+            h.push_str("fn pmod3(p: vec3<f32>, s: f32) -> vec3<f32> {\n");
+            h.push_str("  let half = 0.5 * s;\n");
+            h.push_str("  return (mod3(p + half, vec3<f32>(s, s, s)) - half);\n");
+            h.push_str("}\n");
+            h.push_str("fn saturate(x: f32) -> f32 { clamp(x, 0.0, 1.0) }\n");
+            h.push_str("fn palette(t: f32, a: vec3<f32>, b: vec3<f32>, c: vec3<f32>, d: vec3<f32>) -> vec3<f32> {\n");
+            h.push_str("  return a + b * cos(6.28318 * (c * t + d));\n");
+            h.push_str("}\n\n");
+            h
+        }
 
-        // Add WGSL header with uniforms
-        wgsl_source.push_str("@group(0) @binding(0) var<uniform> time: f32;\n");
-        wgsl_source.push_str("@group(0) @binding(1) var<uniform> resolution: vec2<f32>;\n");
-        wgsl_source.push_str("@group(0) @binding(2) var<uniform> mouse: vec2<f32>;\n");
-        wgsl_source.push_str("@group(0) @binding(3) var input_texture: texture_2d<f32>;\n");
-        wgsl_source.push_str("@group(0) @binding(4) var texture_sampler: sampler;\n\n");
-
-        wgsl_source.push_str("@fragment\n");
-        wgsl_source.push_str("fn main(@builtin(position) coord: vec4<f32>) -> @location(0) vec4<f32> {\n");
-        wgsl_source.push_str("    let uv = coord.xy / resolution;\n");
-
-        // Extract the main function body from ISF shader
-        let body_start = isf_content.find("void main() {").unwrap_or(0) + 12;
+        // Extract main body
+        let body_start = isf_content.find("void main() {").unwrap_or_else(|| {
+            isf_content.find("void mainImage(").unwrap_or(0)
+        });
         let body_end = isf_content.rfind("}").unwrap_or(isf_content.len());
-        let body = &isf_content[body_start..body_end];
+        let mut body = if body_start > 0 {
+            let start = isf_content[body_start..].find("{").map(|i| body_start + i + 1).unwrap_or(body_start);
+            isf_content[start..body_end].to_string()
+        } else {
+            isf_content.to_string()
+        };
 
-        // Convert GLSL syntax to WGSL
-        let converted_body = body
+        body = body
+            .replace("gl_FragCoord.xy", "coord.xy")
+            .replace("gl_FragCoord", "coord.xy")
+            .replace("RENDERSIZE.xy", "resolution")
+            .replace("RENDERSIZE", "vec2<f32>(resolution.x, resolution.y)")
+            .replace("TIME", "time")
+            .replace("iTime", "time")
+            .replace("iResolution", "resolution")
+            .replace("IMG_PIXEL(inputTex, ", "textureSample(input_texture, texture_sampler, ")
+            .replace("texture(inputTex, ", "textureSample(input_texture, texture_sampler, ");
+
+        // Canonicalize ++ to explicit increment (best-effort)
+        body = body.replace("i++", "i = i + 1");
+
+        // Types and constructors
+        let mut converted = body
             .replace("vec2", "vec2<f32>")
             .replace("vec3", "vec3<f32>")
             .replace("vec4", "vec4<f32>")
-            .replace("float", "f32")
-            .replace("int", "i32")
-            .replace("bool", "bool")
             .replace("mat2", "mat2x2<f32>")
             .replace("mat3", "mat3x3<f32>")
             .replace("mat4", "mat4x4<f32>")
-            .replace("gl_FragCoord.xy", "coord.xy")
-            .replace("gl_FragColor", "return")
-            .replace("RENDERSIZE.xy", "resolution")
-            .replace("RENDERSIZE.y", "resolution.y")
-            .replace("TIME", "time")
-            .replace("IMG_PIXEL(inputTex, ", "textureSample(input_texture, texture_sampler, ")
-            .replace("mod(", "f32(")
-            .replace("pmod(", "f32(")
-            // Handle common GLSL functions
-            .replace("sin(", "sin(")
-            .replace("cos(", "cos(")
-            .replace("tan(", "tan(")
-            .replace("abs(", "abs(")
-            .replace("length(", "length(")
-            .replace("normalize(", "normalize(")
-            .replace("dot(", "dot(")
-            .replace("cross(", "cross(")
-            .replace("mix(", "mix(")
-            .replace("clamp(", "clamp(")
-            .replace("smoothstep(", "smoothstep(")
-            .replace("step(", "step(")
-            .replace("fract(", "fract(")
-            .replace("floor(", "floor(")
-            .replace("ceil(", "ceil(")
-            .replace("pow(", "pow(")
-            .replace("exp(", "exp(")
-            .replace("log(", "log(")
-            .replace("sqrt(", "sqrt(")
-            .replace("min(", "min(")
-            .replace("max(", "max(");
+            .replace("float", "f32")
+            .replace("int", "i32");
 
-        wgsl_source.push_str(&converted_body);
-        wgsl_source.push_str("}\n");
+        // GLSL mod to WGSL helpers
+        converted = converted
+            .replace("mod(", "modf(")
+            .replace("mod(vec2", "mod2(vec2")
+            .replace("mod(vec3", "mod3(vec3");
+
+        // Output handling
+        converted = converted.replace("gl_FragColor =", "out_color =");
+
+        let mut wgsl_source = String::new();
+        wgsl_source.push_str(&wgsl_header());
+        wgsl_source.push_str("@fragment\n");
+        wgsl_source.push_str("fn main(@builtin(position) coord: vec4<f32>) -> @location(0) vec4<f32> {\n");
+        wgsl_source.push_str("  let uv: vec2<f32> = coord.xy / resolution;\n");
+        wgsl_source.push_str("  var out_color: vec4<f32> = vec4<f32>(0.0, 0.0, 0.0, 1.0);\n");
+        wgsl_source.push_str("  // Converted ISF body\n");
+        wgsl_source.push_str(&converted);
+        wgsl_source.push_str("\n  return out_color;\n}\n");
 
         Ok(wgsl_source)
     }

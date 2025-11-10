@@ -5,6 +5,7 @@
 
 use super::*;
 use std::process::Command;
+use std::io::Write as IoWrite;
 
 /// Video export settings
 #[derive(Debug, Clone)]
@@ -104,17 +105,30 @@ impl VideoExporter {
             VideoCodec::H264 => {
                 cmd.arg("-c:v").arg("libx264");
                 let (preset, crf) = self.settings.quality.ffmpeg_params();
-                cmd.arg(preset.split(' ').get(1).unwrap())
-                   .arg(preset.split(' ').get(0).unwrap().trim_start_matches('-'));
-                cmd.arg(crf.split(' ').get(1).unwrap())
-                   .arg(crf.split(' ').get(0).unwrap().trim_start_matches('-'));
+                // preset and crf are like "-preset veryfast" and "-crf 23"
+                if let Some((opt, val)) = {
+                    let mut parts = preset.split_whitespace();
+                    parts.next().and_then(|o| parts.next().map(|v| (o, v)))
+                } {
+                    cmd.arg(val).arg(opt.trim_start_matches('-'));
+                }
+                if let Some((opt, val)) = {
+                    let mut parts = crf.split_whitespace();
+                    parts.next().and_then(|o| parts.next().map(|v| (o, v)))
+                } {
+                    cmd.arg(val).arg(opt.trim_start_matches('-'));
+                }
                 cmd.arg("-pix_fmt").arg("yuv420p");
             }
             VideoCodec::H265 => {
                 cmd.arg("-c:v").arg("libx265");
-                let (preset, crf) = self.settings.quality.ffmpeg_params();
-                cmd.arg(preset.split(' ').get(1).unwrap())
-                   .arg(preset.split(' ').get(0).unwrap().trim_start_matches('-'));
+                let (preset, _crf) = self.settings.quality.ffmpeg_params();
+                if let Some((opt, val)) = {
+                    let mut parts = preset.split_whitespace();
+                    parts.next().and_then(|o| parts.next().map(|v| (o, v)))
+                } {
+                    cmd.arg(val).arg(opt.trim_start_matches('-'));
+                }
                 cmd.arg("-crf").arg("23");
                 cmd.arg("-pix_fmt").arg("yuv420p10le");
             }
@@ -381,5 +395,142 @@ impl VideoPresets {
             audio_enabled: false,
             audio_path: None,
         }
+    }
+}
+
+/// Direct-to-file video recorder using ffmpeg rawvideo pipe
+pub struct VideoRecorder {
+    width: u32,
+    height: u32,
+    frame_rate: u32,
+    codec: VideoCodec,
+    quality: VideoQuality,
+    child: Option<std::process::Child>,
+}
+
+impl VideoRecorder {
+    /// Start recording to a file using ffmpeg, writing raw RGBA frames via stdin
+    pub fn start(
+        width: u32,
+        height: u32,
+        frame_rate: u32,
+        codec: VideoCodec,
+        quality: VideoQuality,
+        output_path: &std::path::Path,
+    ) -> Result<Self, ExportError> {
+        // Build ffmpeg command
+        let mut cmd = Command::new("ffmpeg");
+        cmd.arg("-y"); // overwrite output
+        cmd.arg("-loglevel").arg("error");
+
+        // Input from raw RGBA frames
+        cmd.arg("-f").arg("rawvideo");
+        cmd.arg("-pixel_format").arg("rgba");
+        cmd.arg("-video_size").arg(format!("{}x{}", width, height));
+        cmd.arg("-framerate").arg(frame_rate.to_string());
+        cmd.arg("-i").arg("-"); // stdin
+
+        // Codec selection and quality
+        match codec {
+            VideoCodec::H264 => {
+                cmd.arg("-c:v").arg("libx264");
+                let (preset, crf) = quality.ffmpeg_params();
+                // preset like "-preset medium", crf like "-crf 23"
+                let preset_parts: Vec<&str> = preset.split_whitespace().collect();
+                let crf_parts: Vec<&str> = crf.split_whitespace().collect();
+                if preset_parts.len() == 2 {
+                    cmd.arg(preset_parts[0]).arg(preset_parts[1]);
+                }
+                if crf_parts.len() == 2 {
+                    cmd.arg(crf_parts[0]).arg(crf_parts[1]);
+                }
+                cmd.arg("-pix_fmt").arg("yuv420p");
+            }
+            VideoCodec::H265 => {
+                cmd.arg("-c:v").arg("libx265");
+                let (preset, _crf) = quality.ffmpeg_params();
+                let preset_parts: Vec<&str> = preset.split_whitespace().collect();
+                if preset_parts.len() == 2 {
+                    cmd.arg(preset_parts[0]).arg(preset_parts[1]);
+                }
+                cmd.arg("-crf").arg("23");
+                cmd.arg("-pix_fmt").arg("yuv420p10le");
+            }
+            VideoCodec::VP9 => {
+                cmd.arg("-c:v").arg("libvpx-vp9");
+                cmd.arg("-crf").arg("30");
+                cmd.arg("-b:v").arg("0");
+            }
+            VideoCodec::AV1 => {
+                cmd.arg("-c:v").arg("libaom-av1");
+                cmd.arg("-crf").arg("30");
+                cmd.arg("-b:v").arg("0");
+                cmd.arg("-cpu-used").arg("8");
+            }
+            VideoCodec::ProRes => {
+                cmd.arg("-c:v").arg("prores_ks");
+                cmd.arg("-profile:v").arg("3");
+                cmd.arg("-pix_fmt").arg("yuv422p10le");
+            }
+        }
+
+        // Output file
+        cmd.arg(output_path);
+
+        // Spawn ffmpeg and keep stdin open
+        let child = cmd
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .map_err(|e| ExportError::IoError(e))?;
+
+        Ok(Self {
+            width,
+            height,
+            frame_rate,
+            codec,
+            quality,
+            child: Some(child),
+        })
+    }
+
+    /// Send a single RGBA frame to ffmpeg stdin
+    pub fn send_frame(&mut self, pixels: &[u8]) -> Result<(), ExportError> {
+        // Expect exact RGBA size
+        let expected = (self.width as usize) * (self.height as usize) * 4;
+        if pixels.len() != expected {
+            return Err(ExportError::IoError(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!(
+                    "Invalid frame size: expected {} bytes, got {}",
+                    expected, pixels.len()
+                ),
+            )));
+        }
+        if let Some(child) = &mut self.child {
+            if let Some(stdin) = &mut child.stdin {
+                stdin.write_all(pixels).map_err(|e| ExportError::IoError(e))?;
+                stdin.flush().map_err(|e| ExportError::IoError(e))?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Stop recording and finalize the file
+    pub fn stop(&mut self) -> Result<(), ExportError> {
+        if let Some(mut child) = self.child.take() {
+            // Close stdin to signal end of stream
+            drop(child.stdin.take());
+            let output = child.wait_with_output().map_err(|e| ExportError::IoError(e))?;
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                return Err(ExportError::IoError(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("ffmpeg failed: {}", stderr),
+                )));
+            }
+        }
+        Ok(())
     }
 }

@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+MSG_FILE="$1"
+COMMIT_MSG=$(cat "$MSG_FILE")
+
+# Allow bypass with Doc-Exempt tag for trivial infra/typo commits.
+if echo "$COMMIT_MSG" | grep -E -q '\bDoc-Exempt\b'; then
+  exit 0
+fi
+
+# Recommend including a Docs: section or links to updated docs.
+if ! echo "$COMMIT_MSG" | grep -E -qi 'Docs:|docs/'; then
+  echo "Commit-msg Docs Hint: Include a 'Docs:' section or links to updated docs." >&2
+  echo "Example: Docs: Updated DEVELOPMENT_PLAN and GAP_ASSESSMENT for new renderer change." >&2
+fi
+
+exit 0

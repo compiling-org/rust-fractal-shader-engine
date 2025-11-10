@@ -1,0 +1,14 @@
+[alias]
+# Fast dev run: quicker compile than default dev, decent runtime perf
+runf = "run --profile dev-fast"
+buildf = "build --profile dev-fast"
+
+# Maximum performance run/build
+runr = "run --release"
+buildr = "build --release"
+
+# Common shortcuts
+rr = "run --release"
+br = "build --release"
+rd = "run"
+bd = "build"

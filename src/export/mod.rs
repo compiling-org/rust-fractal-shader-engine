@@ -8,6 +8,9 @@ use std::fs::File;
 use std::io::Write;
 use image::{ImageBuffer, Rgba};
 use nalgebra::Vector3;
+// Submodules
+pub mod video;
+pub mod animation;
 
 /// Export error types
 #[derive(Debug)]
@@ -34,6 +37,18 @@ impl From<image::ImageError> for ExportError {
 impl From<serde_json::Error> for ExportError {
     fn from(error: serde_json::Error) -> Self {
         ExportError::JsonError(error)
+    }
+}
+
+impl std::fmt::Display for ExportError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ExportError::IoError(e) => write!(f, "I/O error: {}", e),
+            ExportError::ImageError(e) => write!(f, "Image error: {}", e),
+            ExportError::JsonError(e) => write!(f, "JSON error: {}", e),
+            ExportError::UnsupportedFormat => write!(f, "Unsupported export format"),
+            ExportError::InvalidData => write!(f, "Invalid export data"),
+        }
     }
 }
 
@@ -84,7 +99,7 @@ impl ImageExporter {
                 let img = ImageBuffer::<Rgba<u8>, _>::from_raw(width, height, pixels.to_vec())
                     .ok_or(ExportError::InvalidData)?;
                 let quality = 90; // Default quality for JPEG
-                let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(
+                let encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(
                     File::create(path)?,
                     quality,
                 );

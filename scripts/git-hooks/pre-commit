@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Fail commit if code files are staged without any docs changes.
+CODE_PATTERNS='^src/|^assets/shaders/|^examples/|^web/|^scripts/|^Cargo.toml|^README.md'
+DOCS_PATTERN='^docs/'
+
+STAGED=$(git diff --cached --name-only)
+
+if echo "$STAGED" | grep -E -q "$CODE_PATTERNS"; then
+  if ! echo "$STAGED" | grep -E -q "$DOCS_PATTERN"; then
+    echo "Pre-commit Docs Gate: Code changes staged without docs updates under docs/." >&2
+    echo "Add or update relevant docs before committing (plans, roadmap, gap assessment, guides)." >&2
+    exit 1
+  fi
+fi
+
+exit 0

@@ -60,6 +60,13 @@
 - **❌ Motion Blur**: No temporal effects
 - **❌ Screen Space Effects**: No ambient occlusion or reflections
 
+### 🟢 IMPLEMENTED - Fragment Pseudo‑3D Raymarcher (Experimental)
+- **✅ Fullscreen Fragment Pipeline**: Fragment shader raymarches a Mandelbox‑style SDF
+- **✅ UI Toggle**: Enable via `Rendering` → `Fragment Pseudo‑3D Mode`
+- **✅ Uniforms Wired**: Resolution, time, camera FOV/pos/dir, scale, bailout, iterations
+- **✅ Viewport Preview**: Renders directly to egui texture in the Rendering workspace
+- **⚠️ Limitations**: Basic lighting and camera; orbit/drag controls planned
+
 ## User Interface Features
 
 ### 🟢 IMPLEMENTED - Node-Based Editor
@@ -189,6 +196,7 @@
 - **✅ CONFIGURED**: Updated Cargo.toml dependencies to resolve version conflicts
 - **✅ FIXED**: Corrected type mismatches in theme definitions for eframe 0.30.0 compatibility
 - **✅ MAINTAINED**: Preserved all existing UI functionality while upgrading dependencies
+- **✅ ADDED**: Fragment pseudo‑3D raymarcher pipeline with UI toggle and viewport preview
 
 ### Remaining Critical Tasks
 1. **Implement GPU Rendering Pipeline**
@@ -196,6 +204,7 @@
    - Implement fractal computation shaders (WGSL)
    - Connect UI parameters to GPU shader uniforms
    - Display rendered fractals in viewport
+   - Add camera controls for fragment raymarcher (orbit, pan, FOV)
 
 2. **Complete Node Execution Engine**
    - Implement data flow between connected nodes
@@ -223,3 +232,9 @@
 - **Cross-Platform**: Windows, macOS, Linux, Web support
 
 This project provides a comprehensive architectural foundation for a professional fractal generation tool. While many advanced features are documented as completed, the current implementation focuses on the UI framework and mathematical algorithms. Core rendering functionality and real-time visualization are the primary areas requiring implementation to achieve the documented feature set. Recent progress has successfully resolved critical dependency issues, enabling WGPU integration which is a major step toward GPU-accelerated fractal rendering.
+## Camera and Shader Loader Enhancements (Nov 2025)
+
+- Camera target controls (X, Y, Z) available in `Rendering` and `Shader Loader` workspaces.
+- Camera FOV slider present in both workspaces and synced to renderer.
+- Fragment pseudo‑3D mode toggle exposed; renderer computes camera direction from position→target.
+- App state snapshot now includes `camera_target` and restores/syncs it to renderer.

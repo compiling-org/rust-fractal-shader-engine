@@ -30,14 +30,11 @@ impl FractalFormulaSelector {
         egui::ScrollArea::vertical()
             .max_height(300.0)
             .show(ui, |ui| {
-                // Fractal formulas with 3D support
+                // 3D-only fractal formulas
                 let formulas = vec![
-                    ("Mandelbrot", "Classic 2D Mandelbrot set"),
-                    ("Julia", "2D Julia set with customizable parameters"),
                     ("Mandelbulb", "3D power fractal with spherical coordinates"),
                     ("Mandelbox", "3D box folding fractal"),
                     ("Quaternion Julia", "4D quaternion fractal"),
-                    ("IFS", "Iterated function system (2D)"),
                 ];
 
                 for (name, description) in formulas {

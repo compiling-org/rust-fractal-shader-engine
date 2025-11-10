@@ -1,0 +1,1928 @@
+warning: unused import: `bevy_egui::EguiContexts`
+ --> src\ui\main.rs:7:5
+  |
+7 | use bevy_egui::EguiContexts;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `Rounding`
+ --> src\ui\theme.rs:6:27
+  |
+6 | use egui::{Color32, Vec2, Rounding, Stroke, Style, Visuals, Margin, FontId, FontFamily};
+  |                           ^^^^^^^^
+
+warning: unused imports: `Primitive` and `Rgba`
+ --> src\ui\theme.rs:7:28
+  |
+7 | use egui::epaint::{Shadow, Primitive, Rgba};
+  |                            ^^^^^^^^^  ^^^^
+
+warning: unused imports: `Align2`, `FontFamily`, `Id`, `ScrollArea`, `Sense`, and `Shape`
+ --> src\ui\node_editor.rs:6:88
+  |
+6 | ...ntId, RichText, FontFamily, Shape, Sense, Id, Rounding, Align2, ScrollArea};
+  |                    ^^^^^^^^^^  ^^^^^  ^^^^^  ^^            ^^^^^^  ^^^^^^^^^^
+
+warning: unused import: `crate::nodes::*`
+ --> src\node_editor.rs:3:5
+  |
+3 | use crate::nodes::*;
+  |     ^^^^^^^^^^^^^^^
+
+warning: unused import: `std::collections::HashMap`
+ --> src\node_editor.rs:4:5
+  |
+4 | use std::collections::HashMap;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `Matrix4` and `Vector4`
+ --> src\fractal\types.rs:5:16
+  |
+5 | use nalgebra::{Matrix4, Vector3, Vector4};
+  |                ^^^^^^^           ^^^^^^^
+
+warning: unused import: `Vector4`
+ --> src\fractal\formulas.rs:7:34
+  |
+7 | use nalgebra::{Matrix4, Vector3, Vector4};
+  |                                  ^^^^^^^
+
+warning: unused import: `Vector4`
+ --> src\scene\mod.rs:6:34
+  |
+6 | use nalgebra::{Matrix4, Vector3, Vector4, UnitQuaternion};
+  |                                  ^^^^^^^
+
+warning: unused import: `Scalar`
+ --> src\animation\keyframe.rs:7:34
+  |
+7 | use nalgebra::{Vector3, Vector4, Scalar};
+  |                                  ^^^^^^
+
+warning: unused import: `std::collections::HashMap`
+ --> src\animation\timeline.rs:7:5
+  |
+7 | use std::collections::HashMap;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unnecessary parentheses around block return value
+   --> src\animation\mod.rs:241:21
+    |
+241 |                     (2.0_f32.powf(10.0 * t - 10.0))
+    |                     ^                             ^
+    |
+    = note: `#[warn(unused_parens)]` on by default
+help: remove these parentheses
+    |
+241 -                     (2.0_f32.powf(10.0 * t - 10.0))
+241 +                     2.0_f32.powf(10.0 * t - 10.0)
+    |
+
+warning: unused import: `std::collections::HashMap`
+  --> src\export\animation.rs:10:5
+   |
+10 | use std::collections::HashMap;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: variant `PNG_Sequence` should have an upper camel case name
+  --> src\export\animation.rs:33:5
+   |
+33 |     PNG_Sequence,
+   |     ^^^^^^^^^^^^ help: convert the identifier to upper camel case: `PngSequence`
+   |
+   = note: `#[warn(non_camel_case_types)]` on by default
+
+warning: variant `JPEG_Sequence` should have an upper camel case name
+  --> src\export\animation.rs:34:5
+   |
+34 |     JPEG_Sequence,
+   |     ^^^^^^^^^^^^^ help: convert the identifier to upper camel case: `JpegSequence`
+
+warning: variant `TIFF_Sequence` should have an upper camel case name
+  --> src\export\animation.rs:35:5
+   |
+35 |     TIFF_Sequence,
+   |     ^^^^^^^^^^^^^ help: convert the identifier to upper camel case: `TiffSequence`
+
+warning: variant `JSON_Keyframes` should have an upper camel case name
+  --> src\export\animation.rs:36:5
+   |
+36 |     JSON_Keyframes,
+   |     ^^^^^^^^^^^^^^ help: convert the identifier to upper camel case: `JsonKeyframes`
+
+warning: variant `FBX_Animation` should have an upper camel case name
+  --> src\export\animation.rs:37:5
+   |
+37 |     FBX_Animation,
+   |     ^^^^^^^^^^^^^ help: convert the identifier to upper camel case: `FbxAnimation`
+
+warning: variant `GLTF_Animation` should have an upper camel case name
+  --> src\export\animation.rs:38:5
+   |
+38 |     GLTF_Animation,
+   |     ^^^^^^^^^^^^^^ help: convert the identifier to upper camel case: `GltfAnimation`
+
+warning: use of deprecated function `egui::menu::bar`: Use `egui::MenuBar::new().ui(` instead
+   --> src\ui\main.rs:225:21
+    |
+225 |         egui::menu::bar(ui, |ui| {
+    |                     ^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated type alias `egui::Rounding`: Renamed to CornerRadius
+ --> src\ui\theme.rs:6:27
+  |
+6 | use egui::{Color32, Vec2, Rounding, Stroke, Style, Visuals, Margin, FontId, FontFamily};
+  |                           ^^^^^^^^
+
+warning: use of deprecated type alias `egui::Rounding`: Renamed to CornerRadius
+ --> src\ui\node_editor.rs:6:118
+  |
+6 | ... RichText, FontFamily, Shape, Sense, Id, Rounding, Align2, ScrollArea};
+  |                                             ^^^^^^^^
+
+warning: use of deprecated type alias `egui::Rounding`: Renamed to CornerRadius
+   --> src\ui\node_editor.rs:401:40
+    |
+401 |         painter.rect_filled(node_rect, Rounding::same(8), bg_color);
+    |                                        ^^^^^^^^
+
+warning: use of deprecated method `egui::Ui::allocate_ui_at_rect`: Use `allocate_new_ui` instead
+    --> src\ui\main.rs:1937:12
+     |
+1937 |         ui.allocate_ui_at_rect(timeline_rect, |ui| {
+     |            ^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated method `egui::Ui::allocate_ui_at_rect`: Use `allocate_new_ui` instead
+    --> src\ui\main.rs:2026:12
+     |
+2026 |         ui.allocate_ui_at_rect(spectrum_rect, |ui| {
+     |            ^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated method `egui::Ui::allocate_ui_at_rect`: Use `allocate_new_ui` instead
+    --> src\ui\main.rs:2065:12
+     |
+2065 |         ui.allocate_ui_at_rect(waveform_rect, |ui| {
+     |            ^^^^^^^^^^^^^^^^^^^
+
+warning: variable does not need to be mutable
+   --> src\osc.rs:294:13
+    |
+294 |         let mut data_start = (type_end + 4) & !3; // Align to 4-byte boundary
+    |             ----^^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` on by default
+
+warning: unused variable: `renderer`
+    --> src\ui\main.rs:1046:41
+     |
+1046 | ...                   if let Some(renderer) = &self.fractal_renderer {
+     |                                   ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_renderer`
+     |
+     = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `config`
+   --> src\ui\theme.rs:589:13
+    |
+589 |         let config = &theme.effects.glassmorphism;
+    |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_config`
+
+warning: unused variable: `theme`
+   --> src\ui\theme.rs:601:21
+    |
+601 |         if let Some(theme) = self.themes.get(theme_name) {
+    |                     ^^^^^ help: if this is intentional, prefix it with an underscore: `_theme`
+
+warning: unused variable: `color_key`
+   --> src\ui\theme.rs:600:47
+    |
+600 |     pub fn get_color(&self, theme_name: &str, color_key: &str) -> Option<Color32> {
+    |                                               ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_color_key`
+
+warning: unused variable: `ui`
+   --> src\ui\node_editor.rs:745:41
+    |
+745 |     fn execute_node(&self, node: &Node, ui: &Ui) {
+    |                                         ^^ help: if this is intentional, prefix it with an underscore: `_ui`
+
+warning: unused variable: `from_output`
+   --> src\nodes.rs:226:37
+    |
+226 |             if let Some((from_node, from_output)) = input.connected_output {
+    |                                     ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_from_output`
+
+warning: unused variable: `parameters`
+   --> src\nodes.rs:306:9
+    |
+306 |         parameters: &HashMap<String, NodeParameter>,
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parameters`
+
+warning: unused variable: `wgpu_queue`
+  --> src\fractal\renderer.rs:44:13
+   |
+44 |         let wgpu_queue = &queue.0;
+   |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_wgpu_queue`
+
+warning: variable does not need to be mutable
+   --> src\scene\mod.rs:234:34
+    |
+234 |     pub fn add_object(&mut self, mut object: SceneObject) -> ObjectId {
+    |                                  ----^^^^^^
+    |                                  |
+    |                                  help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src\export\video.rs:481:13
+    |
+481 |         let mut child = cmd
+    |             ----^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src\export\mod.rs:102:21
+    |
+102 |                 let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(
+    |                     ----^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: unused variable: `distance_field`
+   --> src\export\mod.rs:272:9
+    |
+272 |         distance_field: &[f32],
+    |         ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_distance_field`
+
+warning: unused variable: `width`
+   --> src\export\mod.rs:273:9
+    |
+273 |         width: u32,
+    |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_width`
+
+warning: unused variable: `height`
+   --> src\export\mod.rs:274:9
+    |
+274 |         height: u32,
+    |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_height`
+
+warning: unused variable: `depth`
+   --> src\export\mod.rs:275:9
+    |
+275 |         depth: u32,
+    |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_depth`
+
+warning: unused variable: `iso_level`
+   --> src\export\mod.rs:276:9
+    |
+276 |         iso_level: f32,
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_iso_level`
+
+warning: fields `name` and `source` are never read
+  --> src\lib.rs:58:5
+   |
+57 | pub struct ShaderModule {
+   |            ------------ fields in this struct
+58 |     name: String,
+   |     ^^^^
+59 |     source: String,
+   |     ^^^^^^
+   |
+   = note: `#[warn(dead_code)]` on by default
+
+warning: field `socket` is never read
+  --> src\osc.rs:51:5
+   |
+50 | pub struct OscServer {
+   |            --------- field in this struct
+51 |     socket: UdpSocket,
+   |     ^^^^^^
+
+warning: field `custom_colors` is never read
+   --> src\ui\theme.rs:419:5
+    |
+416 | pub struct ThemeManager {
+    |            ------------ field in this struct
+...
+419 |     custom_colors: HashMap<String, Color32>,
+    |     ^^^^^^^^^^^^^
+
+warning: methods `execute_node_graph`, `execute_node`, and `get_node_output_value` are never used
+   --> src\ui\node_editor.rs:738:8
+    |
+193 | impl NodeEditor {
+    | --------------- methods in this implementation
+...
+738 |     fn execute_node_graph(&mut self, ui: &Ui) {
+    |        ^^^^^^^^^^^^^^^^^^
+...
+745 |     fn execute_node(&self, node: &Node, ui: &Ui) {
+    |        ^^^^^^^^^^^^
+...
+785 |     fn get_node_output_value(&self, node: &Node) -> Option<f32> {
+    |        ^^^^^^^^^^^^^^^^^^^^^
+
+warning: fields `api_endpoint` and `api_key` are never read
+   --> src\nft\mod.rs:254:5
+    |
+253 | pub struct FilecoinClient {
+    |            -------------- fields in this struct
+254 |     api_endpoint: String,
+    |     ^^^^^^^^^^^^
+255 |     api_key: String,
+    |     ^^^^^^^
+
+warning: fields `contract_id` and `account_id` are never read
+   --> src\nft\mod.rs:282:5
+    |
+281 | pub struct NearClient {
+    |            ---------- fields in this struct
+282 |     contract_id: String,
+    |     ^^^^^^^^^^^
+283 |     account_id: String,
+    |     ^^^^^^^^^^
+
+warning: associated functions `ifs_dragon_curve`, `ifs_barnsley_fern`, and `ifs_sierpinski_triangle` are never used
+   --> src\fractal\formulas.rs:163:8
+    |
+ 14 | impl FractalFormulaLibrary {
+    | -------------------------- associated functions in this implementation
+...
+163 |     fn ifs_dragon_curve() -> FractalFormula {
+    |        ^^^^^^^^^^^^^^^^
+...
+194 |     fn ifs_barnsley_fern() -> FractalFormula {
+    |        ^^^^^^^^^^^^^^^^^
+...
+237 |     fn ifs_sierpinski_triangle() -> FractalFormula {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: field `settings` is never read
+   --> src\export\video.rs:213:5
+    |
+212 | pub struct VideoStreamer {
+    |            ------------- field in this struct
+213 |     settings: VideoSettings,
+    |     ^^^^^^^^
+
+warning: fields `frame_rate`, `codec`, and `quality` are never read
+   --> src\export\video.rs:405:5
+    |
+402 | pub struct VideoRecorder {
+    |            ------------- fields in this struct
+...
+405 |     frame_rate: u32,
+    |     ^^^^^^^^^^
+406 |     codec: VideoCodec,
+    |     ^^^^^
+407 |     quality: VideoQuality,
+    |     ^^^^^^^
+
+warning: unused `std::result::Result` that must be used
+   --> src\fractal\renderer.rs:615:13
+    |
+615 |             wgpu_device.poll(wgpu::PollType::Wait);
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: this `Result` may be an `Err` variant, which should be handled
+    = note: `#[warn(unused_must_use)]` on by default
+help: use `let _ = ...` to ignore the resulting value
+    |
+615 |             let _ = wgpu_device.poll(wgpu::PollType::Wait);
+    |             +++++++
+
+warning: unused `std::result::Result` that must be used
+   --> src\fractal\renderer.rs:770:9
+    |
+770 |         wgpu_device.poll(wgpu::PollType::Wait);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: this `Result` may be an `Err` variant, which should be handled
+help: use `let _ = ...` to ignore the resulting value
+    |
+770 |         let _ = wgpu_device.poll(wgpu::PollType::Wait);
+    |         +++++++
+
+warning: `modular-fractal-shader` (lib) generated 54 warnings (run `cargo fix --lib -p modular-fractal-shader` to apply 17 suggestions)
+   Compiling modular-fractal-shader v0.1.0 (C:\Users\kapil\compiling\modular-fractal-shader)
+warning: unnecessary parentheses around function argument
+   --> src\bin\complex_fractal_validation.rs:137:31
+    |
+137 |     let mut lums = vec![0f64; (w * h)];
+    |                               ^     ^
+    |
+    = note: `#[warn(unused_parens)]` on by default
+help: remove these parentheses
+    |
+137 -     let mut lums = vec![0f64; (w * h)];
+137 +     let mut lums = vec![0f64; w * h];
+    |
+
+warning: unused import: `QualitySettings`
+  --> src\bin\fractal_snapshot.rs:13:61
+   |
+13 | use fractal_generator_lib::fractal::types::{FractalFormula, QualitySettings};
+   |                                                             ^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `std::any::Any`
+  --> src\gui.rs:13:5
+   |
+13 | use std::any::Any;
+   |     ^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `engine::*`
+  --> src\fractal\mod.rs:12:9
+   |
+12 | pub use engine::*;
+   |         ^^^^^^^^^
+
+warning: unused import: `formulas::*`
+  --> src\fractal\mod.rs:13:9
+   |
+13 | pub use formulas::*;
+   |         ^^^^^^^^^^^
+
+warning: unused import: `renderer::*`
+  --> src\fractal\mod.rs:14:9
+   |
+14 | pub use renderer::*;
+   |         ^^^^^^^^^^^
+
+warning: use of deprecated type alias `bevy::prelude::EventReader`: Renamed to `MessageReader`.
+   --> src\gui.rs:295:23
+    |
+295 |     mut focus_events: EventReader<WindowFocused>,
+    |                       ^^^^^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated type alias `bevy::prelude::EventReader`: Renamed to `MessageReader`.
+   --> src\gui.rs:322:22
+    |
+322 |     mut exit_events: EventReader<AppExit>,
+    |                      ^^^^^^^^^^^
+
+warning: unused variable: `camera_state`
+   --> src\gui.rs:245:5
+    |
+245 |     camera_state: Res<CameraState>,
+    |     ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_camera_state`
+    |
+    = note: `#[warn(unused_variables)]` on by default
+
+warning: variable does not need to be mutable
+   --> src\scene\mod.rs:234:34
+    |
+234 |     pub fn add_object(&mut self, mut object: SceneObject) -> ObjectId {
+    |                                  ----^^^^^^
+    |                                  |
+    |                                  help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` on by default
+
+warning: unused variable: `params`
+   --> src\main.rs:137:9
+    |
+137 |     let params = fractal_generator_lib::fractal::types::FractalParameters::default();
+    |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_params`
+
+warning: function `has_primary_egui_ctx` is never used
+   --> src\gui.rs:387:4
+    |
+387 | fn has_primary_egui_ctx(
+    |    ^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: enum `FractalFormula` is never used
+  --> src\fractal\types.rs:11:10
+   |
+11 | pub enum FractalFormula {
+   |          ^^^^^^^^^^^^^^
+
+warning: struct `DistanceResult` is never constructed
+  --> src\fractal\types.rs:71:12
+   |
+71 | pub struct DistanceResult {
+   |            ^^^^^^^^^^^^^^
+
+warning: struct `FractalParameters` is never constructed
+  --> src\fractal\types.rs:80:12
+   |
+80 | pub struct FractalParameters {
+   |            ^^^^^^^^^^^^^^^^^
+
+warning: struct `ColorMapping` is never constructed
+   --> src\fractal\types.rs:120:12
+    |
+120 | pub struct ColorMapping {
+    |            ^^^^^^^^^^^^
+
+warning: struct `LightingParameters` is never constructed
+   --> src\fractal\types.rs:130:12
+    |
+130 | pub struct LightingParameters {
+    |            ^^^^^^^^^^^^^^^^^^
+
+warning: struct `VolumetricParameters` is never constructed
+   --> src\fractal\types.rs:141:12
+    |
+141 | pub struct VolumetricParameters {
+    |            ^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `QualitySettings` is never constructed
+   --> src\fractal\types.rs:153:12
+    |
+153 | pub struct QualitySettings {
+    |            ^^^^^^^^^^^^^^^
+
+warning: enum `QualityPreset` is never used
+   --> src\fractal\types.rs:181:10
+    |
+181 | pub enum QualityPreset {
+    |          ^^^^^^^^^^^^^
+
+warning: method `to_settings` is never used
+   --> src\fractal\types.rs:190:12
+    |
+188 | impl QualityPreset {
+    | ------------------ method in this implementation
+189 |     /// Convert a preset to concrete `QualitySettings`, using a base resolution.
+190 |     pub fn to_settings(self, base_resolution: [u32; 2]) -> QualitySettings {
+    |            ^^^^^^^^^^^
+
+warning: struct `FractalStats` is never constructed
+   --> src\fractal\types.rs:238:12
+    |
+238 | pub struct FractalStats {
+    |            ^^^^^^^^^^^^
+
+warning: enum `BlendMode` is never used
+   --> src\fractal\types.rs:262:10
+    |
+262 | pub enum BlendMode {
+    |          ^^^^^^^^^
+
+warning: struct `MaterialProperties` is never constructed
+   --> src\fractal\types.rs:273:12
+    |
+273 | pub struct MaterialProperties {
+    |            ^^^^^^^^^^^^^^^^^^
+
+warning: struct `TextureTransform` is never constructed
+   --> src\fractal\types.rs:307:12
+    |
+307 | pub struct TextureTransform {
+    |            ^^^^^^^^^^^^^^^^
+
+warning: struct `NoiseParameters` is never constructed
+   --> src\fractal\types.rs:325:12
+    |
+325 | pub struct NoiseParameters {
+    |            ^^^^^^^^^^^^^^^
+
+warning: struct `FractalEngine` is never constructed
+  --> src\fractal\engine.rs:11:12
+   |
+11 | pub struct FractalEngine {
+   |            ^^^^^^^^^^^^^
+
+warning: multiple associated items are never used
+   --> src\fractal\engine.rs:19:12
+    |
+ 17 | impl FractalEngine {
+    | ------------------ associated items in this implementation
+ 18 |     /// Create a new fractal engine with default parameters
+ 19 |     pub fn new() -> Self {
+    |            ^^^
+...
+ 28 |     pub fn parameters(&self) -> &FractalParameters {
+    |            ^^^^^^^^^^
+...
+ 33 |     pub fn parameters_mut(&mut self) -> &mut FractalParameters {
+    |            ^^^^^^^^^^^^^^
+...
+ 38 |     pub fn quality_settings(&self) -> &QualitySettings {
+    |            ^^^^^^^^^^^^^^^^
+...
+ 43 |     pub fn set_quality_settings(&mut self, settings: QualitySettings) {
+    |            ^^^^^^^^^^^^^^^^^^^^
+...
+ 50 |     pub fn apply_quality_preset(&mut self, preset: QualityPreset, base_resolution: Option<[...
+    |            ^^^^^^^^^^^^^^^^^^^^
+...
+ 57 |     pub fn stats(&self) -> &FractalStats {
+    |            ^^^^^
+...
+ 62 |     pub fn reset_stats(&mut self) {
+    |            ^^^^^^^^^^^
+...
+ 67 |     pub fn compute_color(&self, result: &DistanceResult) -> Vector3<f32> {
+    |            ^^^^^^^^^^^^^
+...
+ 72 |     fn compute_base_color(&self, result: &DistanceResult) -> Vector3<f32> {
+    |        ^^^^^^^^^^^^^^^^^^
+...
+104 |     fn adjust_saturation(&self, color: Vector3<f32>, saturation: f32) -> Vector3<f32> {
+    |        ^^^^^^^^^^^^^^^^^
+...
+111 |     fn get_max_iterations(&self) -> u32 {
+    |        ^^^^^^^^^^^^^^^^^^
+...
+116 |     fn compute_mandelbrot_distance(&self, point: Vector3<f32>, center: [f32; 2], zoom: f32,...
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+147 |     fn compute_mandelbulb_distance(&self, point: Vector3<f32>, power: f32, max_iterations: ...
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+181 |     fn compute_mandelbox_distance(&self, point: Vector3<f32>, scale: f32, max_iterations: u...
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+213 |     pub fn compute_distance(&self, point: Vector3<f32>) -> DistanceResult {
+    |            ^^^^^^^^^^^^^^^^
+...
+256 |     fn compute_julia_distance(&self, point: Vector3<f32>, c: [f32; 2], max_iterations: u32)...
+    |        ^^^^^^^^^^^^^^^^^^^^^^
+...
+280 |     fn compute_burning_ship_distance(&self, point: Vector3<f32>, max_iterations: u32) -> Di...
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+304 |     fn compute_tricorn_distance(&self, point: Vector3<f32>, max_iterations: u32) -> Distanc...
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+328 |     fn compute_menger_sponge_distance(&self, point: Vector3<f32>, iterations: u32) -> Dista...
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+354 |     fn compute_sierpinski_distance(&self, point: Vector3<f32>, iterations: u32) -> Distance...
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+378 |     fn compute_apollonian_distance(&self, point: Vector3<f32>, iterations: u32) -> Distance...
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+399 |     fn compute_quaternion_julia_distance(&self, point: Vector3<f32>, c: [f32; 4], max_itera...
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+425 |     fn compute_kaleidoscopic_ifs_distance(&self, point: Vector3<f32>, scale: f32, rotation:...
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+456 |     fn rotate_point(&self, point: Vector3<f32>, angle: f32, axis: Vector3<f32>) -> Vector3<...
+    |        ^^^^^^^^^^^^
+
+warning: struct `FractalFormulaLibrary` is never constructed
+  --> src\fractal\formulas.rs:10:12
+   |
+10 | pub struct FractalFormulaLibrary {
+   |            ^^^^^^^^^^^^^^^^^^^^^
+
+warning: multiple associated items are never used
+   --> src\fractal\formulas.rs:16:12
+    |
+ 14 | impl FractalFormulaLibrary {
+    | -------------------------- associated items in this implementation
+ 15 |     /// Create a new formula library with all available formulas
+ 16 |     pub fn new() -> Self {
+    |            ^^^
+...
+ 41 |     pub fn formulas(&self) -> &[FractalFormula] {
+    |            ^^^^^^^^
+...
+ 46 |     pub fn get_formula(&self, name: &str) -> Option<&FractalFormula> {
+    |            ^^^^^^^^^^^
+...
+ 51 |     pub fn get_formula_name(&self, formula: &FractalFormula) -> String {
+    |            ^^^^^^^^^^^^^^^^
+...
+ 75 |     fn mandelbrot_classic() -> FractalFormula {
+    |        ^^^^^^^^^^^^^^^^^^
+...
+ 83 |     fn julia_classic() -> FractalFormula {
+    |        ^^^^^^^^^^^^^
+...
+ 91 |     fn burning_ship_classic() -> FractalFormula {
+    |        ^^^^^^^^^^^^^^^^^^^^
+...
+ 98 |     fn tricorn_classic() -> FractalFormula {
+    |        ^^^^^^^^^^^^^^^
+...
+105 |     fn menger_sponge_classic() -> FractalFormula {
+    |        ^^^^^^^^^^^^^^^^^^^^^
+...
+112 |     fn sierpinski_classic() -> FractalFormula {
+    |        ^^^^^^^^^^^^^^^^^^
+...
+119 |     fn apollonian_classic() -> FractalFormula {
+    |        ^^^^^^^^^^^^^^^^^^
+...
+126 |     fn kaleidoscopic_ifs_classic() -> FractalFormula {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+135 |     fn mandelbulb_classic() -> FractalFormula {
+    |        ^^^^^^^^^^^^^^^^^^
+...
+142 |     fn mandelbulb_power_tower() -> FractalFormula {
+    |        ^^^^^^^^^^^^^^^^^^^^^^
+...
+149 |     fn mandelbox_classic() -> FractalFormula {
+    |        ^^^^^^^^^^^^^^^^^
+...
+156 |     fn mandelbox_spherical() -> FractalFormula {
+    |        ^^^^^^^^^^^^^^^^^^^
+...
+163 |     fn ifs_dragon_curve() -> FractalFormula {
+    |        ^^^^^^^^^^^^^^^^
+...
+194 |     fn ifs_barnsley_fern() -> FractalFormula {
+    |        ^^^^^^^^^^^^^^^^^
+...
+237 |     fn ifs_sierpinski_triangle() -> FractalFormula {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^
+...
+272 |     fn quaternion_julia_classic() -> FractalFormula {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+280 |     fn quaternion_julia_cubic() -> FractalFormula {
+    |        ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `DistanceFieldOps` is never constructed
+   --> src\fractal\formulas.rs:295:12
+    |
+295 | pub struct DistanceFieldOps;
+    |            ^^^^^^^^^^^^^^^^
+
+warning: multiple associated functions are never used
+   --> src\fractal\formulas.rs:299:12
+    |
+297 | impl DistanceFieldOps {
+    | --------------------- associated functions in this implementation
+298 |     /// Union of two distance fields
+299 |     pub fn union(a: f32, b: f32) -> f32 {
+    |            ^^^^^
+...
+304 |     pub fn intersection(a: f32, b: f32) -> f32 {
+    |            ^^^^^^^^^^^^
+...
+309 |     pub fn subtraction(a: f32, b: f32) -> f32 {
+    |            ^^^^^^^^^^^
+...
+314 |     pub fn smooth_union(a: f32, b: f32, k: f32) -> f32 {
+    |            ^^^^^^^^^^^^
+...
+320 |     pub fn smooth_intersection(a: f32, b: f32, k: f32) -> f32 {
+    |            ^^^^^^^^^^^^^^^^^^^
+...
+326 |     pub fn smooth_subtraction(a: f32, b: f32, k: f32) -> f32 {
+    |            ^^^^^^^^^^^^^^^^^^
+...
+332 |     pub fn onion(distance: f32, thickness: f32) -> f32 {
+    |            ^^^^^
+...
+337 |     pub fn round(distance: f32, radius: f32) -> f32 {
+    |            ^^^^^
+...
+342 |     pub fn displace(distance: f32, displacement: f32) -> f32 {
+    |            ^^^^^^^^
+...
+347 |     pub fn twist(distance: f32, point: Vector3<f32>, amount: f32) -> f32 {
+    |            ^^^^^
+
+warning: struct `DistancePrimitives` is never constructed
+   --> src\fractal\formulas.rs:362:12
+    |
+362 | pub struct DistancePrimitives;
+    |            ^^^^^^^^^^^^^^^^^^
+
+warning: associated functions `sphere`, `box_distance`, `torus`, `cylinder`, and `plane` are never used
+   --> src\fractal\formulas.rs:366:12
+    |
+364 | impl DistancePrimitives {
+    | ----------------------- associated functions in this implementation
+365 |     /// Sphere distance
+366 |     pub fn sphere(point: Vector3<f32>, center: Vector3<f32>, radius: f32) -> f32 {
+    |            ^^^^^^
+...
+371 |     pub fn box_distance(point: Vector3<f32>, center: Vector3<f32>, size: Vector3<f32>) -> f...
+    |            ^^^^^^^^^^^^
+...
+383 |     pub fn torus(point: Vector3<f32>, center: Vector3<f32>, major_radius: f32, minor_radius...
+    |            ^^^^^
+...
+394 |     pub fn cylinder(point: Vector3<f32>, center: Vector3<f32>, height: f32, radius: f32) ->...
+    |            ^^^^^^^^
+...
+405 |     pub fn plane(point: Vector3<f32>, normal: Vector3<f32>, distance: f32) -> f32 {
+    |            ^^^^^
+
+warning: struct `FractalRenderer` is never constructed
+ --> src\fractal\renderer.rs:9:12
+  |
+9 | pub struct FractalRenderer {
+  |            ^^^^^^^^^^^^^^^
+
+warning: multiple associated items are never used
+   --> src\fractal\renderer.rs:29:12
+    |
+ 27 | impl FractalRenderer {
+    | -------------------- associated items in this implementation
+ 28 |     /// Create a new GPU-accelerated fractal renderer using provided WGPU device and queue
+ 29 |     pub fn new_with_wgpu_context(
+    |            ^^^^^^^^^^^^^^^^^^^^^
+...
+351 |     pub fn apply_quality_preset(
+    |            ^^^^^^^^^^^^^^^^^^^^
+...
+360 |     pub fn set_quality_settings(&mut self, settings: crate::fractal::types::QualitySettings) {
+    |            ^^^^^^^^^^^^^^^^^^^^
+...
+365 |     pub fn get_quality_settings(&self) -> crate::fractal::types::QualitySettings {
+    |            ^^^^^^^^^^^^^^^^^^^^
+...
+370 |     pub fn render_frame(&mut self, time: f32, resolution: (u32, u32)) -> Result<(), Box<dyn...
+    |            ^^^^^^^^^^^^
+...
+431 |     pub fn render_frame_to_texture(&mut self, time: f32, resolution: (u32, u32), ctx: &egui...
+    |            ^^^^^^^^^^^^^^^^^^^^^^^
+...
+677 |     pub fn render_image_readback(
+    |            ^^^^^^^^^^^^^^^^^^^^^
+...
+796 |     pub fn get_output_texture(&self) -> (&wgpu::Texture, u32, u32) {
+    |            ^^^^^^^^^^^^^^^^^^
+...
+801 |     pub fn set_egui_texture(&mut self, texture_id: egui::TextureId) {
+    |            ^^^^^^^^^^^^^^^^
+...
+806 |     pub fn get_egui_texture(&self) -> Option<egui::TextureId> {
+    |            ^^^^^^^^^^^^^^^^
+...
+811 |     pub fn update_parameters(&mut self, params: &FractalParameters) {
+    |            ^^^^^^^^^^^^^^^^^
+...
+816 |     pub fn set_formula(&mut self, formula_id: &str) -> Result<(), String> {
+    |            ^^^^^^^^^^^
+...
+829 |     fn create_parameter_data(&self, time: f32, resolution: (u32, u32)) -> [f32; 256] {
+    |        ^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `CPUFractalRenderer` is never constructed
+   --> src\fractal\renderer.rs:909:12
+    |
+909 | pub struct CPUFractalRenderer {
+    |            ^^^^^^^^^^^^^^^^^^
+
+warning: associated items `new`, `render`, and `calculate_color` are never used
+   --> src\fractal\renderer.rs:918:12
+    |
+917 | impl CPUFractalRenderer {
+    | ----------------------- associated items in this implementation
+918 |     pub fn new() -> Self {
+    |            ^^^
+...
+928 |     pub fn render(&self, width: u32, height: u32) -> Vec<u8> {
+    |            ^^^^^^
+...
+995 |     fn calculate_color(&self, _point: Vector3<f32>, result: &DistanceResult) -> [f32; 3] {
+    |        ^^^^^^^^^^^^^^^
+
+warning: type alias `ObjectId` is never used
+  --> src\scene\mod.rs:11:10
+   |
+11 | pub type ObjectId = u64;
+   |          ^^^^^^^^
+
+warning: struct `Transform` is never constructed
+  --> src\scene\mod.rs:15:12
+   |
+15 | pub struct Transform {
+   |            ^^^^^^^^^
+
+warning: methods `matrix`, `forward`, `right`, and `up` are never used
+  --> src\scene\mod.rs:33:12
+   |
+31 | impl Transform {
+   | -------------- methods in this implementation
+32 |     /// Create transformation matrix
+33 |     pub fn matrix(&self) -> Matrix4<f32> {
+   |            ^^^^^^
+...
+41 |     pub fn forward(&self) -> Vector3<f32> {
+   |            ^^^^^^^
+...
+46 |     pub fn right(&self) -> Vector3<f32> {
+   |            ^^^^^
+...
+51 |     pub fn up(&self) -> Vector3<f32> {
+   |            ^^
+
+warning: struct `Material` is never constructed
+  --> src\scene\mod.rs:58:12
+   |
+58 | pub struct Material {
+   |            ^^^^^^^^
+
+warning: enum `ObjectType` is never used
+  --> src\scene\mod.rs:80:10
+   |
+80 | pub enum ObjectType {
+   |          ^^^^^^^^^^
+
+warning: enum `LightType` is never used
+   --> src\scene\mod.rs:111:10
+    |
+111 | pub enum LightType {
+    |          ^^^^^^^^^
+
+warning: struct `SceneObject` is never constructed
+   --> src\scene\mod.rs:122:12
+    |
+122 | pub struct SceneObject {
+    |            ^^^^^^^^^^^
+
+warning: associated items `new_fractal`, `new_light`, `new_camera`, `world_matrix`, and `world_position` are never used
+   --> src\scene\mod.rs:135:12
+    |
+133 | impl SceneObject {
+    | ---------------- associated items in this implementation
+134 |     /// Create a new fractal object
+135 |     pub fn new_fractal(name: &str, fractal_params: crate::fractal::FractalParameters) -> Se...
+    |            ^^^^^^^^^^^
+...
+149 |     pub fn new_light(name: &str, light_type: LightType, color: Vector3<f32>, intensity: f32...
+    |            ^^^^^^^^^
+...
+169 |     pub fn new_camera(name: &str, fov: f32, aspect_ratio: f32) -> Self {
+    |            ^^^^^^^^^^
+...
+188 |     pub fn world_matrix(&self, scene: &Scene) -> Matrix4<f32> {
+    |            ^^^^^^^^^^^^
+...
+205 |     pub fn world_position(&self, scene: &Scene) -> Vector3<f32> {
+    |            ^^^^^^^^^^^^^^
+
+warning: struct `Scene` is never constructed
+   --> src\scene\mod.rs:213:12
+    |
+213 | pub struct Scene {
+    |            ^^^^^
+
+warning: multiple associated items are never used
+   --> src\scene\mod.rs:223:12
+    |
+221 | impl Scene {
+    | ---------- associated items in this implementation
+222 |     /// Create a new empty scene
+223 |     pub fn new(name: &str) -> Self {
+    |            ^^^
+...
+234 |     pub fn add_object(&mut self, mut object: SceneObject) -> ObjectId {
+    |            ^^^^^^^^^^
+...
+241 |     pub fn remove_object(&mut self, id: ObjectId) -> bool {
+    |            ^^^^^^^^^^^^^
+...
+262 |     pub fn set_parent(&mut self, child_id: ObjectId, parent_id: Option<ObjectId>) -> bool {
+    |            ^^^^^^^^^^
+...
+293 |     pub fn active_camera(&self) -> Option<&SceneObject> {
+    |            ^^^^^^^^^^^^^
+...
+298 |     pub fn set_active_camera(&mut self, camera_id: ObjectId) {
+    |            ^^^^^^^^^^^^^^^^^
+...
+309 |     pub fn fractal_objects(&self) -> Vec<&SceneObject> {
+    |            ^^^^^^^^^^^^^^^
+...
+316 |     pub fn lights(&self) -> Vec<&SceneObject> {
+    |            ^^^^^^
+...
+323 |     pub fn create_default_scene() -> Self {
+    |            ^^^^^^^^^^^^^^^^^^^^
+
+warning: function `generate_id` is never used
+   --> src\scene\mod.rs:346:4
+    |
+346 | fn generate_id() -> ObjectId {
+    |    ^^^^^^^^^^^
+
+warning: struct `AnimationController` is never constructed
+  --> src\animation\mod.rs:13:12
+   |
+13 | pub struct AnimationController {
+   |            ^^^^^^^^^^^^^^^^^^^
+
+warning: multiple associated items are never used
+  --> src\animation\mod.rs:21:12
+   |
+20 | impl AnimationController {
+   | ------------------------ associated items in this implementation
+21 |     pub fn new() -> Self {
+   |            ^^^
+...
+30 |     pub fn update(&mut self, delta_time: f32) {
+   |            ^^^^^^
+...
+44 |     pub fn play(&mut self) {
+   |            ^^^^
+...
+48 |     pub fn pause(&mut self) {
+   |            ^^^^^
+...
+52 |     pub fn stop(&mut self) {
+   |            ^^^^
+...
+57 |     pub fn set_time(&mut self, time: f32) {
+   |            ^^^^^^^^
+...
+61 |     pub fn current_time(&self) -> f32 {
+   |            ^^^^^^^^^^^^
+...
+65 |     pub fn is_playing(&self) -> bool {
+   |            ^^^^^^^^^^
+...
+69 |     pub fn timeline(&self) -> &TimelineProject {
+   |            ^^^^^^^^
+...
+73 |     pub fn timeline_mut(&mut self) -> &mut TimelineProject {
+   |            ^^^^^^^^^^^^
+
+warning: struct `TimelineProject` is never constructed
+  --> src\animation\mod.rs:80:12
+   |
+80 | pub struct TimelineProject {
+   |            ^^^^^^^^^^^^^^^
+
+warning: multiple associated items are never used
+   --> src\animation\mod.rs:87:12
+    |
+ 86 | impl TimelineProject {
+    | -------------------- associated items in this implementation
+ 87 |     pub fn new() -> Self {
+    |            ^^^
+...
+ 95 |     pub fn add_track(&mut self, track: AnimationTrack) {
+    |            ^^^^^^^^^
+...
+ 99 |     pub fn tracks(&self) -> &[AnimationTrack] {
+    |            ^^^^^^
+...
+103 |     pub fn duration(&self) -> f32 {
+    |            ^^^^^^^^
+...
+107 |     pub fn set_duration(&mut self, duration: f32) {
+    |            ^^^^^^^^^^^^
+...
+111 |     pub fn frame_rate(&self) -> f32 {
+    |            ^^^^^^^^^^
+...
+115 |     pub fn set_frame_rate(&mut self, frame_rate: f32) {
+    |            ^^^^^^^^^^^^^^
+...
+119 |     pub fn current_time(&self) -> f32 {
+    |            ^^^^^^^^^^^^
+...
+124 |     pub fn current_frame(&self) -> u32 {
+    |            ^^^^^^^^^^^^^
+
+warning: struct `AnimationTrack` is never constructed
+   --> src\animation\mod.rs:131:12
+    |
+131 | pub struct AnimationTrack {
+    |            ^^^^^^^^^^^^^^
+
+warning: struct `Keyframe` is never constructed
+   --> src\animation\mod.rs:139:12
+    |
+139 | pub struct Keyframe {
+    |            ^^^^^^^^
+
+warning: enum `InterpolationMode` is never used
+   --> src\animation\mod.rs:146:10
+    |
+146 | pub enum InterpolationMode {
+    |          ^^^^^^^^^^^^^^^^^
+
+warning: enum `EasingType` is never used
+   --> src\animation\mod.rs:153:10
+    |
+153 | pub enum EasingType {
+    |          ^^^^^^^^^^
+
+warning: associated items `new`, `add_keyframe`, `evaluate`, and `apply_easing` are never used
+   --> src\animation\mod.rs:164:12
+    |
+163 | impl AnimationTrack {
+    | ------------------- associated items in this implementation
+164 |     pub fn new(name: &str, parameter_path: &str) -> Self {
+    |            ^^^
+...
+173 |     pub fn add_keyframe(&mut self, time: f32, value: f32, easing: EasingType) {
+    |            ^^^^^^^^^^^^
+...
+178 |     pub fn evaluate(&self, time: f32) -> f32 {
+    |            ^^^^^^^^
+...
+223 |     fn apply_easing(&self, t: f32, easing: &EasingType) -> f32 {
+    |        ^^^^^^^^^^^^
+
+warning: trait `EasingTrait` is never used
+ --> src\animation\easing.rs:7:11
+  |
+7 | pub trait EasingTrait: std::fmt::Debug {
+  |           ^^^^^^^^^^^
+
+warning: enum `EasingFunction` is never used
+  --> src\animation\easing.rs:13:10
+   |
+13 | pub enum EasingFunction {
+   |          ^^^^^^^^^^^^^^
+
+warning: associated items `apply` and `ease_out_bounce` are never used
+   --> src\animation\easing.rs:50:12
+    |
+ 49 | impl EasingFunction {
+    | ------------------- associated items in this implementation
+ 50 |     pub fn apply(&self, t: f32) -> f32 {
+    |            ^^^^^
+...
+198 |     fn ease_out_bounce(t: f32) -> f32 {
+    |        ^^^^^^^^^^^^^^^
+
+warning: struct `EasingFactory` is never constructed
+   --> src\animation\easing.rs:224:12
+    |
+224 | pub struct EasingFactory;
+    |            ^^^^^^^^^^^^^
+
+warning: associated functions `custom`, `bounce`, `elastic`, `bezier`, and `spring` are never used
+   --> src\animation\easing.rs:228:12
+    |
+226 | impl EasingFactory {
+    | ------------------ associated functions in this implementation
+227 |     /// Create a custom easing function from a mathematical function
+228 |     pub fn custom<F: Fn(f32) -> f32 + Send + Sync + std::fmt::Debug + 'static>(func: F) -> ...
+    |            ^^^^^^
+...
+233 |     pub fn bounce(_strength: f32) -> EasingFunction {
+    |            ^^^^^^
+...
+239 |     pub fn elastic(_tension: f32, _damping: f32) -> EasingFunction {
+    |            ^^^^^^^
+...
+245 |     pub fn bezier(_p0: f32, _p1: f32, _p2: f32, _p3: f32) -> EasingFunction {
+    |            ^^^^^^
+...
+251 |     pub fn spring(_tension: f32, _friction: f32) -> EasingFunction {
+    |            ^^^^^^
+
+warning: struct `CustomEasing` is never constructed
+   --> src\animation\easing.rs:259:8
+    |
+259 | struct CustomEasing<F: Fn(f32) -> f32 + Send + Sync + std::fmt::Debug>(F);
+    |        ^^^^^^^^^^^^
+
+warning: constant `SMOOTH` is never used
+   --> src\animation\easing.rs:272:15
+    |
+272 |     pub const SMOOTH: EasingFunction = EasingFunction::Smooth;
+    |               ^^^^^^
+
+warning: constant `LINEAR` is never used
+   --> src\animation\easing.rs:275:15
+    |
+275 |     pub const LINEAR: EasingFunction = EasingFunction::Linear;
+    |               ^^^^^^
+
+warning: constant `EASE_OUT` is never used
+   --> src\animation\easing.rs:278:15
+    |
+278 |     pub const EASE_OUT: EasingFunction = EasingFunction::EaseOutCubic;
+    |               ^^^^^^^^
+
+warning: constant `EASE_IN` is never used
+   --> src\animation\easing.rs:281:15
+    |
+281 |     pub const EASE_IN: EasingFunction = EasingFunction::EaseInCubic;
+    |               ^^^^^^^
+
+warning: constant `EASE_IN_OUT` is never used
+   --> src\animation\easing.rs:284:15
+    |
+284 |     pub const EASE_IN_OUT: EasingFunction = EasingFunction::EaseInOutCubic;
+    |               ^^^^^^^^^^^
+
+warning: constant `BOUNCE` is never used
+   --> src\animation\easing.rs:287:15
+    |
+287 |     pub const BOUNCE: EasingFunction = EasingFunction::EaseOutBounce;
+    |               ^^^^^^
+
+warning: constant `ELASTIC` is never used
+   --> src\animation\easing.rs:290:15
+    |
+290 |     pub const ELASTIC: EasingFunction = EasingFunction::EaseOutElastic;
+    |               ^^^^^^^
+
+warning: constant `BACK` is never used
+   --> src\animation\easing.rs:293:15
+    |
+293 |     pub const BACK: EasingFunction = EasingFunction::EaseOutBack;
+    |               ^^^^
+
+warning: constant `EXPONENTIAL` is never used
+   --> src\animation\easing.rs:296:15
+    |
+296 |     pub const EXPONENTIAL: EasingFunction = EasingFunction::EaseOutExpo;
+    |               ^^^^^^^^^^^
+
+warning: constant `SINE` is never used
+   --> src\animation\easing.rs:299:15
+    |
+299 |     pub const SINE: EasingFunction = EasingFunction::EaseInOutSine;
+    |               ^^^^
+
+warning: constant `CIRC` is never used
+   --> src\animation\easing.rs:302:15
+    |
+302 |     pub const CIRC: EasingFunction = EasingFunction::EaseInCirc;
+    |               ^^^^
+
+warning: constant `QUART_IN_OUT` is never used
+   --> src\animation\easing.rs:305:15
+    |
+305 |     pub const QUART_IN_OUT: EasingFunction = EasingFunction::EaseInOutQuart;
+    |               ^^^^^^^^^^^^
+
+warning: constant `QUINT_IN_OUT` is never used
+   --> src\animation\easing.rs:308:15
+    |
+308 |     pub const QUINT_IN_OUT: EasingFunction = EasingFunction::EaseInOutQuint;
+    |               ^^^^^^^^^^^^
+
+warning: type alias `TrackId` is never used
+  --> src\animation\keyframe.rs:12:10
+   |
+12 | pub type TrackId = u64;
+   |          ^^^^^^^
+
+warning: struct `Keyframe` is never constructed
+  --> src\animation\keyframe.rs:16:12
+   |
+16 | pub struct Keyframe<T> {
+   |            ^^^^^^^^
+
+warning: enum `InterpolationMode` is never used
+  --> src\animation\keyframe.rs:24:10
+   |
+24 | pub enum InterpolationMode {
+   |          ^^^^^^^^^^^^^^^^^
+
+warning: struct `AnimationTrack` is never constructed
+  --> src\animation\keyframe.rs:35:12
+   |
+35 | pub struct AnimationTrack<T> {
+   |            ^^^^^^^^^^^^^^
+
+warning: struct `AnimationController` is never constructed
+  --> src\animation\keyframe.rs:45:12
+   |
+45 | pub struct AnimationController {
+   |            ^^^^^^^^^^^^^^^^^^^
+
+warning: enum `AnimationTrackType` is never used
+  --> src\animation\keyframe.rs:54:10
+   |
+54 | pub enum AnimationTrackType {
+   |          ^^^^^^^^^^^^^^^^^^
+
+warning: multiple associated items are never used
+   --> src\animation\keyframe.rs:63:12
+    |
+ 61 | impl AnimationController {
+    | ------------------------ associated items in this implementation
+ 62 |     /// Create new animation controller
+ 63 |     pub fn new() -> Self {
+    |            ^^^
+...
+ 74 |     pub fn add_float_track(&mut self, name: &str, target_path: &str) -> TrackId {
+    |            ^^^^^^^^^^^^^^^
+...
+ 88 |     pub fn add_vec3_track(&mut self, name: &str, target_path: &str) -> TrackId {
+    |            ^^^^^^^^^^^^^^
+...
+102 |     pub fn add_keyframe(&mut self, track_id: TrackId, time: f32, value: AnimationValue, int...
+    |            ^^^^^^^^^^^^
+...
+127 |     pub fn evaluate_track(&self, track_id: TrackId) -> Option<AnimationValue> {
+    |            ^^^^^^^^^^^^^^
+...
+147 |     fn evaluate_float_track(&self, track: &AnimationTrack<f32>) -> Option<f32> {
+    |        ^^^^^^^^^^^^^^^^^^^^
+...
+201 |     fn evaluate_vec3_track(&self, track: &AnimationTrack<Vector3<f32>>) -> Option<Vector3<f...
+    |        ^^^^^^^^^^^^^^^^^^^
+...
+245 |     fn evaluate_vec4_track(&self, track: &AnimationTrack<Vector4<f32>>) -> Option<Vector4<f...
+    |        ^^^^^^^^^^^^^^^^^^^
+...
+289 |     fn interpolate(&self, t: f32, mode: InterpolationMode) -> f32 {
+    |        ^^^^^^^^^^^
+...
+310 |     pub fn update(&mut self, delta_time: f32) {
+    |            ^^^^^^
+...
+324 |     pub fn play(&mut self) {
+    |            ^^^^
+...
+329 |     pub fn pause(&mut self) {
+    |            ^^^^^
+...
+334 |     pub fn stop(&mut self) {
+    |            ^^^^
+...
+340 |     pub fn seek(&mut self, time: f32) {
+    |            ^^^^
+...
+345 |     pub fn set_time(&mut self, time: f32) {
+    |            ^^^^^^^^
+...
+355 |     pub fn get_fractal_value(&self, _name: &str) -> Option<FractalParameters> {
+    |            ^^^^^^^^^^^^^^^^^
+
+warning: enum `AnimationValue` is never used
+   --> src\animation\keyframe.rs:362:10
+    |
+362 | pub enum AnimationValue {
+    |          ^^^^^^^^^^^^^^
+
+warning: function `generate_track_id` is never used
+   --> src\animation\keyframe.rs:370:4
+    |
+370 | fn generate_track_id() -> TrackId {
+    |    ^^^^^^^^^^^^^^^^^
+
+warning: struct `TimelineProject` is never constructed
+  --> src\animation\timeline.rs:12:12
+   |
+12 | pub struct TimelineProject {
+   |            ^^^^^^^^^^^^^^^
+
+warning: struct `TimelineTrack` is never constructed
+  --> src\animation\timeline.rs:23:12
+   |
+23 | pub struct TimelineTrack {
+   |            ^^^^^^^^^^^^^
+
+warning: enum `TimelineTrackType` is never used
+  --> src\animation\timeline.rs:34:10
+   |
+34 | pub enum TimelineTrackType {
+   |          ^^^^^^^^^^^^^^^^^
+
+warning: struct `TimelineKeyframe` is never constructed
+  --> src\animation\timeline.rs:45:12
+   |
+45 | pub struct TimelineKeyframe {
+   |            ^^^^^^^^^^^^^^^^
+
+warning: struct `TimelineSelection` is never constructed
+  --> src\animation\timeline.rs:54:12
+   |
+54 | pub struct TimelineSelection {
+   |            ^^^^^^^^^^^^^^^^^
+
+warning: multiple associated items are never used
+   --> src\animation\timeline.rs:62:12
+    |
+ 60 | impl TimelineProject {
+    | -------------------- associated items in this implementation
+ 61 |     /// Create new timeline project
+ 62 |     pub fn new(name: &str) -> Self {
+    |            ^^^
+...
+ 74 |     pub fn add_track(&mut self, name: &str, track_type: TimelineTrackType, color: [f32; 3])...
+    |            ^^^^^^^^^
+...
+ 97 |     pub fn current_time(&self) -> f32 {
+    |            ^^^^^^^^^^^^
+...
+102 |     pub fn set_current_frame(&mut self, frame: u32) {
+    |            ^^^^^^^^^^^^^^^^^
+...
+108 |     pub fn time_to_frame(&self, time: f32) -> u32 {
+    |            ^^^^^^^^^^^^^
+...
+113 |     pub fn frame_to_time(&self, frame: u32) -> f32 {
+    |            ^^^^^^^^^^^^^
+...
+118 |     pub fn timeline_mut(&mut self) -> &mut Self {
+    |            ^^^^^^^^^^^^
+...
+123 |     pub fn timeline(&self) -> &Self {
+    |            ^^^^^^^^
+...
+128 |     pub fn tracks(&self) -> &[TimelineTrack] {
+    |            ^^^^^^
+...
+133 |     pub fn animation_controller(&self) -> &AnimationController {
+    |            ^^^^^^^^^^^^^^^^^^^^
+...
+138 |     pub fn animation_controller_mut(&mut self) -> &mut AnimationController {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+143 |     pub fn set_current_time(&mut self, time: f32) {
+    |            ^^^^^^^^^^^^^^^^
+...
+149 |     pub fn get_track_keyframes(&self, track_id: TrackId) -> Vec<TimelineKeyframe> {
+    |            ^^^^^^^^^^^^^^^^^^^
+...
+168 |     pub fn add_keyframe(&mut self, track_id: TrackId, time: f32, value: f32, interpolation:...
+    |            ^^^^^^^^^^^^
+...
+178 |     pub fn remove_keyframe(&mut self, track_id: TrackId, keyframe_index: usize) {
+    |            ^^^^^^^^^^^^^^^
+...
+192 |     pub fn update_keyframe(&mut self, track_id: TrackId, keyframe_index: usize, time: f32, ...
+    |            ^^^^^^^^^^^^^^^
+...
+209 |     pub fn play(&mut self) {
+    |            ^^^^
+...
+214 |     pub fn pause(&mut self) {
+    |            ^^^^^
+...
+219 |     pub fn stop(&mut self) {
+    |            ^^^^
+...
+225 |     pub fn step_forward(&mut self) {
+    |            ^^^^^^^^^^^^
+...
+232 |     pub fn step_backward(&mut self) {
+    |            ^^^^^^^^^^^^^
+...
+239 |     pub fn update(&mut self, delta_time: f32) {
+    |            ^^^^^^
+
+warning: struct `TimelineUI` is never constructed
+   --> src\animation\timeline.rs:249:12
+    |
+249 | pub struct TimelineUI;
+    |            ^^^^^^^^^^
+
+warning: associated functions `calculate_visible_range`, `screen_to_time`, `time_to_screen`, `snap_to_frame`, and `get_time_at_mouse` are never used
+   --> src\animation\timeline.rs:253:12
+    |
+251 | impl TimelineUI {
+    | --------------- associated functions in this implementation
+252 |     /// Calculate visible time range for timeline display
+253 |     pub fn calculate_visible_range(current_time: f32, zoom: f32, viewport_width: f32) -> (f...
+    |            ^^^^^^^^^^^^^^^^^^^^^^^
+...
+261 |     pub fn screen_to_time(screen_x: f32, start_time: f32, zoom: f32, timeline_x: f32) -> f32 {
+    |            ^^^^^^^^^^^^^^
+...
+266 |     pub fn time_to_screen(time: f32, start_time: f32, zoom: f32, timeline_x: f32) -> f32 {
+    |            ^^^^^^^^^^^^^^
+...
+271 |     pub fn snap_to_frame(time: f32, frame_rate: f32) -> f32 {
+    |            ^^^^^^^^^^^^^
+...
+277 |     pub fn get_time_at_mouse(mouse_x: f32, timeline_rect: &egui::Rect, visible_start: f32, ...
+    |            ^^^^^^^^^^^^^^^^^
+
+warning: struct `AnimationPresets` is never constructed
+   --> src\animation\timeline.rs:284:12
+    |
+284 | pub struct AnimationPresets;
+    |            ^^^^^^^^^^^^^^^^
+
+warning: associated functions `create_bounce_animation`, `create_elastic_animation`, `create_pulse_animation`, and `create_fractal_morph` are never used
+   --> src\animation\timeline.rs:288:12
+    |
+286 | impl AnimationPresets {
+    | --------------------- associated functions in this implementation
+287 |     /// Create bounce animation
+288 |     pub fn create_bounce_animation(controller: &mut AnimationController, track_id: TrackId) {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^
+...
+297 |     pub fn create_elastic_animation(controller: &mut AnimationController, track_id: TrackId) {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+303 |     pub fn create_pulse_animation(controller: &mut AnimationController, track_id: TrackId, ...
+    |            ^^^^^^^^^^^^^^^^^^^^^^
+...
+314 |     pub fn create_fractal_morph(controller: &mut AnimationController, power_track: TrackId,...
+    |            ^^^^^^^^^^^^^^^^^^^^
+
+warning: enum `ExportError` is never used
+  --> src\export\mod.rs:17:10
+   |
+17 | pub enum ExportError {
+   |          ^^^^^^^^^^^
+
+warning: enum `ExportFormat` is never used
+  --> src\export\mod.rs:57:10
+   |
+57 | pub enum ExportFormat {
+   |          ^^^^^^^^^^^^
+
+warning: struct `ExportSettings` is never constructed
+  --> src\export\mod.rs:70:12
+   |
+70 | pub struct ExportSettings {
+   |            ^^^^^^^^^^^^^^
+
+warning: struct `ImageExporter` is never constructed
+  --> src\export\mod.rs:81:12
+   |
+81 | pub struct ImageExporter;
+   |            ^^^^^^^^^^^^^
+
+warning: associated functions `export_image` and `export_fractal_image` are never used
+   --> src\export\mod.rs:85:12
+    |
+ 83 | impl ImageExporter {
+    | ------------------ associated functions in this implementation
+ 84 |     /// Export RGBA pixel data to image file
+ 85 |     pub fn export_image(
+    |            ^^^^^^^^^^^^
+...
+127 |     pub fn export_fractal_image(
+    |            ^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `VideoExporter` is never constructed
+   --> src\export\mod.rs:157:12
+    |
+157 | pub struct VideoExporter;
+    |            ^^^^^^^^^^^^^
+
+warning: associated function `export_video` is never used
+   --> src\export\mod.rs:161:12
+    |
+159 | impl VideoExporter {
+    | ------------------ associated function in this implementation
+160 |     /// Export animation frames to video
+161 |     pub fn export_video(
+    |            ^^^^^^^^^^^^
+
+warning: struct `MeshExporter` is never constructed
+   --> src\export\mod.rs:191:12
+    |
+191 | pub struct MeshExporter;
+    |            ^^^^^^^^^^^^
+
+warning: associated functions `export_obj`, `export_stl`, and `generate_fractal_mesh` are never used
+   --> src\export\mod.rs:195:12
+    |
+193 | impl MeshExporter {
+    | ----------------- associated functions in this implementation
+194 |     /// Export fractal as OBJ mesh
+195 |     pub fn export_obj(
+    |            ^^^^^^^^^^
+...
+226 |     pub fn export_stl(
+    |            ^^^^^^^^^^
+...
+271 |     pub fn generate_fractal_mesh(
+    |            ^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `AnimationExporter` is never constructed
+   --> src\export\mod.rs:321:12
+    |
+321 | pub struct AnimationExporter;
+    |            ^^^^^^^^^^^^^^^^^
+
+warning: associated functions `export_animation_json` and `export_keyframes_csv` are never used
+   --> src\export\mod.rs:325:12
+    |
+323 | impl AnimationExporter {
+    | ---------------------- associated functions in this implementation
+324 |     /// Export animation data as JSON
+325 |     pub fn export_animation_json(
+    |            ^^^^^^^^^^^^^^^^^^^^^
+...
+341 |     pub fn export_keyframes_csv(
+    |            ^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `Exporter` is never constructed
+   --> src\export\mod.rs:388:12
+    |
+388 | pub struct Exporter;
+    |            ^^^^^^^^
+
+warning: associated functions `export_fractal` and `export_scene` are never used
+   --> src\export\mod.rs:392:12
+    |
+390 | impl Exporter {
+    | ------------- associated functions in this implementation
+391 |     /// Export fractal with given settings
+392 |     pub fn export_fractal(
+    |            ^^^^^^^^^^^^^^
+...
+424 |     pub fn export_scene(
+    |            ^^^^^^^^^^^^
+
+warning: struct `VideoSettings` is never constructed
+  --> src\export\video.rs:12:12
+   |
+12 | pub struct VideoSettings {
+   |            ^^^^^^^^^^^^^
+
+warning: enum `VideoCodec` is never used
+  --> src\export\video.rs:25:10
+   |
+25 | pub enum VideoCodec {
+   |          ^^^^^^^^^^
+
+warning: enum `VideoQuality` is never used
+  --> src\export\video.rs:35:10
+   |
+35 | pub enum VideoQuality {
+   |          ^^^^^^^^^^^^
+
+warning: method `ffmpeg_params` is never used
+  --> src\export\video.rs:44:12
+   |
+42 | impl VideoQuality {
+   | ----------------- method in this implementation
+43 |     /// Get ffmpeg quality parameters
+44 |     pub fn ffmpeg_params(&self) -> (&str, &str) {
+   |            ^^^^^^^^^^^^^
+
+warning: struct `VideoExporter` is never constructed
+  --> src\export\video.rs:55:12
+   |
+55 | pub struct VideoExporter {
+   |            ^^^^^^^^^^^^^
+
+warning: associated items `new`, `add_frame`, `finalize`, `cleanup`, `progress`, and `is_complete` are never used
+   --> src\export\video.rs:63:12
+    |
+ 61 | impl VideoExporter {
+    | ------------------ associated items in this implementation
+ 62 |     /// Create new video exporter
+ 63 |     pub fn new(settings: VideoSettings) -> Result<Self, ExportError> {
+    |            ^^^
+...
+ 75 |     pub fn add_frame(&mut self, pixels: &[u8]) -> Result<(), ExportError> {
+    |            ^^^^^^^^^
+...
+ 93 |     pub fn finalize(&self, output_path: &std::path::Path) -> Result<(), ExportError> {
+    |            ^^^^^^^^
+...
+186 |     fn cleanup(&self) -> Result<(), ExportError> {
+    |        ^^^^^^^
+...
+196 |     pub fn progress(&self) -> f32 {
+    |            ^^^^^^^^
+...
+205 |     pub fn is_complete(&self) -> bool {
+    |            ^^^^^^^^^^^
+
+warning: struct `VideoStreamer` is never constructed
+   --> src\export\video.rs:212:12
+    |
+212 | pub struct VideoStreamer {
+    |            ^^^^^^^^^^^^^
+
+warning: associated items `start_streaming`, `send_frame`, and `stop_streaming` are never used
+   --> src\export\video.rs:219:12
+    |
+217 | impl VideoStreamer {
+    | ------------------ associated items in this implementation
+218 |     /// Start streaming to RTMP endpoint
+219 |     pub fn start_streaming(settings: VideoSettings, rtmp_url: &str) -> Result<Self, ExportE...
+    |            ^^^^^^^^^^^^^^^
+...
+252 |     pub fn send_frame(&mut self, pixels: &[u8]) -> Result<(), ExportError> {
+    |            ^^^^^^^^^^
+...
+264 |     pub fn stop_streaming(&mut self) -> Result<(), ExportError> {
+    |            ^^^^^^^^^^^^^^
+
+warning: struct `VideoFormatValidator` is never constructed
+   --> src\export\video.rs:274:12
+    |
+274 | pub struct VideoFormatValidator;
+    |            ^^^^^^^^^^^^^^^^^^^^
+
+warning: associated functions `check_ffmpeg`, `get_supported_codecs`, `check_codec_support`, and `validate_settings` are never used
+   --> src\export\video.rs:278:12
+    |
+276 | impl VideoFormatValidator {
+    | ------------------------- associated functions in this implementation
+277 |     /// Check if ffmpeg is available
+278 |     pub fn check_ffmpeg() -> bool {
+    |            ^^^^^^^^^^^^
+...
+287 |     pub fn get_supported_codecs() -> Vec<VideoCodec> {
+    |            ^^^^^^^^^^^^^^^^^^^^
+...
+307 |     fn check_codec_support(codec: &str) -> bool {
+    |        ^^^^^^^^^^^^^^^^^^^
+...
+319 |     pub fn validate_settings(settings: &VideoSettings) -> Result<(), String> {
+    |            ^^^^^^^^^^^^^^^^^
+
+warning: struct `VideoPresets` is never constructed
+   --> src\export\video.rs:341:12
+    |
+341 | pub struct VideoPresets;
+    |            ^^^^^^^^^^^^
+
+warning: associated functions `youtube_1080p`, `vimeo_4k`, `instagram_reels`, and `archival_prores` are never used
+   --> src\export\video.rs:345:12
+    |
+343 | impl VideoPresets {
+    | ----------------- associated functions in this implementation
+344 |     /// Create settings for YouTube 1080p
+345 |     pub fn youtube_1080p(duration: f32) -> VideoSettings {
+    |            ^^^^^^^^^^^^^
+...
+359 |     pub fn vimeo_4k(duration: f32) -> VideoSettings {
+    |            ^^^^^^^^
+...
+373 |     pub fn instagram_reels(duration: f32) -> VideoSettings {
+    |            ^^^^^^^^^^^^^^^
+...
+387 |     pub fn archival_prores(duration: f32) -> VideoSettings {
+    |            ^^^^^^^^^^^^^^^
+
+warning: struct `VideoRecorder` is never constructed
+   --> src\export\video.rs:402:12
+    |
+402 | pub struct VideoRecorder {
+    |            ^^^^^^^^^^^^^
+
+warning: associated items `start`, `send_frame`, and `stop` are never used
+   --> src\export\video.rs:413:12
+    |
+411 | impl VideoRecorder {
+    | ------------------ associated items in this implementation
+412 |     /// Start recording to a file using ffmpeg, writing raw RGBA frames via stdin
+413 |     pub fn start(
+    |            ^^^^^
+...
+499 |     pub fn send_frame(&mut self, pixels: &[u8]) -> Result<(), ExportError> {
+    |            ^^^^^^^^^^
+...
+521 |     pub fn stop(&mut self) -> Result<(), ExportError> {
+    |            ^^^^
+
+warning: struct `AnimationExportSettings` is never constructed
+  --> src\export\animation.rs:14:12
+   |
+14 | pub struct AnimationExportSettings {
+   |            ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: enum `AnimationFormat` is never used
+  --> src\export\animation.rs:27:10
+   |
+27 | pub enum AnimationFormat {
+   |          ^^^^^^^^^^^^^^^
+
+warning: enum `ExportFrames` is never used
+  --> src\export\animation.rs:43:10
+   |
+43 | pub enum ExportFrames {
+   |          ^^^^^^^^^^^^
+
+warning: enum `AnimationQuality` is never used
+  --> src\export\animation.rs:51:10
+   |
+51 | pub enum AnimationQuality {
+   |          ^^^^^^^^^^^^^^^^
+
+warning: enum `AnimationCompression` is never used
+  --> src\export\animation.rs:60:10
+   |
+60 | pub enum AnimationCompression {
+   |          ^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `AnimationExportResult` is never constructed
+  --> src\export\animation.rs:71:12
+   |
+71 | pub struct AnimationExportResult {
+   |            ^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `AnimationMetadata` is never constructed
+  --> src\export\animation.rs:79:12
+   |
+79 | pub struct AnimationMetadata {
+   |            ^^^^^^^^^^^^^^^^^
+
+warning: struct `AnimationExporter` is never constructed
+  --> src\export\animation.rs:88:12
+   |
+88 | pub struct AnimationExporter {
+   |            ^^^^^^^^^^^^^^^^^
+
+warning: multiple associated items are never used
+   --> src\export\animation.rs:93:12
+    |
+ 92 | impl AnimationExporter {
+    | ---------------------- associated items in this implementation
+ 93 |     pub fn new(settings: AnimationExportSettings) -> Self {
+    |            ^^^
+...
+ 98 |     pub fn export_animation(&self, project: &TimelineProject, output_path: &str) -> Result<...
+    |            ^^^^^^^^^^^^^^^^
+...
+177 |     fn render_frame(&self, project: &TimelineProject, frame: u32, time: f32, output_path: &...
+    |        ^^^^^^^^^^^^
+...
+194 |     fn render_fractal_frame(&self, params: &Option<FractalParameters>, filename: &str, fram...
+    |        ^^^^^^^^^^^^^^^^^^^^
+...
+225 |     fn calculate_fractal_distance(&self, formula: &crate::fractal::types::FractalFormula, p...
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+253 |     fn distance_to_color(&self, distance: f32, frame: u32) -> [u8; 3] {
+    |        ^^^^^^^^^^^^^^^^^
+...
+265 |     fn extract_keyframes(&self, project: &TimelineProject) -> Vec<(u32, f32)> {
+    |        ^^^^^^^^^^^^^^^^^
+...
+309 |     fn combine_frames_to_video(&self, output_path: &str) -> Result<Vec<String>, Box<dyn std...
+    |        ^^^^^^^^^^^^^^^^^^^^^^^
+...
+336 |     fn create_gif_from_frames(&self, output_path: &str) -> Result<Vec<String>, Box<dyn std:...
+    |        ^^^^^^^^^^^^^^^^^^^^^^
+...
+347 |     fn encode_video_ffmpeg(&self, output_file: &str) -> Result<(), Box<dyn std::error::Erro...
+    |        ^^^^^^^^^^^^^^^^^^^
+...
+355 |     fn export_keyframes_json(&self, project: &TimelineProject, output_path: &str) -> Result...
+    |        ^^^^^^^^^^^^^^^^^^^^^
+...
+371 |     fn export_fbx_animation(&self, _project: &TimelineProject, _output_path: &str) -> Resul...
+    |        ^^^^^^^^^^^^^^^^^^^^
+...
+377 |     fn export_gltf_animation(&self, _project: &TimelineProject, _output_path: &str) -> Resu...
+    |        ^^^^^^^^^^^^^^^^^^^^^
+...
+383 |     fn extract_all_keyframes(&self, project: &TimelineProject) -> serde_json::Value {
+    |        ^^^^^^^^^^^^^^^^^^^^^
+...
+437 |     fn calculate_average_frame_time(&self, frame_count: u32) -> f32 {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+443 |     fn calculate_total_render_time(&self, frame_count: u32) -> f32 {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+448 |     fn calculate_total_file_size(&self, files: &[String]) -> f32 {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: field `iterations` is never read
+  --> src\benchmark.rs:15:9
+   |
+12 | pub struct BenchmarkResult {
+   |            --------------- field in this struct
+...
+15 |     pub iterations: u32,
+   |         ^^^^^^^^^^
+   |
+   = note: `BenchmarkResult` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: field `peak_memory_usage` is never read
+   --> src\benchmark.rs:309:9
+    |
+305 | pub struct BenchmarkSummary {
+    |            ---------------- field in this struct
+...
+309 |     pub peak_memory_usage: Option<u64>,
+    |         ^^^^^^^^^^^^^^^^^
+    |
+    = note: `BenchmarkSummary` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: variants `ComputationError` and `MemoryError` are never constructed
+   --> src\benchmark.rs:370:5
+    |
+368 | pub enum BenchmarkError {
+    |          -------------- variants in this enum
+369 |     ThreadError,
+370 |     ComputationError(String),
+    |     ^^^^^^^^^^^^^^^^
+371 |     MemoryError(String),
+    |     ^^^^^^^^^^^
+    |
+    = note: `BenchmarkError` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: `modular-fractal-shader` (bin "complex-fractal-validation") generated 1 warning (run `cargo fix --bin "complex-fractal-validation"` to apply 1 suggestion)
+warning: `modular-fractal-shader` (bin "fractal-snapshot") generated 1 warning (run `cargo fix --bin "fractal-snapshot"` to apply 1 suggestion)
+warning: `modular-fractal-shader` (bin "fractal-generator") generated 156 warnings (23 duplicates) (run `cargo fix --bin "fractal-generator"` to apply 5 suggestions)
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `modular_fractal_shader`
+ --> src\bin\mesh_export.rs:6:5
+  |
+6 | use modular_fractal_shader::export::MeshExporter;
+  |     ^^^^^^^^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `modular_fractal_shader`
+  |
+  = help: if you wanted to use a crate named `modular_fractal_shader`, use `cargo add modular_fractal_shader` to add it to your `Cargo.toml`
+
+For more information about this error, try `rustc --explain E0433`.
+error: could not compile `modular-fractal-shader` (bin "mesh_export") due to 1 previous error

@@ -126,7 +126,13 @@ impl GestureController {
 
     /// Update gesture data from Leap Motion
     pub fn update_from_leap_motion(&self, frame_data: LeapFrameData) {
-        let mut data = self.gesture_data.lock().unwrap();
+        let mut data = match self.gesture_data.lock() {
+            Ok(guard) => guard,
+            Err(_poison) => {
+                log::error!("GestureData mutex poisoned in update_from_leap_motion; skipping frame");
+                return;
+            }
+        };
         data.hand_positions.clear();
         
         // Convert Leap Motion data to our format
@@ -160,7 +166,13 @@ impl GestureController {
 
     /// Update gesture data from MediaPipe
     pub fn update_from_mediapipe(&self, landmarks: MediaPipeLandmarks) {
-        let mut data = self.gesture_data.lock().unwrap();
+        let mut data = match self.gesture_data.lock() {
+            Ok(guard) => guard,
+            Err(_poison) => {
+                log::error!("GestureData mutex poisoned in update_from_mediapipe; skipping frame");
+                return;
+            }
+        };
         data.hand_positions.clear();
         
         // Convert MediaPipe data to our format
@@ -277,7 +289,13 @@ impl GestureController {
     /// Get parameter value based on gesture
     pub fn get_parameter(&self, name: &str) -> f32 {
         // Get gesture data
-        let data = self.gesture_data.lock().unwrap();
+        let data = match self.gesture_data.lock() {
+            Ok(guard) => guard,
+            Err(_poison) => {
+                log::error!("GestureData mutex poisoned in get_parameter; returning default");
+                return 0.0;
+            }
+        };
         
         // Check if we have a mapping for this parameter
         for (_, mapping) in &self.parameter_mappings {

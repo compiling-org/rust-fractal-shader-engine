@@ -2,7 +2,7 @@
 //!
 //! This module defines the core types used throughout the fractal generation system.
 
-use nalgebra::{Matrix4, Vector3, Vector4};
+use nalgebra::Vector3;
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
@@ -172,6 +172,63 @@ impl Default for QualitySettings {
             shadow_quality: 1,
             reflection_quality: 1,
             refraction_quality: 1,
+        }
+    }
+}
+
+/// Predefined rendering quality presets
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum QualityPreset {
+    Low,
+    Medium,
+    High,
+    Ultra,
+}
+
+impl QualityPreset {
+    /// Convert a preset to concrete `QualitySettings`, using a base resolution.
+    pub fn to_settings(self, base_resolution: [u32; 2]) -> QualitySettings {
+        match self {
+            QualityPreset::Low => QualitySettings {
+                resolution: [base_resolution[0] / 2, base_resolution[1] / 2],
+                anti_aliasing: 1,
+                max_iterations: 64,
+                distance_threshold: 0.0020,
+                normal_epsilon: 0.0020,
+                shadow_quality: 0,
+                reflection_quality: 0,
+                refraction_quality: 0,
+            },
+            QualityPreset::Medium => QualitySettings {
+                resolution: [base_resolution[0] * 3 / 4, base_resolution[1] * 3 / 4],
+                anti_aliasing: 1,
+                max_iterations: 100,
+                distance_threshold: 0.0015,
+                normal_epsilon: 0.0015,
+                shadow_quality: 1,
+                reflection_quality: 1,
+                refraction_quality: 1,
+            },
+            QualityPreset::High => QualitySettings {
+                resolution: base_resolution,
+                anti_aliasing: 2,
+                max_iterations: 200,
+                distance_threshold: 0.0010,
+                normal_epsilon: 0.0010,
+                shadow_quality: 2,
+                reflection_quality: 2,
+                refraction_quality: 2,
+            },
+            QualityPreset::Ultra => QualitySettings {
+                resolution: base_resolution,
+                anti_aliasing: 4,
+                max_iterations: 300,
+                distance_threshold: 0.0005,
+                normal_epsilon: 0.0005,
+                shadow_quality: 3,
+                reflection_quality: 3,
+                refraction_quality: 3,
+            },
         }
     }
 }

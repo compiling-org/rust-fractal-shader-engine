@@ -238,7 +238,7 @@ impl AnimationTrack {
                 if t == 0.0 {
                     0.0
                 } else {
-                    (2.0_f32.powf(10.0 * t - 10.0))
+                    2.0_f32.powf(10.0 * t - 10.0)
                 }
             }
         }

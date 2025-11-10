@@ -27,6 +27,8 @@ pub mod fractal;
 pub mod project;
 pub mod scene;
 pub mod animation;
+pub mod export;
+pub mod metrics;
 
 // Web deployment module (only compiled for WASM targets)
 #[cfg(target_arch = "wasm32")]
@@ -251,49 +253,10 @@ impl ShaderConverter {
         Ok(hlsl_source)
     }
 
-    /// Convert ISF shader to WGSL (improved version)
+    /// Convert ISF shader to WGSL (advanced fractal-aware)
     pub fn isf_to_wgsl(isf_source: &str) -> Result<String, Box<dyn std::error::Error>> {
-        let mut wgsl_source = String::new();
-
-        // Add WGSL header
-        wgsl_source.push_str("@group(0) @binding(0) var<uniform> time: f32;\n");
-        wgsl_source.push_str("@group(0) @binding(1) var<uniform> resolution: vec2<f32>;\n");
-        wgsl_source.push_str("@group(0) @binding(2) var input_texture: texture_2d<f32>;\n");
-        wgsl_source.push_str("@group(0) @binding(3) var texture_sampler: sampler;\n\n");
-
-        wgsl_source.push_str("@fragment\n");
-        wgsl_source.push_str("fn main(@builtin(position) coord: vec4<f32>) -> @location(0) vec4<f32> {\n");
-        wgsl_source.push_str("    let uv = coord.xy / resolution;\n");
-
-        // Extract the main function body from ISF shader
-        let body_start = isf_source.find("void main() {").unwrap_or(0) + 12;
-        let body_end = isf_source.rfind("}").unwrap_or(isf_source.len());
-        let body = &isf_source[body_start..body_end];
-
-        // Convert GLSL syntax to WGSL
-        let converted_body = body
-            .replace("vec2", "vec2<f32>")
-            .replace("vec3", "vec3<f32>")
-            .replace("vec4", "vec4<f32>")
-            .replace("float", "f32")
-            .replace("int", "i32")
-            .replace("bool", "bool")
-            .replace("mat2", "mat2x2<f32>")
-            .replace("mat3", "mat3x3<f32>")
-            .replace("mat4", "mat4x4<f32>")
-            .replace("gl_FragCoord.xy", "coord.xy")
-            .replace("gl_FragColor", "return")
-            .replace("RENDERSIZE.xy", "resolution")
-            .replace("RENDERSIZE.y", "resolution.y")
-            .replace("TIME", "time")
-            .replace("IMG_PIXEL(inputTex, ", "textureSample(input_texture, texture_sampler, ")
-            .replace("mod(", "f32(")
-            .replace("pmod(", "f32(");
-
-        wgsl_source.push_str(&converted_body);
-        wgsl_source.push_str("}\n");
-
-        Ok(wgsl_source)
+        // Delegate to the advanced converter in shader_converter.rs to keep behavior consistent
+        crate::shader_converter::BatchShaderConverter::convert_isf_to_wgsl(isf_source)
     }
 
     /// Convert between shader formats

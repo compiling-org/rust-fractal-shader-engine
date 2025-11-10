@@ -1,0 +1,71 @@
+{
+  "device_name": "NVIDIA GeForce RTX 3070 Ti Laptop GPU",
+  "backend": "Vulkan",
+  "cases": [
+    [
+      "mandelbrot",
+      {
+        "width": 1024,
+        "height": 768,
+        "nonblack_ratio": 0.19224167,
+        "luminance_mean": 0.4907876,
+        "luminance_stddev": 0.98987556,
+        "edge_mean": 0.041421812,
+        "elapsed_ms": 18.0912,
+        "pass": false
+      }
+    ],
+    [
+      "julia",
+      {
+        "width": 1024,
+        "height": 768,
+        "nonblack_ratio": 0.31604132,
+        "luminance_mean": 0.7848492,
+        "luminance_stddev": 1.1543496,
+        "edge_mean": 0.011768148,
+        "elapsed_ms": 3.7538,
+        "pass": false
+      }
+    ],
+    [
+      "mandelbulb",
+      {
+        "width": 1024,
+        "height": 768,
+        "nonblack_ratio": 0.945179,
+        "luminance_mean": 65.34561,
+        "luminance_stddev": 35.658966,
+        "edge_mean": 2.5415187,
+        "elapsed_ms": 11.8168,
+        "pass": true
+      }
+    ],
+    [
+      "mandelbox",
+      {
+        "width": 1024,
+        "height": 768,
+        "nonblack_ratio": 0.9880562,
+        "luminance_mean": 68.45328,
+        "luminance_stddev": 32.43809,
+        "edge_mean": 19.758131,
+        "elapsed_ms": 92.9548,
+        "pass": true
+      }
+    ],
+    [
+      "quaternion_julia",
+      {
+        "width": 1024,
+        "height": 768,
+        "nonblack_ratio": 1.0,
+        "luminance_mean": 57.784264,
+        "luminance_stddev": 13.736728,
+        "edge_mean": 0.07297819,
+        "elapsed_ms": 2.7076000000000002,
+        "pass": false
+      }
+    ]
+  ]
+}

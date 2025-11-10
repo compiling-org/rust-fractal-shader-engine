@@ -52,18 +52,25 @@ pub fn update_fractal_shaders(
     midi_controller: Option<Res<crate::audio::MidiController>>,
     windows: Query<&Window>,
 ) {
-    let window = windows.single().unwrap();
+    // Safely obtain the primary window; fall back to defaults if not present
+    if let Some(window) = windows.iter().next() {
+        // Update time and resolution
+        shader_uniforms.buffer.time = time.elapsed_secs();
+        shader_uniforms.buffer.resolution = [window.width(), window.height()];
 
-    // Update time and resolution
-    shader_uniforms.buffer.time = time.elapsed_secs();
-    shader_uniforms.buffer.resolution = [window.width(), window.height()];
-
-    // Update mouse position (normalized)
-    if let Some(cursor_pos) = window.cursor_position() {
-        shader_uniforms.buffer.mouse = [
-            cursor_pos.x / window.width(),
-            1.0 - (cursor_pos.y / window.height()), // Flip Y coordinate
-        ];
+        // Update mouse position (normalized)
+        if let Some(cursor_pos) = window.cursor_position() {
+            shader_uniforms.buffer.mouse = [
+                cursor_pos.x / window.width(),
+                1.0 - (cursor_pos.y / window.height()), // Flip Y coordinate
+            ];
+        }
+    } else {
+        // No window available yet; keep time updated and use sane defaults
+        shader_uniforms.buffer.time = time.elapsed_secs();
+        shader_uniforms.buffer.resolution = [1280.0, 720.0];
+        shader_uniforms.buffer.mouse = [0.5, 0.5];
+        log::warn!("No primary Window found; using default resolution and mouse");
     }
 
     // Update audio data

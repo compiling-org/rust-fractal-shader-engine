@@ -4,8 +4,9 @@
 //! scene objects, and material properties.
 
 use std::collections::HashMap;
-use nalgebra::{Vector3, Vector4, Scalar};
+use nalgebra::{Vector3, Vector4};
 use serde::{Deserialize, Serialize};
+use crate::fractal::types::FractalParameters;
 
 /// Unique identifier for animation tracks
 pub type TrackId = u64;
@@ -338,6 +339,21 @@ impl AnimationController {
     /// Seek to specific time
     pub fn seek(&mut self, time: f32) {
         self.current_time = time.clamp(0.0, self.duration);
+    }
+
+    /// Directly set current time, clamping/looping to duration
+    pub fn set_time(&mut self, time: f32) {
+        if self.loop_animation {
+            self.current_time = if self.duration > 0.0 { time % self.duration } else { 0.0 };
+        } else {
+            self.current_time = if self.duration > 0.0 { time.min(self.duration) } else { 0.0 };
+        }
+    }
+
+    /// Adapter: get fractal parameters for a named target.
+    /// Placeholder to satisfy exporter API; returns None until wired to actual fractal tracks.
+    pub fn get_fractal_value(&self, _name: &str) -> Option<FractalParameters> {
+        None
     }
 }
 

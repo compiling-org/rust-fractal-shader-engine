@@ -4,9 +4,9 @@
 //! for use in video editing software and other 3D applications.
 
 use crate::animation::timeline::*;
+use crate::animation::keyframe::AnimationTrackType;
 use crate::fractal::types::FractalParameters;
 use nalgebra::Vector3;
-use std::collections::HashMap;
 
 /// Animation export settings
 #[derive(Debug, Clone)]
@@ -191,7 +191,9 @@ impl AnimationExporter {
 
     /// Render a single fractal frame
     fn render_fractal_frame(&self, params: &Option<FractalParameters>, filename: &str, frame: u32) -> Result<(), Box<dyn std::error::Error>> {
-        let fractal_params = params.as_ref().unwrap_or(&FractalParameters::default());
+        // Avoid borrowing a temporary by binding a default value
+        let default_params = FractalParameters::default();
+        let fractal_params = params.as_ref().unwrap_or(&default_params);
         let (width, height) = (self.settings.resolution[0], self.settings.resolution[1]);
 
         // Create image buffer
@@ -224,7 +226,7 @@ impl AnimationExporter {
         // For now, simplified implementation
         match formula {
             crate::fractal::types::FractalFormula::Mandelbulb { power, .. } => {
-                let r = point.magnitude();
+                let r = point.norm();
                 if r == 0.0 { return 0.0; }
                 
                 let theta = (point.z / r).acos();
@@ -240,9 +242,9 @@ impl AnimationExporter {
                     new_r * new_theta.cos(),
                 );
                 
-                (z_new - point).magnitude()
+                (z_new - point).norm()
             }
-            _ => point.magnitude() - 1.0, // Simple sphere as fallback
+            _ => point.norm() - 1.0, // Simple sphere as fallback
         }
     }
 
@@ -265,14 +267,32 @@ impl AnimationExporter {
 
         // Extract keyframes from all tracks
         for track in project.timeline().tracks() {
-            let animation_track = project.animation_controller()
-                .fractal_tracks()
-                .find(|t| t.name() == track.name);
-            
-            if let Some(anim_track) = animation_track {
-                for keyframe in anim_track.keyframes() {
-                    let frame = (keyframe.time * frame_rate) as u32;
-                    keyframes.push((frame, keyframe.time));
+            if let Some(track_type) = project.animation_controller().tracks.get(&track.id) {
+                match track_type {
+                    AnimationTrackType::Float(t) => {
+                        for kf in &t.keyframes {
+                            let frame = (kf.time * frame_rate) as u32;
+                            keyframes.push((frame, kf.time));
+                        }
+                    }
+                    AnimationTrackType::Vec3(t) => {
+                        for kf in &t.keyframes {
+                            let frame = (kf.time * frame_rate) as u32;
+                            keyframes.push((frame, kf.time));
+                        }
+                    }
+                    AnimationTrackType::Vec4(t) => {
+                        for kf in &t.keyframes {
+                            let frame = (kf.time * frame_rate) as u32;
+                            keyframes.push((frame, kf.time));
+                        }
+                    }
+                    AnimationTrackType::Color(t) => {
+                        for kf in &t.keyframes {
+                            let frame = (kf.time * frame_rate) as u32;
+                            keyframes.push((frame, kf.time));
+                        }
+                    }
                 }
             }
         }
@@ -363,18 +383,48 @@ impl AnimationExporter {
         let mut keyframes_data = Vec::new();
 
         for track in project.timeline().tracks() {
-            let animation_track = project.animation_controller()
-                .fractal_tracks()
-                .find(|t| t.name() == track.name);
-            
-            if let Some(anim_track) = animation_track {
-                for keyframe in anim_track.keyframes() {
-                    keyframes_data.push(serde_json::json!({
-                        "track": track.name,
-                        "time": keyframe.time,
-                        "value": keyframe.value,
-                        "easing": format!("{:?}", keyframe.easing)
-                    }));
+            if let Some(track_type) = project.animation_controller().tracks.get(&track.id) {
+                match track_type {
+                    AnimationTrackType::Float(t) => {
+                        for kf in &t.keyframes {
+                            keyframes_data.push(serde_json::json!({
+                                "track": track.name,
+                                "time": kf.time,
+                                "value": kf.value,
+                                "easing": format!("{:?}", kf.interpolation)
+                            }));
+                        }
+                    }
+                    AnimationTrackType::Vec3(t) => {
+                        for kf in &t.keyframes {
+                            keyframes_data.push(serde_json::json!({
+                                "track": track.name,
+                                "time": kf.time,
+                                "value": [kf.value.x, kf.value.y, kf.value.z],
+                                "easing": format!("{:?}", kf.interpolation)
+                            }));
+                        }
+                    }
+                    AnimationTrackType::Vec4(t) => {
+                        for kf in &t.keyframes {
+                            keyframes_data.push(serde_json::json!({
+                                "track": track.name,
+                                "time": kf.time,
+                                "value": [kf.value.x, kf.value.y, kf.value.z, kf.value.w],
+                                "easing": format!("{:?}", kf.interpolation)
+                            }));
+                        }
+                    }
+                    AnimationTrackType::Color(t) => {
+                        for kf in &t.keyframes {
+                            keyframes_data.push(serde_json::json!({
+                                "track": track.name,
+                                "time": kf.time,
+                                "value": [kf.value.x, kf.value.y, kf.value.z],
+                                "easing": format!("{:?}", kf.interpolation)
+                            }));
+                        }
+                    }
                 }
             }
         }
@@ -420,13 +470,4 @@ impl Default for AnimationExportSettings {
     }
 }
 
-/// Extension trait for AnimationController to expose fractal_tracks
-trait FractalTracksExt {
-    fn fractal_tracks(&self) -> &[crate::animation::keyframe::AnimationTrack<crate::fractal::types::FractalParameters>];
-}
-
-impl FractalTracksExt for crate::animation::keyframe::AnimationController {
-    fn fractal_tracks(&self) -> &[crate::animation::keyframe::AnimationTrack<crate::fractal::types::FractalParameters>] {
-        &self.fractal_tracks
-    }
-}
+// Removed unsupported extension trait; exporter now reads from AnimationController::tracks HashMap

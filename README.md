@@ -120,6 +120,47 @@ cargo build --release
 
 All documents are living and must be updated at each sprint and release.
 
+## ⚠️ GPU-Only Policy (Non-Negotiable)
+
+- This application must never run without a real GPU device. There is no CPU fallback for the GUI path.
+- Startup enforces a fail-fast watchdog: if `RenderDevice` is not available shortly after launch, the app aborts with a clear error.
+- Mandatory environment configuration before running:
+  - Windows: set `WGPU_BACKEND=vulkan,dx12`, `WGPU_POWER_PREF=high`, `WGPU_DX12_COMPILER=fxc`
+  - macOS: set `WGPU_BACKEND=metal`, `WGPU_POWER_PREF=high`
+  - Linux: set `WGPU_BACKEND=vulkan`, `WGPU_POWER_PREF=high`
+- Development and CI must use machines with a discrete GPU and up-to-date drivers. Do not attempt to run or validate GUI features on CPU-only hosts.
+
+### Required Run Commands
+
+- PowerShell (Windows):
+
+```
+$env:WGPU_BACKEND = 'vulkan,dx12'
+$env:WGPU_POWER_PREF = 'high'
+$env:WGPU_DX12_COMPILER = 'fxc'
+cargo run --features gui
+```
+
+- Git Bash (Windows):
+
+```
+export WGPU_BACKEND='vulkan,dx12'
+export WGPU_POWER_PREF='high'
+export WGPU_DX12_COMPILER='fxc'
+cargo run --features gui
+```
+
+- macOS/Linux:
+
+```
+export WGPU_BACKEND='metal'   # macOS
+export WGPU_BACKEND='vulkan'  # Linux
+export WGPU_POWER_PREF='high'
+cargo run --features gui
+```
+
+If the app exits with a message about “GPU device not available — GPU-only policy enforced,” verify drivers and backend selection.
+
 ### Docs-First Workflow (Required)
 
 - Every code change must update relevant docs in the same PR.
@@ -155,6 +196,23 @@ cargo run -- test
 # Build for web deployment
 cargo run --features web
 ```
+
+### Fragment Pseudo‑3D Mode (Experimental)
+The fragment pipeline enables ShaderToy/ShadPlay‑style iteration using a fullscreen fragment shader that raymarches a Mandelbox‑style SDF. It’s great for fast iteration and pseudo‑3D decorative geometries.
+
+- Switch to the `Rendering` workspace.
+- In the left `Render Settings` panel, enable `Fragment Pseudo‑3D Mode`.
+- The viewport will render via the fragment raymarcher. Toggle off to return to the compute + post‑process path.
+
+Key parameters affecting fragment visuals:
+- `scale` (Mandelbox scale)
+- `bailout` (ray exit distance)
+- `max_iterations` (distance estimator iterations)
+- `FOV` (camera field of view; default 60°)
+
+Notes:
+- The fragment renderer prioritizes interactive iteration; for more structured multi‑stage pipelines, use the default compute path.
+- Future updates will add orbit/pitch camera controls and shader hot‑reload.
 
 ### Node Editor Demo
 ```bash

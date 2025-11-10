@@ -14,6 +14,11 @@ Create the world's most powerful and intuitive fractal generation studio, combin
 - ✅ GPU-accelerated distance estimation with WGPU
 - ✅ Advanced 3D camera navigation
 - ✅ Professional lighting and materials system
+ 
+## Cross-References
+- See `docs/ADVANCED_SUITE_REQUIREMENTS.md` for module-by-module acceptance criteria.
+- See `docs/GAP_ASSESSMENT.md` for Present/Partial/Missing status across the suite.
+- See `docs/REALTIME_3D_ENGINE_PLAN.md` for the real-time renderer loop, WGSL interface, and performance targets.
 
 ### 2. Node-Based Visual Programming
 **Goal**: Provide an intuitive node-based interface for composing complex fractal systems, similar to Houdini or TouchDesigner.
@@ -51,6 +56,26 @@ Create the world's most powerful and intuitive fractal generation studio, combin
 - ✅ 3D mesh export (OBJ, STL)
 - ⏳ Animation sequence export
 - ⏳ NFT minting integration
+
+#### 5.a 3D Fractal File Export (Explicit Goal)
+**Goal**: Export fractals as 3D files suitable for DCC pipelines and 3D printing.
+
+**Supported/Planned Formats**
+- ✅ OBJ, ✅ STL (mesh)
+- ⏳ FBX, ⏳ glTF (mesh + animation)
+- ⏳ VOX, ⏳ QUB (voxel)
+
+**Acceptance Criteria**
+- Mesh exports load in Blender/Maya with correct scale and orientation.
+- Vertex normals are coherent; no flipped/shaded artifacts on typical scenes.
+- Topology is manifold for STL; non-manifold triangles flagged and optionally repaired.
+- Bounds and density reflect export settings; reasonable vertex count at default quality.
+- Voxel exports open in MagicaVoxel; resolution and palette preserved where applicable.
+
+**Cross-References**
+- Code: `src/export/mod.rs`, `src/export/mesh.rs`, `src/export/formats.rs`, `src/export/voxel.rs`
+- UI: `src/ui/fractal_ui.rs::FractalExportDialog`
+- Roadmap: `docs/FEATURE_DEVELOPMENT_ROADMAP.md` (Phase 6: Export System Enhancement)
 
 ## Feature Areas - Detailed Tracking
 
@@ -195,3 +220,11 @@ Create the world's most powerful and intuitive fractal generation studio, combin
 - ✅ Improved GPU resource management
 - ✅ Enhanced fractal rendering performance
 - ✅ Fixed compilation warnings and errors
+## GPU-Only Principle (Non-Negotiable)
+
+- The GUI application must never run without a real GPU device.
+- No CPU fallback is permitted for the GUI; startup aborts early when WGPU adapter/device is unavailable.
+- Backend configuration is mandatory: enforce `WGPU_BACKEND` and `WGPU_POWER_PREF` per platform; use `WGPU_DX12_COMPILER=fxc` on Windows.
+- Logs must surface adapter/backend selection and device features at startup.
+
+Rationale: This product is fundamentally a GPU/3D application. Allowing non-GPU execution creates false positives, wastes time, and breaks user trust.

@@ -41,6 +41,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+use std::error::Error;
 
 /// Main project structure for Fractal Studio
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -122,7 +123,7 @@ impl FractalStudioProject {
                 author: whoami::username(),
                 tags: Vec::new(),
             },
-            scene: crate::scene::Scene::new(name),
+            scene: crate::scene::Scene::create_default_scene(),
             animation_controller: crate::animation::AnimationController::new(),
             node_graph: crate::nodes::NodeGraph::new(),
             assets: Vec::new(),
@@ -149,6 +150,14 @@ impl FractalStudioProject {
         let json = std::fs::read_to_string(path)?;
         let project: FractalStudioProject = serde_json::from_str(&json)?;
         Ok(project)
+    }
+
+    /// Load project and return a validation report alongside the project
+    pub fn load_from_file_with_report(path: &Path) -> Result<(Self, ProjectValidationReport), Box<dyn Error>> {
+        let json = std::fs::read_to_string(path)?;
+        let project: FractalStudioProject = serde_json::from_str(&json)?;
+        let report = project.validate();
+        Ok((project, report))
     }
     
     /// Update modification timestamp
@@ -216,5 +225,89 @@ impl FractalStudioProject {
 impl Default for FractalStudioProject {
     fn default() -> Self {
         Self::new("Untitled Project")
+    }
+}
+
+/// Validation severity levels
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ValidationLevel {
+    Error,
+    Warning,
+    Info,
+}
+
+/// A single validation issue
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ValidationIssue {
+    pub level: ValidationLevel,
+    pub message: String,
+}
+
+/// A validation report for a project
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectValidationReport {
+    pub issues: Vec<ValidationIssue>,
+}
+
+impl ProjectValidationReport {
+    pub fn counts(&self) -> (usize, usize, usize) {
+        let mut e = 0; let mut w = 0; let mut i = 0;
+        for issue in &self.issues { match issue.level { ValidationLevel::Error => e += 1, ValidationLevel::Warning => w += 1, ValidationLevel::Info => i += 1 } }
+        (e, w, i)
+    }
+    pub fn has_errors(&self) -> bool { self.issues.iter().any(|iss| matches!(iss.level, ValidationLevel::Error)) }
+}
+
+impl FractalStudioProject {
+    /// Validate project schema and runtime expectations; returns issues rather than failing
+    pub fn validate(&self) -> ProjectValidationReport {
+        let mut issues: Vec<ValidationIssue> = Vec::new();
+
+        // Version presence and basic compatibility
+        if self.version.trim().is_empty() {
+            issues.push(ValidationIssue { level: ValidationLevel::Warning, message: "Project version is missing".to_string() });
+        } else {
+            let build_version = env!("CARGO_PKG_VERSION");
+            let build_major_minor = build_version.split('.').take(2).collect::<Vec<_>>().join(".");
+            let proj_major_minor = self.version.split('.').take(2).collect::<Vec<_>>().join(".");
+            if build_major_minor != proj_major_minor {
+                issues.push(ValidationIssue { level: ValidationLevel::Info, message: format!("Project version ({}) differs from app ({})", self.version, build_version) });
+            }
+        }
+
+        // Metadata timestamps
+        if chrono::DateTime::parse_from_rfc3339(&self.metadata.created_at).is_err() {
+            issues.push(ValidationIssue { level: ValidationLevel::Warning, message: "Invalid created_at timestamp (expected ISO 8601)".to_string() });
+        }
+        if chrono::DateTime::parse_from_rfc3339(&self.metadata.modified_at).is_err() {
+            issues.push(ValidationIssue { level: ValidationLevel::Warning, message: "Invalid modified_at timestamp (expected ISO 8601)".to_string() });
+        }
+
+        // Scene sanity checks
+        if self.scene.objects.is_empty() {
+            issues.push(ValidationIssue { level: ValidationLevel::Info, message: "Scene contains no objects".to_string() });
+        }
+        if let Some(cam_id) = self.scene.active_camera_id {
+            if !self.scene.objects.contains_key(&cam_id) {
+                issues.push(ValidationIssue { level: ValidationLevel::Warning, message: "Active camera ID not found in scene objects".to_string() });
+            }
+        }
+
+        // Asset references
+        for path in &self.assets {
+            if path.trim().is_empty() { continue; }
+            if std::path::Path::new(path).exists() {
+                // ok
+            } else {
+                issues.push(ValidationIssue { level: ValidationLevel::Warning, message: format!("Missing asset: {}", path) });
+            }
+        }
+
+        // Export settings
+        if self.export_settings.export_directory.trim().is_empty() {
+            issues.push(ValidationIssue { level: ValidationLevel::Warning, message: "Export directory is empty".to_string() });
+        }
+
+        ProjectValidationReport { issues }
     }
 }

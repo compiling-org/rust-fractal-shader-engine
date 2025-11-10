@@ -16,13 +16,22 @@ use fractal_generator_lib::fractal::types::FractalParameters;
 
 fn main() {
     // Set up panic hook for better error reporting
+    fn safe_eprintln(msg: &str) {
+        use std::io::Write;
+        let _ = writeln!(std::io::stderr(), "{}", msg);
+    }
+    fn safe_println(msg: &str) {
+        use std::io::Write;
+        let _ = writeln!(std::io::stdout(), "{}", msg);
+    }
     std::panic::set_hook(Box::new(|panic_info| {
-        eprintln!("❌ Application panicked: {}", panic_info);
-        eprintln!("This might be related to the known Bevy 0.17 + bevy_egui focus issue.");
-        eprintln!("Try running with RUST_BACKTRACE=1 for more detailed information.");
-        
+        // Avoid panicking on closed pipes by using safe writes
+        safe_eprintln(&format!("❌ Application panicked: {}", panic_info));
+        safe_eprintln("This might be related to the known Bevy 0.17 + bevy_egui focus issue.");
+        safe_eprintln("Try running with RUST_BACKTRACE=1 for more detailed information.");
         // Try to save any unsaved work here if possible
-        eprintln!("Attempting to save current state...");
+        safe_eprintln("Attempting to save current state...");
+        let _ = std::fs::write("last_panic.log", format!("{}", panic_info));
     }));
 
     // Initialize logger so info/warn/error from the app are visible
@@ -36,15 +45,15 @@ fn main() {
     if args.len() > 1 {
         match args[1].as_str() {
             "benchmark" => {
-                println!("🧪 Running performance benchmarks...");
+                safe_println("🧪 Running performance benchmarks...");
                 if let Err(e) = benchmark::run_benchmark() {
-                    eprintln!("Benchmark failed: {}", e);
+                    safe_eprintln(&format!("Benchmark failed: {}", e));
                     std::process::exit(1);
                 }
                 return;
             }
             "test" => {
-                println!("🧪 Running cross-platform compatibility tests...");
+                safe_println("🧪 Running cross-platform compatibility tests...");
                 run_compatibility_tests();
                 return;
             }
@@ -52,53 +61,53 @@ fn main() {
         }
     }
 
-    println!("🌀 Modular Fractal Shader - Professional Fractal Generator");
-    println!("========================================================");
-    println!();
-    println!("Features:");
-    println!("  ✨ Real-time fractal generation (Mandelbrot, Mandelbulb, Mandelbox, IFS)");
-    println!("  🎨 Node-based visual programming interface");
-    println!("  🎬 Professional keyframe animation system");
-    println!("  🌐 3D scene environment with fractal objects");
-    println!("  📦 Export to OBJ, FBX, glTF, and voxel formats");
-    println!("  🎵 Audio-reactive parameter control");
-    println!("  🎭 Gesture control support (Leap Motion/MediaPipe)");
-    println!("  🎨 Physically-based materials and lighting");
-    println!("  📊 Real-time performance monitoring");
-    println!("  🎪 Volumetric rendering and atmospheric effects");
-    println!("  🔗 NFT minting with Filecoin + NEAR blockchain");
-    println!("  🌐 Web deployment with WASM");
-    println!();
-    println!("Usage:");
-    println!("  cargo run                    # Start GUI application");
-    println!("  cargo run -- benchmark       # Run performance benchmarks");
-    println!("  cargo run -- test           # Run compatibility tests");
-    println!("  cargo run --features web     # Build for web deployment");
-    println!();
-    println!("Controls:");
-    println!("  - Node Editor: Drag nodes to create fractal compositions");
-    println!("  - Parameters: Adjust fractal properties in real-time");
-    println!("  - Animation: Keyframe complex parameter animations");
-    println!("  - Export: Generate 3D meshes and animations");
-    println!("  - NFT: Mint fractal art as blockchain NFTs");
-    println!();
+    safe_println("🌀 Modular Fractal Shader - Professional Fractal Generator");
+    safe_println("========================================================");
+    safe_println("");
+    safe_println("Features:");
+    safe_println("  ✨ Real-time fractal generation (Mandelbrot, Mandelbulb, Mandelbox, IFS)");
+    safe_println("  🎨 Node-based visual programming interface");
+    safe_println("  🎬 Professional keyframe animation system");
+    safe_println("  🌐 3D scene environment with fractal objects");
+    safe_println("  📦 Export to OBJ, FBX, glTF, and voxel formats");
+    safe_println("  🎵 Audio-reactive parameter control");
+    safe_println("  🎭 Gesture control support (Leap Motion/MediaPipe)");
+    safe_println("  🎨 Physically-based materials and lighting");
+    safe_println("  📊 Real-time performance monitoring");
+    safe_println("  🎪 Volumetric rendering and atmospheric effects");
+    safe_println("  🔗 NFT minting with Filecoin + NEAR blockchain");
+    safe_println("  🌐 Web deployment with WASM");
+    safe_println("");
+    safe_println("Usage:");
+    safe_println("  cargo run                    # Start GUI application");
+    safe_println("  cargo run -- benchmark       # Run performance benchmarks");
+    safe_println("  cargo run -- test           # Run compatibility tests");
+    safe_println("  cargo run --features web     # Build for web deployment");
+    safe_println("");
+    safe_println("Controls:");
+    safe_println("  - Node Editor: Drag nodes to create fractal compositions");
+    safe_println("  - Parameters: Adjust fractal properties in real-time");
+    safe_println("  - Animation: Keyframe complex parameter animations");
+    safe_println("  - Export: Generate 3D meshes and animations");
+    safe_println("  - NFT: Mint fractal art as blockchain NFTs");
+    safe_println("");
 
     #[cfg(feature = "gui")]
     {
-        println!("🚀 Starting GUI application...");
+        safe_println("🚀 Starting GUI application...");
         match std::panic::catch_unwind(|| gui::run_gui()) {
             Ok(Ok(())) => {
-                println!("✅ GUI application exited normally");
+                safe_println("✅ GUI application exited normally");
             },
             Ok(Err(e)) => {
-                eprintln!("❌ Failed to start GUI: {}", e);
+                safe_eprintln(&format!("❌ Failed to start GUI: {}", e));
                 std::process::exit(1);
             },
             Err(panic_info) => {
-                eprintln!("❌ GUI application panicked: {:?}", panic_info);
-                eprintln!("This is likely the known Bevy 0.17 + bevy_egui focus issue.");
-                eprintln!("The application may have exited when the window lost/gained focus.");
-                eprintln!("Try running with RUST_BACKTRACE=1 for more detailed information.");
+                safe_eprintln(&format!("❌ GUI application panicked: {:?}", panic_info));
+                safe_eprintln("This is likely the known Bevy 0.17 + bevy_egui focus issue.");
+                safe_eprintln("The application may have exited when the window lost/gained focus.");
+                safe_eprintln("Try running with RUST_BACKTRACE=1 for more detailed information.");
                 std::process::exit(1);
             }
         }
@@ -106,33 +115,36 @@ fn main() {
 
     #[cfg(not(feature = "gui"))]
     {
-        println!("❌ GUI not available - build with: cargo run --features gui");
-        println!("💡 For web deployment: cargo run --features web");
-        println!("💡 For benchmarks: cargo run -- benchmark");
+        safe_println("❌ GUI not available - build with: cargo run --features gui");
+        safe_println("💡 For web deployment: cargo run --features web");
+        safe_println("💡 For benchmarks: cargo run -- benchmark");
         std::process::exit(1);
     }
 }
 
 /// Run cross-platform compatibility tests
 fn run_compatibility_tests() {
-    println!("🖥️  Running cross-platform compatibility tests...");
+    use std::io::Write;
+    let mut out = std::io::stdout();
+    let mut err = std::io::stderr();
+    let _ = writeln!(out, "🖥️  Running cross-platform compatibility tests...");
 
     // Test system information
-    println!("  📊 System Information:");
-    println!("    OS: {}", std::env::consts::OS);
-    println!("    Architecture: {}", std::env::consts::ARCH);
-    println!("    CPU Cores: {}", num_cpus::get());
+    let _ = writeln!(out, "  📊 System Information:");
+    let _ = writeln!(out, "    OS: {}", std::env::consts::OS);
+    let _ = writeln!(out, "    Architecture: {}", std::env::consts::ARCH);
+    let _ = writeln!(out, "    CPU Cores: {}", num_cpus::get());
 
     // Test memory allocation
-    println!("  🧠 Memory Test:");
+    let _ = writeln!(out, "  🧠 Memory Test:");
     let mut test_vec = Vec::with_capacity(1000000);
     for i in 0..1000000 {
         test_vec.push(i as f32);
     }
-    println!("    Allocated {} MB successfully", test_vec.len() * 4 / 1024 / 1024);
+    let _ = writeln!(out, "    Allocated {} MB successfully", test_vec.len() * 4 / 1024 / 1024);
 
     // Test fractal computation
-    println!("  🌀 Fractal Computation Test:");
+    let _ = writeln!(out, "  🌀 Fractal Computation Test:");
     #[cfg(feature = "gui")]
     let params = fractal_generator_lib::fractal::types::FractalParameters::default();
     let start = std::time::Instant::now();
@@ -156,22 +168,22 @@ fn run_compatibility_tests() {
     }
 
     let duration = start.elapsed();
-    println!("    1000 fractal computations: {:.2}ms", duration.as_millis());
+    let _ = writeln!(out, "    1000 fractal computations: {:.2}ms", duration.as_millis());
 
     // Test file I/O
-    println!("  📁 File I/O Test:");
+    let _ = writeln!(out, "  📁 File I/O Test:");
     let test_file = "test_compatibility.tmp";
     if std::fs::write(test_file, "compatibility test").is_ok() {
         if std::fs::read(test_file).is_ok() {
             let _ = std::fs::remove_file(test_file);
-            println!("    File I/O operations: ✅");
+            let _ = writeln!(out, "    File I/O operations: ✅");
         }
     } else {
-        println!("    File I/O operations: ❌");
+        let _ = writeln!(out, "    File I/O operations: ❌");
     }
 
     // Test threading
-    println!("  ⚡ Threading Test:");
+    let _ = writeln!(out, "  ⚡ Threading Test:");
     let handles: Vec<_> = (0..4).map(|i| {
         std::thread::spawn(move || {
             format!("Thread {} completed", i)
@@ -180,9 +192,9 @@ fn run_compatibility_tests() {
 
     for handle in handles {
         if let Ok(msg) = handle.join() {
-            println!("    {}", msg);
+            let _ = writeln!(out, "    {}", msg);
         }
     }
 
-    println!("✅ Cross-platform compatibility tests completed!");
+    let _ = writeln!(out, "✅ Cross-platform compatibility tests completed!");
 }

@@ -159,8 +159,38 @@ pub fn run_gui() -> Result<(), Box<dyn std::error::Error>> {
         buf.push('\n');
     };
     log(&mut gpu_log, "Starting Bevy application with bevy_egui...".to_string());
+    // Windows backend selection + fallback
+    // Goal: pick a working backend and avoid DX12 push-constant crash (wgpu#5683).
+    #[cfg(target_os = "windows")]
+    {
+        let backend_env = std::env::var("WGPU_BACKEND").ok();
+        if backend_env.is_none() {
+            let instance = wgpu::Instance::default();
+            let vulkan_adapters = instance.enumerate_adapters(wgpu::Backends::VULKAN);
+            let dx12_adapters = instance.enumerate_adapters(wgpu::Backends::DX12);
+
+            if !vulkan_adapters.is_empty() {
+                std::env::set_var("WGPU_BACKEND", "vulkan");
+                log(&mut gpu_log, "Selected backend: Vulkan (detected adapters)".to_string());
+            } else if !dx12_adapters.is_empty() {
+                std::env::set_var("WGPU_BACKEND", "dx12");
+                // Prefer DXC to avoid HLSL push-constant translation issues.
+                if std::env::var("WGPU_DX12_COMPILER").is_err() {
+                    std::env::set_var("WGPU_DX12_COMPILER", "dxc");
+                }
+                log(&mut gpu_log, "Selected backend: DX12 (no Vulkan). Using DXC compiler.".to_string());
+            } else {
+                // Last resort: GL (ANGLE) for very limited environments
+                std::env::set_var("WGPU_BACKEND", "gl");
+                log(&mut gpu_log, "Selected backend: GL (no Vulkan/DX12 adapters found)".to_string());
+            }
+        } else {
+            log(&mut gpu_log, format!("Backend preset via env: {}", backend_env.unwrap()));
+        }
+    }
     // GPU policy: "discrete_only" or "prefer_discrete" (default)
-    let gpu_policy = std::env::var("GPU_POLICY").unwrap_or_else(|_| "discrete_only".into());
+    // Default to prefer_discrete to avoid hard-failing on systems without a discrete GPU.
+    let gpu_policy = std::env::var("GPU_POLICY").unwrap_or_else(|_| "prefer_discrete".into());
     // Configure WGPU via environment variables before the renderer starts.
     // Force NVIDIA RTX selection: pick discrete NVIDIA adapter and set backend + adapter name.
     // This ensures Bevy/wgpu binds to the RTX GPU, not integrated.
@@ -168,9 +198,9 @@ pub fn run_gui() -> Result<(), Box<dyn std::error::Error>> {
         let instance = wgpu::Instance::default();
         let mut chosen_backend: Option<&'static str> = None;
         let mut chosen_name: Option<String> = None;
-        // Prefer DX12 for NVIDIA on Windows, fallback to Vulkan elsewhere
+        // Prefer Vulkan first on Windows to avoid DX12 push-constant crash
         #[cfg(target_os = "windows")]
-        let search_order = [wgpu::Backends::DX12, wgpu::Backends::VULKAN];
+        let search_order = [wgpu::Backends::VULKAN, wgpu::Backends::DX12];
         #[cfg(not(target_os = "windows"))]
         let search_order = [wgpu::Backends::VULKAN];
 
@@ -190,17 +220,10 @@ pub fn run_gui() -> Result<(), Box<dyn std::error::Error>> {
         if let Some(name) = chosen_name {
             std::env::set_var("WGPU_ADAPTER_NAME", name);
         }
-        // Lock Vulkan on Windows to avoid DX12 driver/compiler instability
-        #[cfg(target_os = "windows")]
-        {
-            std::env::set_var("WGPU_BACKEND", "vulkan");
-        }
-        #[cfg(not(target_os = "windows"))]
-        {
+        // Only set BACKEND from enumeration if env is not already set
+        if std::env::var("WGPU_BACKEND").is_err() {
             if let Some(backend) = chosen_backend {
                 std::env::set_var("WGPU_BACKEND", backend);
-            } else {
-                std::env::set_var("WGPU_BACKEND", "vulkan");
             }
         }
     }
@@ -221,12 +244,11 @@ pub fn run_gui() -> Result<(), Box<dyn std::error::Error>> {
         gpu_policy,
     ));
 
-    // Preflight: ensure a discrete GPU is present (and preferred) before starting Bevy.
-    // If none is found, fail fast per the GPU-only policy requested.
+    // Preflight: enumerate adapters and prefer discrete, but do not hard-fail unless policy requires.
     {
         let instance = wgpu::Instance::default();
-        // Enumerate available adapters across common backends
-        let backends = wgpu::Backends::VULKAN | wgpu::Backends::DX12;
+        // Enumerate available adapters across common backends, including GL as a fallback
+        let backends = wgpu::Backends::VULKAN | wgpu::Backends::DX12 | wgpu::Backends::GL;
         let adapters = instance.enumerate_adapters(backends);
         let mut has_discrete = false;
         let mut has_any_gpu = false;
@@ -246,7 +268,7 @@ pub fn run_gui() -> Result<(), Box<dyn std::error::Error>> {
             // Treat any NVIDIA adapter as acceptable for discrete-only policy
             if info.device_type == wgpu::DeviceType::DiscreteGpu || info.vendor == 0x10DE {
                 has_discrete = true;
-                break;
+                // Do not break here; continue to list all adapters for diagnostics
             }
         }
         // Persist the GPU startup diagnostics immediately after enumeration
@@ -257,9 +279,9 @@ pub fn run_gui() -> Result<(), Box<dyn std::error::Error>> {
                 return Err("No discrete GPU available — GPU-only policy enforced".into());
             } else {
                 if has_any_gpu {
-                    log(&mut gpu_log, "Warning: No discrete GPU found; proceeding with available adapter (integrated). Set GPU_POLICY=discrete_only to enforce.".to_string());
+                    log(&mut gpu_log, "Warning: No discrete GPU found; proceeding with available adapter (integrated/GL). Set GPU_POLICY=discrete_only to enforce.".to_string());
                 } else {
-                    eprintln!("Fatal: No GPU adapters detected at all. Check drivers and backend.");
+                    eprintln!("Fatal: No GPU adapters detected at all across Vulkan/DX12/GL. Check drivers and backend.");
                     return Err("No GPU adapters detected".into());
                 }
             }
@@ -438,55 +460,9 @@ fn update(
     camera_state: Res<CameraState>,
     mut images: ResMut<Assets<Image>>,
     primary_window_q: Query<&Window, With<PrimaryWindow>>, 
-    egui_query: Query<Entity, (With<EguiContext>, With<PrimaryEguiContext>)>,
  ) {
-    // Obtain the egui context; will error if not initialised yet
-    if !has_primary_egui_ctx(egui_query) {
-        // Egui context not available yet for this pass
-        return;
-    }
-    {
-        let ctx = match egui_contexts.ctx_mut() {
-            Ok(ctx) => ctx,
-            Err(_) => {
-                // Skip this frame if egui context retrieval fails
-                return;
-            }
-        };
-
-    // Skip the very first frame to avoid egui lifecycle race conditions
-    if ui_run_state.frames_since_start == 0 {
-        ui_run_state.frames_since_start += 1;
-        if ui_run_state.readback_every_n == 0 { ui_run_state.readback_every_n = 10; }
-        return;
-    }
-
-    // Proceed with UI even if window focus info is unavailable.
-    // Focus handling is kept for camera maintenance only.
-    // Process OSC messages safely
-    osc_resource.system.process_messages();
-
-    // Get current audio data
-    let audio_data = audio_midi.system.get_audio_data();
-
-    // Frame metrics: start
-    app_state.app.metrics.start_frame();
-
-    // Update the main application with all control data
-        app_state.app.update(
-            &ctx,
-            Some(&audio_data),
-            Some(&mut audio_midi.system.midi_controller),
-            Some(&mut osc_resource.system.controller),
-            Some(&mut gesture_resource.controller),
-        );
-
-    // Frame metrics: end and periodic logging
-        app_state.app.metrics.end_frame();
-        app_state.app.metrics.maybe_log();
-    }
-
-    // Ensure a Bevy Image exists and is registered with egui for viewport display
+    // Ensure a Bevy Image exists and is registered with egui BEFORE drawing the viewport
+    // so FractalStudioApp::show_fractal_viewport can paint with a valid TextureId.
     let mut width = app_state.app.last_viewport_resolution[0];
     let mut height = app_state.app.last_viewport_resolution[1];
 
@@ -523,7 +499,7 @@ fn update(
             use wgpu::{Extent3d, TextureDimension, TextureFormat};
             let extent = Extent3d { width, height, depth_or_array_layers: 1 };
             let pixel_count = (width as usize) * (height as usize) * 4;
-            let mut image = Image::new(
+            let image = Image::new(
                 extent,
                 TextureDimension::D2,
                 vec![0u8; pixel_count],
@@ -536,8 +512,47 @@ fn update(
             // Register with egui contexts as a user texture (strong handle)
             let tex_id = egui_contexts.add_image(bevy_egui::EguiTextureHandle::Strong(handle.clone()));
             app_state.app.viewport_texture = Some(tex_id);
+            log::info!("Registered viewport texture with egui: {}x{}", width, height);
         }
+    }
 
+    // Obtain the egui context directly in the primary context pass
+    {
+        let ctx = match egui_contexts.ctx_mut() {
+            Ok(ctx) => ctx,
+            Err(_) => return,
+        };
+
+    // Skip the very first frame to avoid egui lifecycle race conditions
+    if ui_run_state.frames_since_start == 0 {
+        ui_run_state.frames_since_start += 1;
+        if ui_run_state.readback_every_n == 0 { ui_run_state.readback_every_n = 10; }
+        return;
+    }
+
+    // Proceed with UI even if window focus info is unavailable.
+    // Focus handling is kept for camera maintenance only.
+    // Process OSC messages safely
+    osc_resource.system.process_messages();
+
+    // Get current audio data
+    let audio_data = audio_midi.system.get_audio_data();
+
+    // Frame metrics: start
+    app_state.app.metrics.start_frame();
+
+    // Update the main application with all control data
+        app_state.app.update(
+            &ctx,
+            Some(&audio_data),
+            Some(&mut audio_midi.system.midi_controller),
+            Some(&mut osc_resource.system.controller),
+            Some(&mut gesture_resource.controller),
+        );
+
+    // Frame metrics: end and periodic logging
+        app_state.app.metrics.end_frame();
+        app_state.app.metrics.maybe_log();
         // Temporary population via CPU readback until GPU copy pipeline is added
         let maybe_handle = app_state.app.viewport_image_handle.clone();
         let current_time = app_state.app.time;
@@ -572,43 +587,15 @@ fn update(
                 }
             }
         } else {
-            log::warn!("FractalRenderer missing; WGPU may not be initialized yet");
-            // Populate a simple debug gradient once so the viewport shows something
-            if let Some(handle) = maybe_handle {
-                if let Some(img) = images.get_mut(&handle) {
-                    let w = width as usize; let h = height as usize;
-                    let mut buf = vec![0u8; w*h*4];
-                    for y in 0..h { for x in 0..w {
-                        let i = (y*w + x)*4;
-                        buf[i] = ((x as f32 / w as f32) * 255.0) as u8;          // R
-                        buf[i+1] = ((y as f32 / h as f32) * 255.0) as u8;        // G
-                        buf[i+2] = 64;                                            // B
-                        buf[i+3] = 255;                                           // A
-                    }}
-                    img.data = Some(buf);
-                }
-            }
+            // GPU-only policy: do not populate CPU fallback imagery.
+            // The viewport panel will draw a placeholder until the renderer is ready.
+            log::warn!("FractalRenderer missing; GPU renderer not initialized yet; skipping CPU fallback");
         }
 
-        // Draw the viewport texture inside a dedicated egui window with a debug overlay
-        if let Some(tex_id) = app_state.app.viewport_texture {
-            let ctx = match egui_contexts.ctx_mut() {
-                Ok(ctx) => ctx,
-                Err(_) => return,
-            };
-            egui::Window::new("Viewport").default_pos(egui::pos2(12.0, 12.0)).show(&ctx, |ui| {
-                ui.label(format!(
-                    "{}x{} | renderer={} | readback_every={} frames",
-                    width,
-                    height,
-                    app_state.app.fractal_renderer.is_some(),
-                    ui_run_state.readback_every_n
-                ));
-                let size = egui::Vec2::new(width as f32, height as f32);
-                let sized = egui::load::SizedTexture { id: tex_id, size };
-                ui.image(egui::ImageSource::Texture(sized));
-            });
-        } else {
+        // Viewport drawing now happens inside FractalStudioApp::show_fractal_viewport
+        // via the central panel. Avoid duplicating an extra window here to reduce
+        // potential egui lifecycle races and UI contention.
+        if app_state.app.viewport_texture.is_none() {
             log::warn!("Viewport texture not registered with egui yet");
         }
     }

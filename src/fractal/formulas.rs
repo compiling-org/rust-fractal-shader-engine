@@ -4,7 +4,7 @@
 //! and distance estimation functions for various mathematical sets.
 
 use super::types::*;
-use nalgebra::{Matrix4, Vector3, Vector4};
+use nalgebra::{Matrix4, Vector3};
 
 /// Collection of predefined fractal formulas
 pub struct FractalFormulaLibrary {

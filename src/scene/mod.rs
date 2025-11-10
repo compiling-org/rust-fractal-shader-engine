@@ -3,7 +3,7 @@
 //! This module handles 3D scene objects, hierarchies, transformations,
 //! and scene graph management for fractal visualization.
 
-use nalgebra::{Matrix4, Vector3, Vector4, UnitQuaternion};
+use nalgebra::{Matrix4, Vector3, UnitQuaternion};
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
@@ -231,7 +231,7 @@ impl Scene {
     }
 
     /// Add object to scene
-    pub fn add_object(&mut self, mut object: SceneObject) -> ObjectId {
+    pub fn add_object(&mut self, object: SceneObject) -> ObjectId {
         let id = object.id;
         self.objects.insert(id, object);
         id

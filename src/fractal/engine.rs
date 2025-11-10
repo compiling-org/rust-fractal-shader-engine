@@ -42,6 +42,15 @@ impl FractalEngine {
     /// Set quality settings
     pub fn set_quality_settings(&mut self, settings: QualitySettings) {
         self.quality_settings = settings;
+        // Keep parameters aligned with quality settings where relevant
+        self.parameters.max_iterations = self.quality_settings.max_iterations;
+    }
+
+    /// Apply a predefined quality preset using current or provided base resolution
+    pub fn apply_quality_preset(&mut self, preset: QualityPreset, base_resolution: Option<[u32; 2]>) {
+        let base = base_resolution.unwrap_or(self.quality_settings.resolution);
+        let settings = preset.to_settings(base);
+        self.set_quality_settings(settings);
     }
 
     /// Get stats reference

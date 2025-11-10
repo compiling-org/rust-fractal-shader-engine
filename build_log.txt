@@ -1,4 +1,11 @@
-   Compiling modular-fractal-shader v0.1.0 (C:\Users\vdmo-live\Documents\Dev\rust-fractal-shader\rust-fractal-shader-engine)
+﻿cargo :    Compiling modular-fractal-shader v0.1.0 (C:\Users\kapil\compiling\modular-fractal-shader)
+At line:1 char:1
++ cargo build --features gui 2>&1 | Out-File -FilePath build_log.txt -E ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (   Compiling mo...fractal-shader):String) [], RemoteEx 
+   ception
+    + FullyQualifiedErrorId : NativeCommandError
+ 
 warning: unused import: `bevy_egui::EguiContexts`
  --> src\ui\main.rs:7:5
   |
@@ -22,8 +29,10 @@ warning: unused imports: `Primitive` and `Rgba`
 warning: unused imports: `Align2`, `FontFamily`, `Id`, `ScrollArea`, `Sense`, and `Shape`
  --> src\ui\node_editor.rs:6:88
   |
-6 | ...e, Painter, Stroke, FontId, RichText, FontFamily, Shape, Sense, Id, Rounding, Align2, ScrollArea};
-  |                                          ^^^^^^^^^^  ^^^^^  ^^^^^  ^^            ^^^^^^  ^^^^^^^^^^
+6 | ...e, Painter, Stroke, FontId, RichText, FontFamily, Shape, Sense, Id, Rounding, Align2, 
+ScrollArea};
+  |                                          ^^^^^^^^^^  ^^^^^  ^^^^^  ^^            ^^^^^^  
+^^^^^^^^^^
 
 warning: unused import: `crate::nodes::*`
  --> src\node_editor.rs:3:5
@@ -80,10 +89,54 @@ help: remove these parentheses
 241 +                     2.0_f32.powf(10.0 * t - 10.0)
     |
 
+warning: unused import: `std::collections::HashMap`
+  --> src\export\animation.rs:10:5
+   |
+10 | use std::collections::HashMap;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: variant `PNG_Sequence` should have an upper camel case name
+  --> src\export\animation.rs:33:5
+   |
+33 |     PNG_Sequence,
+   |     ^^^^^^^^^^^^ help: convert the identifier to upper camel case: `PngSequence`
+   |
+   = note: `#[warn(non_camel_case_types)]` on by default
+
+warning: variant `JPEG_Sequence` should have an upper camel case name
+  --> src\export\animation.rs:34:5
+   |
+34 |     JPEG_Sequence,
+   |     ^^^^^^^^^^^^^ help: convert the identifier to upper camel case: `JpegSequence`
+
+warning: variant `TIFF_Sequence` should have an upper camel case name
+  --> src\export\animation.rs:35:5
+   |
+35 |     TIFF_Sequence,
+   |     ^^^^^^^^^^^^^ help: convert the identifier to upper camel case: `TiffSequence`
+
+warning: variant `JSON_Keyframes` should have an upper camel case name
+  --> src\export\animation.rs:36:5
+   |
+36 |     JSON_Keyframes,
+   |     ^^^^^^^^^^^^^^ help: convert the identifier to upper camel case: `JsonKeyframes`
+
+warning: variant `FBX_Animation` should have an upper camel case name
+  --> src\export\animation.rs:37:5
+   |
+37 |     FBX_Animation,
+   |     ^^^^^^^^^^^^^ help: convert the identifier to upper camel case: `FbxAnimation`
+
+warning: variant `GLTF_Animation` should have an upper camel case name
+  --> src\export\animation.rs:38:5
+   |
+38 |     GLTF_Animation,
+   |     ^^^^^^^^^^^^^^ help: convert the identifier to upper camel case: `GltfAnimation`
+
 warning: use of deprecated function `egui::menu::bar`: Use `egui::MenuBar::new().ui(` instead
-   --> src\ui\main.rs:199:21
+   --> src\ui\main.rs:218:21
     |
-199 |         egui::menu::bar(ui, |ui| {
+218 |         egui::menu::bar(ui, |ui| {
     |                     ^^^
     |
     = note: `#[warn(deprecated)]` on by default
@@ -97,8 +150,10 @@ warning: use of deprecated type alias `egui::Rounding`: Renamed to CornerRadius
 warning: use of deprecated type alias `egui::Rounding`: Renamed to CornerRadius
  --> src\ui\node_editor.rs:6:118
   |
-6 | use egui::{Color32, Pos2, Vec2, Rect, Ui, Response, Painter, Stroke, FontId, RichText, FontFamily, Shape, Sense, Id, Rounding, Align2, Sc...
-  |                                                                                                                      ^^^^^^^^
+6 | use egui::{Color32, Pos2, Vec2, Rect, Ui, Response, Painter, Stroke, FontId, RichText, 
+FontFamily, Shape, Sense, Id, Rounding, Align2, Sc...
+  |                                                                                                 
+                     ^^^^^^^^
 
 warning: use of deprecated type alias `egui::Rounding`: Renamed to CornerRadius
    --> src\ui\node_editor.rs:401:40
@@ -106,44 +161,158 @@ warning: use of deprecated type alias `egui::Rounding`: Renamed to CornerRadius
 401 |         painter.rect_filled(node_rect, Rounding::same(8), bg_color);
     |                                        ^^^^^^^^
 
-error[E0277]: the trait bound `SizedTexture: From<egui::TextureId>` is not satisfied
-    --> src\ui\main.rs:1248:57
+warning: use of deprecated method `egui::Ui::allocate_new_ui`: Use `scope_builder` instead
+    --> src\ui\main.rs:1935:12
      |
-1248 | ...                   ui.add(egui::Image::new(tex_id).fit_to_exact_size(preview_size));
-     |                              ---------------- ^^^^^^ the trait `From<egui::TextureId>` is not implemented for `SizedTexture`
-     |                              |
-     |                              required by a bound introduced by this call
-     |
-     = help: the following other types implement trait `From<T>`:
-               `SizedTexture` implements `From<&TextureHandle>`
-               `SizedTexture` implements `From<(egui::TextureId, egui::Vec2)>`
-     = note: required for `egui::TextureId` to implement `Into<SizedTexture>`
-     = note: required for `ImageSource<'_>` to implement `From<egui::TextureId>`
-     = note: 1 redundant requirement hidden
-     = note: required for `egui::TextureId` to implement `Into<ImageSource<'_>>`
-note: required by a bound in `egui::Image::<'a>::new`
-    --> C:\Users\vdmo-live\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\egui-0.32.3\src\widgets\image.rs:63:29
-     |
-  63 |     pub fn new(source: impl Into<ImageSource<'a>>) -> Self {
-     |                             ^^^^^^^^^^^^^^^^^^^^^ required by this bound in `Image::<'a>::new`
+1935 |         ui.allocate_new_ui(timeline_rect, egui::UiBuilder::default(), |ui| {
+     |            ^^^^^^^^^^^^^^^
 
-warning: use of deprecated method `egui::Ui::allocate_ui_at_rect`: Use `allocate_new_ui` instead
-    --> src\ui\main.rs:1657:12
+error[E0277]: expected a `FnOnce(&mut Ui)` closure, found `UiBuilder`
+    --> src\ui\main.rs:1935:43
      |
-1657 |         ui.allocate_ui_at_rect(timeline_rect, |ui| {
-     |            ^^^^^^^^^^^^^^^^^^^
+1935 |         ui.allocate_new_ui(timeline_rect, egui::UiBuilder::default(), |ui| {
+     |            ---------------                ^^^^^^^^^^^^^^^^^^^^^^^^^^ expected an 
+`FnOnce(&mut Ui)` closure, found `UiBuilder`
+     |            |
+     |            required by a bound introduced by this call
+     |
+     = help: the trait `for<'a> FnOnce(&'a mut Ui)` is not implemented for `UiBuilder`
+note: required by a bound in `Ui::allocate_new_ui`
+    --> 
+C:\Users\kapil\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\egui-0.32.3\src\ui.rs:1539:28
+     |
+1536 |     pub fn allocate_new_ui<R>(
+     |            --------------- required by a bound in this associated function
+...
+1539 |         add_contents: impl FnOnce(&mut Self) -> R,
+     |                            ^^^^^^^^^^^^^^^^^^^^^^ required by this bound in 
+`Ui::allocate_new_ui`
 
-warning: use of deprecated method `egui::Ui::allocate_ui_at_rect`: Use `allocate_new_ui` instead
-    --> src\ui\main.rs:1746:12
+error[E0061]: this method takes 2 arguments but 3 arguments were supplied
+    --> src\ui\main.rs:1935:12
      |
-1746 |         ui.allocate_ui_at_rect(spectrum_rect, |ui| {
-     |            ^^^^^^^^^^^^^^^^^^^
+1935 |           ui.allocate_new_ui(timeline_rect, egui::UiBuilder::default(), |ui| {
+     |  ____________^^^^^^^^^^^^^^^_-------------______________________________-
+     | |                            |
+     | |                            expected `UiBuilder`, found `Rect`
+1936 | |             let painter = ui.painter();
+...    |
+1966 | |         });
+     | |_________- unexpected argument #3
+     |
+note: method defined here
+    --> 
+C:\Users\kapil\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\egui-0.32.3\src\ui.rs:1536:12
+     |
+1536 |     pub fn allocate_new_ui<R>(
+     |            ^^^^^^^^^^^^^^^
+help: remove the extra argument
+     |
+1935 -         ui.allocate_new_ui(timeline_rect, egui::UiBuilder::default(), |ui| {
+1935 +         ui.allocate_new_ui(/* UiBuilder */, egui::UiBuilder::default());
+     |
 
-warning: use of deprecated method `egui::Ui::allocate_ui_at_rect`: Use `allocate_new_ui` instead
-    --> src\ui\main.rs:1785:12
+warning: use of deprecated method `egui::Ui::allocate_new_ui`: Use `scope_builder` instead
+    --> src\ui\main.rs:2024:12
      |
-1785 |         ui.allocate_ui_at_rect(waveform_rect, |ui| {
-     |            ^^^^^^^^^^^^^^^^^^^
+2024 |         ui.allocate_new_ui(spectrum_rect, egui::UiBuilder::default(), |ui| {
+     |            ^^^^^^^^^^^^^^^
+
+error[E0277]: expected a `FnOnce(&mut Ui)` closure, found `UiBuilder`
+    --> src\ui\main.rs:2024:43
+     |
+2024 |         ui.allocate_new_ui(spectrum_rect, egui::UiBuilder::default(), |ui| {
+     |            ---------------                ^^^^^^^^^^^^^^^^^^^^^^^^^^ expected an 
+`FnOnce(&mut Ui)` closure, found `UiBuilder`
+     |            |
+     |            required by a bound introduced by this call
+     |
+     = help: the trait `for<'a> FnOnce(&'a mut Ui)` is not implemented for `UiBuilder`
+note: required by a bound in `Ui::allocate_new_ui`
+    --> 
+C:\Users\kapil\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\egui-0.32.3\src\ui.rs:1539:28
+     |
+1536 |     pub fn allocate_new_ui<R>(
+     |            --------------- required by a bound in this associated function
+...
+1539 |         add_contents: impl FnOnce(&mut Self) -> R,
+     |                            ^^^^^^^^^^^^^^^^^^^^^^ required by this bound in 
+`Ui::allocate_new_ui`
+
+error[E0061]: this method takes 2 arguments but 3 arguments were supplied
+    --> src\ui\main.rs:2024:12
+     |
+2024 |           ui.allocate_new_ui(spectrum_rect, egui::UiBuilder::default(), |ui| {
+     |  ____________^^^^^^^^^^^^^^^_-------------______________________________-
+     | |                            |
+     | |                            expected `UiBuilder`, found `Rect`
+2025 | |             let painter = ui.painter();
+...    |
+2050 | |         });
+     | |_________- unexpected argument #3
+     |
+note: method defined here
+    --> 
+C:\Users\kapil\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\egui-0.32.3\src\ui.rs:1536:12
+     |
+1536 |     pub fn allocate_new_ui<R>(
+     |            ^^^^^^^^^^^^^^^
+help: remove the extra argument
+     |
+2024 -         ui.allocate_new_ui(spectrum_rect, egui::UiBuilder::default(), |ui| {
+2024 +         ui.allocate_new_ui(/* UiBuilder */, egui::UiBuilder::default());
+     |
+
+warning: use of deprecated method `egui::Ui::allocate_new_ui`: Use `scope_builder` instead
+    --> src\ui\main.rs:2063:12
+     |
+2063 |         ui.allocate_new_ui(waveform_rect, egui::UiBuilder::default(), |ui| {
+     |            ^^^^^^^^^^^^^^^
+
+error[E0277]: expected a `FnOnce(&mut Ui)` closure, found `UiBuilder`
+    --> src\ui\main.rs:2063:43
+     |
+2063 |         ui.allocate_new_ui(waveform_rect, egui::UiBuilder::default(), |ui| {
+     |            ---------------                ^^^^^^^^^^^^^^^^^^^^^^^^^^ expected an 
+`FnOnce(&mut Ui)` closure, found `UiBuilder`
+     |            |
+     |            required by a bound introduced by this call
+     |
+     = help: the trait `for<'a> FnOnce(&'a mut Ui)` is not implemented for `UiBuilder`
+note: required by a bound in `Ui::allocate_new_ui`
+    --> 
+C:\Users\kapil\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\egui-0.32.3\src\ui.rs:1539:28
+     |
+1536 |     pub fn allocate_new_ui<R>(
+     |            --------------- required by a bound in this associated function
+...
+1539 |         add_contents: impl FnOnce(&mut Self) -> R,
+     |                            ^^^^^^^^^^^^^^^^^^^^^^ required by this bound in 
+`Ui::allocate_new_ui`
+
+error[E0061]: this method takes 2 arguments but 3 arguments were supplied
+    --> src\ui\main.rs:2063:12
+     |
+2063 |           ui.allocate_new_ui(waveform_rect, egui::UiBuilder::default(), |ui| {
+     |  ____________^^^^^^^^^^^^^^^_-------------______________________________-
+     | |                            |
+     | |                            expected `UiBuilder`, found `Rect`
+2064 | |             let painter = ui.painter();
+...    |
+2089 | |         });
+     | |_________- unexpected argument #3
+     |
+note: method defined here
+    --> 
+C:\Users\kapil\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\egui-0.32.3\src\ui.rs:1536:12
+     |
+1536 |     pub fn allocate_new_ui<R>(
+     |            ^^^^^^^^^^^^^^^
+help: remove the extra argument
+     |
+2063 -         ui.allocate_new_ui(waveform_rect, egui::UiBuilder::default(), |ui| {
+2063 +         ui.allocate_new_ui(/* UiBuilder */, egui::UiBuilder::default());
+     |
 
 warning: variable does not need to be mutable
    --> src\osc.rs:294:13
@@ -155,13 +324,33 @@ warning: variable does not need to be mutable
     |
     = note: `#[warn(unused_mut)]` on by default
 
+warning: unused variable: `renderer`
+    --> src\ui\main.rs:1031:41
+     |
+1031 | ...                   if let Some(renderer) = &self.fractal_renderer {
+     |                                   ^^^^^^^^ help: if this is intentional, prefix it with an 
+underscore: `_renderer`
+     |
+     = note: `#[warn(unused_variables)]` on by default
+
+error[E0502]: cannot borrow `*self` as immutable because it is also borrowed as mutable
+    --> src\ui\main.rs:1691:44
+     |
+1637 |             if let Some(renderer) = &mut self.fractal_renderer {
+     |                                     -------------------------- mutable borrow occurs here
+...
+1691 |                                 let name = self.selected_fractal_name();
+     |                                            ^^^^ immutable borrow occurs here
+...
+1701 |                                 match renderer.render_image_readback(self.time, (width, 
+height)) {
+     |                                       -------- mutable borrow later used here
+
 warning: unused variable: `config`
    --> src\ui\theme.rs:589:13
     |
 589 |         let config = &theme.effects.glassmorphism;
     |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_config`
-    |
-    = note: `#[warn(unused_variables)]` on by default
 
 warning: unused variable: `theme`
    --> src\ui\theme.rs:601:21
@@ -173,19 +362,22 @@ warning: unused variable: `color_key`
    --> src\ui\theme.rs:600:47
     |
 600 |     pub fn get_color(&self, theme_name: &str, color_key: &str) -> Option<Color32> {
-    |                                               ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_color_key`
+    |                                               ^^^^^^^^^ help: if this is intentional, prefix 
+it with an underscore: `_color_key`
 
 warning: unused variable: `ui`
    --> src\ui\node_editor.rs:745:41
     |
 745 |     fn execute_node(&self, node: &Node, ui: &Ui) {
-    |                                         ^^ help: if this is intentional, prefix it with an underscore: `_ui`
+    |                                         ^^ help: if this is intentional, prefix it with an 
+underscore: `_ui`
 
 warning: unused variable: `from_output`
    --> src\nodes.rs:226:37
     |
 226 |             if let Some((from_node, from_output)) = input.connected_output {
-    |                                     ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_from_output`
+    |                                     ^^^^^^^^^^^ help: if this is intentional, prefix it with 
+an underscore: `_from_output`
 
 warning: unused variable: `parameters`
    --> src\nodes.rs:306:9
@@ -194,10 +386,11 @@ warning: unused variable: `parameters`
     |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parameters`
 
 warning: unused variable: `wgpu_queue`
-  --> src\fractal\renderer.rs:44:13
+  --> src\fractal\renderer.rs:46:13
    |
-44 |         let wgpu_queue = &queue.0;
-   |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_wgpu_queue`
+46 |         let wgpu_queue = &queue.0;
+   |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: 
+`_wgpu_queue`
 
 warning: variable does not need to be mutable
    --> src\scene\mod.rs:234:34
@@ -207,6 +400,55 @@ warning: variable does not need to be mutable
     |                                  |
     |                                  help: remove this `mut`
 
-For more information about this error, try `rustc --explain E0277`.
-warning: `modular-fractal-shader` (lib) generated 28 warnings
-error: could not compile `modular-fractal-shader` (lib) due to 1 previous error; 28 warnings emitted
+warning: variable does not need to be mutable
+   --> src\export\video.rs:481:13
+    |
+481 |         let mut child = cmd
+    |             ----^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src\export\mod.rs:102:21
+    |
+102 |                 let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(
+    |                     ----^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: unused variable: `distance_field`
+   --> src\export\mod.rs:272:9
+    |
+272 |         distance_field: &[f32],
+    |         ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: 
+`_distance_field`
+
+warning: unused variable: `width`
+   --> src\export\mod.rs:273:9
+    |
+273 |         width: u32,
+    |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_width`
+
+warning: unused variable: `height`
+   --> src\export\mod.rs:274:9
+    |
+274 |         height: u32,
+    |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_height`
+
+warning: unused variable: `depth`
+   --> src\export\mod.rs:275:9
+    |
+275 |         depth: u32,
+    |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_depth`
+
+warning: unused variable: `iso_level`
+   --> src\export\mod.rs:276:9
+    |
+276 |         iso_level: f32,
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_iso_level`
+
+Some errors have detailed explanations: E0061, E0277, E0502.
+For more information about an error, try `rustc --explain E0061`.
+warning: `modular-fractal-shader` (lib) generated 43 warnings
+error: could not compile `modular-fractal-shader` (lib) due to 7 previous errors; 43 warnings 
+emitted

@@ -4,7 +4,6 @@
 //! with support for multiple tracks, curves, and professional animation tools.
 
 use super::keyframe::*;
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// Timeline project containing multiple animation tracks
@@ -112,6 +111,37 @@ impl TimelineProject {
     /// Convert frame to time
     pub fn frame_to_time(&self, frame: u32) -> f32 {
         frame as f32 / self.frame_rate
+    }
+
+    /// Adapter: provide mutable access matching exporter expectations
+    pub fn timeline_mut(&mut self) -> &mut Self {
+        self
+    }
+
+    /// Adapter: provide immutable access matching exporter expectations
+    pub fn timeline(&self) -> &Self {
+        self
+    }
+
+    /// Adapter: expose tracks slice for exporter and serialization
+    pub fn tracks(&self) -> &[TimelineTrack] {
+        &self.tracks
+    }
+
+    /// Adapter: provide immutable access to the animation controller
+    pub fn animation_controller(&self) -> &AnimationController {
+        &self.animation_controller
+    }
+
+    /// Adapter: provide mutable access to the animation controller
+    pub fn animation_controller_mut(&mut self) -> &mut AnimationController {
+        &mut self.animation_controller
+    }
+
+    /// Adapter: set current time in seconds and seek controller
+    pub fn set_current_time(&mut self, time: f32) {
+        let frame = self.time_to_frame(time);
+        self.set_current_frame(frame);
     }
 
     /// Get keyframes for a track (for UI display)

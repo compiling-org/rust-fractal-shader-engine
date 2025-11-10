@@ -8,9 +8,19 @@ use bevy_egui::EguiContexts;
 use rfd::FileDialog;
 use crate::ui::node_editor::NodeEditor;
 use crate::ui::fractal_ui::FractalCodeEditor;
-use crate::fractal::FractalRenderer;
+use crate::fractal::renderer::FractalRenderer;
+use crate::fractal::types::QualityPreset;
 use crate::project::FractalStudioProject;
 use std::sync::Arc;
+use image::ColorType;
+use crate::export::video::{VideoRecorder, VideoCodec, VideoQuality};
+use crate::export::animation::{AnimationExporter, AnimationExportSettings, AnimationFormat, ExportFrames, AnimationQuality};
+use crate::animation::timeline::TimelineProject;
+use crate::metrics::PerformanceTracker;
+use std::time::Instant;
+use std::time::SystemTime;
+use std::path::PathBuf;
+use walkdir::WalkDir;
 
 /// Main application state
 pub struct FractalStudioApp {
@@ -24,6 +34,7 @@ pub struct FractalStudioApp {
     // GPU renderer
     pub fractal_renderer: Option<FractalRenderer>,
     pub viewport_texture: Option<egui::TextureId>,
+    pub viewport_image_handle: Option<Handle<Image>>,    
     pub has_wgpu_support: bool,
     // Panel visibility toggles
     pub show_left_panel: bool,
@@ -37,6 +48,16 @@ pub struct FractalStudioApp {
     pub current_project: FractalStudioProject,
     pub current_shader_path: Option<std::path::PathBuf>,
     pub code_unsaved_changes: bool,
+    // Shader library and hot-reload state
+    pub shader_library: Vec<PathBuf>,
+    pub shader_hot_reload_enabled: bool,
+    pub shader_last_modified: Option<SystemTime>,
+    pub shader_filter_text: String,
+    pub last_hot_reload_poll: Option<Instant>,
+
+    // Render settings
+    pub render_scale: f32,
+    pub fxaa_enabled: bool,
 
     // Default fractal parameters - reduced for better performance
     pub max_iterations: u32,
@@ -46,11 +67,69 @@ pub struct FractalStudioApp {
     pub position: [f32; 3],
     pub rotation: [f32; 3],
     pub color_saturation: f32,
+    pub camera_fov: f32,
+    pub camera_target: [f32; 3],
+    // Lighting controls
+    pub light_direction: [f32; 3],
+    pub light_color: [f32; 3],
+    pub light_intensity: f32,
+    // Material controls
+    pub material_metallic: f32,
+    pub material_roughness: f32,
+    pub use_fragment_pseudo3d: bool,
+    // Viewport state
+    pub last_viewport_resolution: [u32; 2],
+    // Video recording state
+    pub video_recorder: Option<VideoRecorder>,
+    pub is_recording: bool,
+    pub recording_frame_rate: u32,
+    // Timeline playback state
+    pub is_playing: bool,
+    pub playback_speed: f32,
+    pub timeline_duration: f32,
+    pub last_update_instant: Option<Instant>,
+
+    // Mapping creation form state (MIDI)
+    pub midi_param_name: String,
+    pub midi_channel: u8,
+    pub midi_controller_cc: u8,
+    pub midi_min_value: f32,
+    pub midi_max_value: f32,
+    pub midi_sensitivity: f32,
+    pub midi_invert: bool,
+
+    // Mapping creation form state (OSC)
+    pub osc_address: String,
+    pub osc_param_name: String,
+    pub osc_min_value: f32,
+    pub osc_max_value: f32,
+    pub osc_sensitivity: f32,
+    pub osc_invert: bool,
+
+    // Mapping creation form state (Gesture)
+    pub gesture_name: String,
+    pub gesture_param_name: String,
+    pub gesture_min_value: f32,
+    pub gesture_max_value: f32,
+    pub gesture_sensitivity: f32,
+    pub gesture_invert: bool,
     
     // Undo/Redo system
     pub undo_stack: Vec<AppStateSnapshot>,
     pub redo_stack: Vec<AppStateSnapshot>,
     pub max_undo_steps: usize,
+
+    // Status messaging
+    pub status_message: Option<String>,
+
+    // Performance tracking (non-visual, CSV logging only)
+    pub metrics: PerformanceTracker,
+
+    // GPU Settings UI state (GUI-only)
+    pub show_gpu_settings_window: bool,
+    pub gpu_backend: String,
+    pub gpu_power_pref: String,
+    pub gpu_dx12_compiler: String,
 }
 
 // Snapshot of application state for undo/redo
@@ -65,6 +144,13 @@ pub struct AppStateSnapshot {
     pub position: [f32; 3],
     pub rotation: [f32; 3],
     pub color_saturation: f32,
+    pub camera_fov: f32,
+    pub camera_target: [f32; 3],
+    pub light_direction: [f32; 3],
+    pub light_color: [f32; 3],
+    pub light_intensity: f32,
+    pub material_metallic: f32,
+    pub material_roughness: f32,
     pub current_workspace: WorkspaceView,
 }
 
@@ -74,60 +160,120 @@ pub enum WorkspaceView {
     Animation,
     Rendering,
     NodeEditor,
+    ShaderLoader,
 }
 
 impl Default for FractalStudioApp {
     fn default() -> Self {
         Self {
             time: 0.0,
+            // Default to an intricate preset so launch shows rich 3D detail
             selected_fractal: 0,
+            // 16 rich 3D presets: single-formula variants and multi-formula blends
             fractal_types: vec![
-                "Mandelbrot",
-                "Mandelbulb",
-                "Mandelbox",
-                "Quaternion Julia",
-                "Burning Ship",
-                "Nova",
-                "Phoenix",
-                "Buffalo",
-                "Celtic",
-                "Perpendicular Mandelbrot",
-                "Mandelbar",
-                "Tricorn",
-                "Feather",
-                "Sierpinski",
-                "Koch Snowflake",
-                "Dragon Curve",
-                "IFS Tree",
-                "Lorenz Attractor",
-                "Rossler Attractor",
-                "Chen-Lee Attractor",
+                "Mandelbulb (Power 8)",        // 0
+                "Mandelbulb (Power 10)",       // 1
+                "Mandelbulb (Power 6)",        // 2
+                "Mandelbox (Scale 2.0)",       // 3
+                "Mandelbox (Scale 1.8)",       // 4
+                "Mandelbox (Scale 2.2)",       // 5
+                "Quaternion Julia (Classic)",  // 6
+                "Quaternion Julia (Variant)",  // 7
+                "Bulb ∪ Box (Union)",          // 8
+                "Bulb ∩ Box (Intersection)",   // 9
+                "Bulb − Box (Subtraction)",    // 10
+                "Smooth Union (Bulb, Box)",    // 11
+                "Smooth Intersect (Box, QJulia)", // 12
+                "Smooth Subtract (Bulb, QJulia)", // 13
+                "Triplet Smooth Union (Bulb+Box+QJulia)", // 14
+                "Box ∩ QJulia (Intersection)", // 15
             ],
             node_editor: NodeEditor::new(),
             code_editor: FractalCodeEditor::new(),
             fractal_renderer: None,
             viewport_texture: None,
+            viewport_image_handle: None,
             has_wgpu_support: false,
             // Panels: start with left and right visible to frame the canvas
             show_left_panel: true,
             show_right_panel: true,
             show_bottom_panel: false,
-            current_workspace: WorkspaceView::Modeling,
+            current_workspace: WorkspaceView::Rendering,
             current_project: FractalStudioProject::default(),
             current_shader_path: None,
             code_unsaved_changes: false,
-            // Default fractal parameters - reduced for better performance
-            max_iterations: 50,     // Reduced from 100
+            shader_library: Vec::new(),
+            shader_hot_reload_enabled: false,
+            shader_last_modified: None,
+            shader_filter_text: String::new(),
+            last_hot_reload_poll: None,
+            // Render settings defaults
+            render_scale: 0.75,
+            fxaa_enabled: true,
+            // Default fractal parameters - balanced for better detail
+            max_iterations: 100,
             bailout: 4.0,
             power: 8.0,
             scale: 2.0,
             position: [0.0, 0.0, 0.0],
             rotation: [0.0, 0.0, 0.0],
             color_saturation: 1.0,
+            camera_fov: 60.0,
+            camera_target: [0.0, 0.0, 0.0],
+            // Lighting defaults
+            light_direction: [0.4, 0.7, -0.2],
+            light_color: [0.8, 0.9, 1.0],
+            light_intensity: 1.0,
+            // Material defaults
+            material_metallic: 0.0,
+            material_roughness: 0.5,
+            use_fragment_pseudo3d: false,
+            last_viewport_resolution: [800, 600],
+            // Recording defaults
+            video_recorder: None,
+            is_recording: false,
+            recording_frame_rate: 30,
+            // Playback defaults
+            is_playing: false,
+            playback_speed: 1.0,
+            timeline_duration: 100.0,
+            last_update_instant: None,
+
+            // MIDI mapping defaults
+            midi_param_name: "zoom".to_string(),
+            midi_channel: 1,
+            midi_controller_cc: 1,
+            midi_min_value: 0.1,
+            midi_max_value: 10.0,
+            midi_sensitivity: 1.0,
+            midi_invert: false,
+
+            // OSC mapping defaults
+            osc_address: "/fractal/zoom".to_string(),
+            osc_param_name: "zoom".to_string(),
+            osc_min_value: 0.1,
+            osc_max_value: 10.0,
+            osc_sensitivity: 1.0,
+            osc_invert: false,
+
+            // Gesture mapping defaults
+            gesture_name: "pinch".to_string(),
+            gesture_param_name: "zoom".to_string(),
+            gesture_min_value: 0.1,
+            gesture_max_value: 10.0,
+            gesture_sensitivity: 1.0,
+            gesture_invert: false,
             // Undo/Redo system
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
             max_undo_steps: 50,
+            status_message: None,
+            metrics: PerformanceTracker::default(),
+            // GPU Settings defaults reflect current environment
+            show_gpu_settings_window: false,
+            gpu_backend: std::env::var("WGPU_BACKEND").unwrap_or_else(|_| "vulkan,dx12,gl".to_string()),
+            gpu_power_pref: std::env::var("WGPU_POWER_PREF").unwrap_or_else(|_| "HighPerformance".to_string()),
+            gpu_dx12_compiler: std::env::var("WGPU_DX12_COMPILER").unwrap_or_else(|_| "dxcompiler".to_string()),
         }
     }
 }
@@ -138,13 +284,39 @@ impl FractalStudioApp {
 
         let mut app = Self::default();
         app.has_wgpu_support = false; // Will be set when WGPU context is available
+        // Initial scan of bundled shader library
+        app.refresh_shader_library();
 
         log::info!("FractalStudioApp created successfully");
         app
     }
 
+    fn refresh_shader_library(&mut self) {
+        let mut list: Vec<PathBuf> = Vec::new();
+        for entry in WalkDir::new("assets/shaders").into_iter().filter_map(Result::ok) {
+            let p = entry.path();
+            if p.is_file() {
+                if let Some(ext) = p.extension().and_then(|s| s.to_str()) {
+                    if ext.eq_ignore_ascii_case("wgsl") {
+                        list.push(p.to_path_buf());
+                    }
+                }
+            }
+        }
+        list.sort();
+        self.shader_library = list;
+    }
+
     pub fn initialize_wgpu(&mut self, device: Arc<bevy::render::renderer::RenderDevice>, queue: Arc<bevy::render::renderer::RenderQueue>, width: u32, height: u32) {
         log::info!("Initializing WGPU renderer with size {}x{}", width, height);
+        // Log environment-driven WGPU configuration to aid diagnosis
+        let backend = std::env::var("WGPU_BACKEND").unwrap_or_else(|_| "<unset>".into());
+        let power = std::env::var("WGPU_POWER_PREF").unwrap_or_else(|_| "<unset>".into());
+        let dx12_comp = std::env::var("WGPU_DX12_COMPILER").unwrap_or_else(|_| "<unset>".into());
+        log::info!(
+            "WGPU env → BACKEND={}, POWER_PREF={}, DX12_COMPILER={}",
+            backend, power, dx12_comp
+        );
         
         // Limit texture dimensions to device limits (typically 8192)
         let max_dimension = 8192;
@@ -165,6 +337,20 @@ impl FractalStudioApp {
                 self.fractal_renderer = Some(renderer);
                 self.has_wgpu_support = true;
                 log::info!("Fractal renderer initialized successfully with size {}x{}", safe_width, safe_height);
+                if let Some(r) = &mut self.fractal_renderer {
+                    r.set_camera_fov(self.camera_fov);
+                    r.set_camera_target(self.camera_target);
+                    // Sync lighting and material to renderer
+                    r.set_light_direction(self.light_direction);
+                    r.set_light_color(self.light_color);
+                    r.set_light_intensity(self.light_intensity);
+                    r.set_material_metallic(self.material_metallic);
+                    r.set_material_roughness(self.material_roughness);
+                    // Apply default Medium quality preset using current viewport size as base
+                    r.apply_quality_preset(QualityPreset::Medium, Some([safe_width, safe_height]));
+                    // Ensure true 3D raymarcher path (disable pseudo-3D fragment pipeline)
+                    r.set_fragment_pseudo3d(false);
+                }
             }
             Err(e) => {
                 log::error!("Failed to initialize fractal renderer: {}", e);
@@ -183,6 +369,20 @@ impl FractalStudioApp {
                             self.fractal_renderer = Some(renderer);
                             self.has_wgpu_support = true;
                             log::info!("Fractal renderer initialized successfully with fallback size 512x512");
+                            if let Some(r) = &mut self.fractal_renderer {
+                                r.set_camera_fov(self.camera_fov);
+                                r.set_camera_target(self.camera_target);
+                                // Sync lighting and material to renderer
+                                r.set_light_direction(self.light_direction);
+                                r.set_light_color(self.light_color);
+                                r.set_light_intensity(self.light_intensity);
+                                r.set_material_metallic(self.material_metallic);
+                                r.set_material_roughness(self.material_roughness);
+                                // Apply default Medium quality preset with fallback size
+                                r.apply_quality_preset(QualityPreset::Medium, Some([512, 512]));
+                                // Ensure true 3D raymarcher path (disable pseudo-3D fragment pipeline)
+                                r.set_fragment_pseudo3d(false);
+                            }
                         }
                         Err(e) => {
                             log::error!("Failed to initialize fractal renderer with fallback size: {}", e);
@@ -216,12 +416,21 @@ impl FractalStudioApp {
                         .add_filter("Fractal Studio Project", &["fract"])
                         .pick_file()
                     {
-                        match crate::project::FractalStudioProject::load_from_file(&path) {
-                            Ok(project) => {
+                        match crate::project::FractalStudioProject::load_from_file_with_report(&path) {
+                            Ok((project, report)) => {
+                                let (errors, warnings, infos) = report.counts();
+                                self.status_message = Some(format!(
+                                    "Loaded project: {} errors, {} warnings, {} info",
+                                    errors, warnings, infos
+                                ));
                                 self.current_project = project;
                                 log::info!("Project loaded successfully from {:?}", path);
+                                if report.has_errors() {
+                                    log::warn!("Project loaded with validation errors");
+                                }
                             }
                             Err(e) => {
+                                self.status_message = Some(format!("Failed to load project: {}", e));
                                 log::error!("Failed to load project: {}", e);
                             }
                         }
@@ -330,7 +539,18 @@ impl FractalStudioApp {
                                             log::info!("Converted ISF to WGSL and loaded into editor");
                                         }
                                         Err(e) => {
-                                            log::error!("ISF->WGSL conversion failed: {}", e);
+                                            log::warn!("Advanced ISF->WGSL conversion failed ({}). Attempting simple GLSL->WGSL fallback.", e);
+                                            match crate::ShaderConverter::glsl_to_wgsl(&contents) {
+                                                Ok(wgsl) => {
+                                                    self.code_editor.code = wgsl;
+                                                    self.current_shader_path = Some(path.with_extension("wgsl"));
+                                                    self.code_unsaved_changes = true;
+                                                    log::info!("Converted ISF (fallback GLSL) to WGSL and loaded into editor");
+                                                }
+                                                Err(e2) => {
+                                                    log::error!("ISF->WGSL conversion failed and fallback also failed: {}", e2);
+                                                }
+                                            }
                                         }
                                     }
                                 } else {
@@ -426,24 +646,118 @@ impl FractalStudioApp {
                 
                 ui.menu_button("Export", |ui| {
                     if ui.button("Export Image...").clicked() {
-                        // Export current view as image
+                        // Export current viewport image using GPU renderer where available
                         if let Some(path) = rfd::FileDialog::new()
                             .add_filter("Image Files", &["png", "jpg", "tiff"])
+                            .set_title("Export Image")
                             .save_file()
                         {
-                            log::info!("Exporting image to {:?}", path);
-                            // TODO: Implement image export
+                            self.save_state_for_undo();
+
+                            // Determine format from extension (default PNG)
+                            let format = match path.extension().and_then(|e| e.to_str()).map(|s| s.to_lowercase()) {
+                                Some(ref ext) if ext == "jpg" || ext == "jpeg" => crate::export::ExportFormat::JPEG,
+                                Some(ref ext) if ext == "tiff" || ext == "tif" => crate::export::ExportFormat::TIFF,
+                                _ => crate::export::ExportFormat::PNG,
+                            };
+
+                            let [w, h] = self.last_viewport_resolution;
+                            let width = w.max(1);
+                            let height = h.max(1);
+
+                            // Prefer GPU renderer for readback; fallback to CPU if unavailable
+                            let result = if let Some(renderer) = self.fractal_renderer.as_mut() {
+                                match renderer.render_image_readback(self.time, (width, height)) {
+                                    Ok((pixels, rw, rh)) => {
+                                        if rw != width || rh != height {
+                                            log::warn!("Exported frame size mismatch: {}x{} vs {}x{}", rw, rh, width, height);
+                                        }
+                                        crate::export::ImageExporter::export_image(&pixels, rw, rh, format, &path)
+                                    }
+                                    Err(e) => {
+                                        log::error!("GPU readback failed: {}. Falling back to CPU renderer.", e);
+                                        let cpu = crate::fractal::renderer::CPUFractalRenderer::new();
+                                        let pixels = cpu.render(width, height);
+                                        crate::export::ImageExporter::export_image(&pixels, width, height, format, &path)
+                                    }
+                                }
+                            } else {
+                                // No GPU renderer: use CPU renderer
+                                let cpu = crate::fractal::renderer::CPUFractalRenderer::new();
+                                let pixels = cpu.render(width, height);
+                                crate::export::ImageExporter::export_image(&pixels, width, height, format, &path)
+                            };
+
+                            match result {
+                                Ok(_) => log::info!("Exported image to {:?}", path),
+                                Err(e) => log::error!("Failed to export image: {}", e),
+                            }
+                        } else {
+                            log::info!("Image export canceled by user");
                         }
                         ui.close();
                     }
                     if ui.button("Export Animation...").clicked() {
-                        // Export animation sequence
+                        // Export animation sequence using AnimationExporter
                         if let Some(path) = rfd::FileDialog::new()
-                            .add_filter("Video Files", &["mp4", "avi", "mov"])
+                            .add_filter("Video Files", &["mp4", "avi", "mov", "webm", "gif"])
+                            .set_title("Export Animation")
                             .save_file()
                         {
-                            log::info!("Exporting animation to {:?}", path);
-                            // TODO: Implement animation export
+                            self.save_state_for_undo();
+                            // Determine format from extension
+                            let format = match path.extension().and_then(|e| e.to_str()).map(|s| s.to_lowercase()) {
+                                Some(ref ext) if ext == "mp4" => AnimationFormat::MP4,
+                                Some(ref ext) if ext == "avi" => AnimationFormat::AVI,
+                                Some(ref ext) if ext == "mov" => AnimationFormat::MOV,
+                                Some(ref ext) if ext == "webm" => AnimationFormat::WEBM,
+                                Some(ref ext) if ext == "gif" => AnimationFormat::GIF,
+                                _ => AnimationFormat::MP4,
+                            };
+
+                            let [w, h] = self.last_viewport_resolution;
+                            let frame_rate = self.recording_frame_rate as f32;
+                            let default_duration = 5.0f32; // simple default
+                            let settings = AnimationExportSettings {
+                                format,
+                                frame_rate,
+                                resolution: [w.max(1), h.max(1)],
+                                duration: default_duration,
+                                export_frames: ExportFrames::AllFrames,
+                                quality: AnimationQuality::Standard,
+                                compression: crate::export::animation::AnimationCompression::H264,
+                                include_audio: false,
+                            };
+
+                            // Build a basic timeline project for export
+                            let mut timeline_project = TimelineProject::new(&self.current_project.metadata.name);
+                            timeline_project.frame_rate = frame_rate;
+                            timeline_project.total_frames = (default_duration * frame_rate) as u32;
+
+                            // Prepare output base directory: <parent>/<name>_frames
+                            let base_name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("animation");
+                            let parent_dir = path.parent().unwrap_or_else(|| std::path::Path::new("."));
+                            let frames_dir = parent_dir.join(format!("{}{}_frames", base_name, ""));
+                            if let Err(e) = std::fs::create_dir_all(&frames_dir) {
+                                log::error!("Failed to create frames directory: {}", e);
+                                ui.close();
+                                return;
+                            }
+
+                            let exporter = AnimationExporter::new(settings);
+                            match exporter.export_animation(&timeline_project, frames_dir.to_str().unwrap_or("exports/animation")) {
+                                Ok(result) => {
+                                    log::info!(
+                                        "Exported animation: {} frames over {:.2}s; files: {:?}",
+                                        result.frames_generated,
+                                        result.total_duration,
+                                        result.output_files
+                                    );
+                                }
+                                Err(e) => {
+                                    log::error!("Failed to export animation: {}", e);
+                                }
+                            }
                         }
                         ui.close();
                     }
@@ -597,6 +911,13 @@ impl FractalStudioApp {
                     self.current_workspace = WorkspaceView::NodeEditor;
                     ui.close();
                 }
+                if ui.button("Shader Loader").clicked() {
+                    // Save current state for undo
+                    self.save_state_for_undo();
+                    
+                    self.current_workspace = WorkspaceView::ShaderLoader;
+                    ui.close();
+                }
                 ui.separator();
                 
                 // View controls
@@ -661,14 +982,6 @@ impl FractalStudioApp {
             ui.menu_button("Fractal", |ui| {
                 // Fractal generation
                 ui.label("Fractal Types:");
-                if ui.button("Mandelbrot").clicked() {
-                    // Save current state for undo
-                    self.save_state_for_undo();
-                    
-                    self.selected_fractal = 0;
-                    self.reset_parameters_for_fractal_type(0);
-                    ui.close();
-                }
                 if ui.button("Mandelbulb").clicked() {
                     // Save current state for undo
                     self.save_state_for_undo();
@@ -689,8 +1002,8 @@ impl FractalStudioApp {
                     // Save current state for undo
                     self.save_state_for_undo();
                     
-                    self.selected_fractal = 3;
-                    self.reset_parameters_for_fractal_type(3);
+                    self.selected_fractal = 4;
+                    self.reset_parameters_for_fractal_type(4);
                     ui.close();
                 }
                 ui.separator();
@@ -724,6 +1037,67 @@ impl FractalStudioApp {
                     // Open fractal settings dialog
                     log::info!("Opening fractal settings");
                     // TODO: Implement fractal settings dialog
+                    ui.close();
+                }
+            });
+
+            // Quick-load curated examples for immediate visual verification
+            ui.menu_button("Examples", |ui| {
+                if ui.button("Mandelbrot (2D)").clicked() {
+                    self.save_state_for_undo();
+                    self.selected_fractal = 0;
+                    self.reset_parameters_for_fractal_type(0);
+                    self.status_message = Some("Loaded example: Mandelbrot (GPU displays 3D fallback)".to_string());
+                    ui.close();
+                }
+                if ui.button("Mandelbulb (3D)").clicked() {
+                    self.save_state_for_undo();
+                    self.selected_fractal = 1;
+                    self.reset_parameters_for_fractal_type(1);
+                    self.status_message = Some("Loaded example: Mandelbulb".to_string());
+                    ui.close();
+                }
+                if ui.button("Mandelbox (3D)").clicked() {
+                    self.save_state_for_undo();
+                    self.selected_fractal = 2;
+                    self.reset_parameters_for_fractal_type(2);
+                    self.status_message = Some("Loaded example: Mandelbox".to_string());
+                    ui.close();
+                }
+                if ui.button("Quaternion Julia (3D)").clicked() {
+                    self.save_state_for_undo();
+                    self.selected_fractal = 4;
+                    self.reset_parameters_for_fractal_type(4);
+                    self.status_message = Some("Loaded example: Quaternion Julia".to_string());
+                    ui.close();
+                }
+                ui.separator();
+                if ui.button("Tricorn (2D)").clicked() {
+                    self.save_state_for_undo();
+                    self.selected_fractal = 11;
+                    self.reset_parameters_for_fractal_type(11);
+                    self.status_message = Some("Loaded example: Tricorn (GPU displays 3D fallback)".to_string());
+                    ui.close();
+                }
+                if ui.button("Sierpinski (3D)").clicked() {
+                    self.save_state_for_undo();
+                    self.selected_fractal = 13;
+                    self.reset_parameters_for_fractal_type(13);
+                    self.status_message = Some("Loaded example: Sierpinski (GPU displays 3D fallback)".to_string());
+                    ui.close();
+                }
+                if ui.button("Koch Snowflake (2D)").clicked() {
+                    self.save_state_for_undo();
+                    self.selected_fractal = 14;
+                    self.reset_parameters_for_fractal_type(14);
+                    self.status_message = Some("Loaded example: Koch Snowflake (GPU displays 3D fallback)".to_string());
+                    ui.close();
+                }
+                if ui.button("Dragon Curve (2D)").clicked() {
+                    self.save_state_for_undo();
+                    self.selected_fractal = 15;
+                    self.reset_parameters_for_fractal_type(15);
+                    self.status_message = Some("Loaded example: Dragon Curve (GPU displays 3D fallback)".to_string());
                     ui.close();
                 }
             });
@@ -807,18 +1181,105 @@ impl FractalStudioApp {
                     // Save current state for undo
                     self.save_state_for_undo();
                     
-                    // Render current view as high-quality image
+                    // Render current view as high-quality image and save to PNG
                     log::info!("Rendering image");
-                    // TODO: Implement image rendering
+                    let default_dims = self.last_viewport_resolution;
+                    let file = FileDialog::new()
+                        .add_filter("PNG Image", &["png"])
+                        .set_title("Save Rendered Image")
+                        .save_file();
+                    if let Some(path) = file {
+                        if let Some(renderer) = &mut self.fractal_renderer {
+                            let [w, h] = default_dims;
+                            match renderer.render_image_readback(self.time, (w, h)) {
+                                Ok((pixels, rw, rh)) => {
+                                    let mut save_path = path.clone();
+                                    if save_path.extension().is_none() {
+                                        save_path.set_extension("png");
+                                    }
+                                    match image::save_buffer(&save_path, &pixels, rw, rh, ColorType::Rgba8) {
+                                        Ok(_) => log::info!("Saved image to {:?}", save_path),
+                                        Err(e) => log::error!("Failed to save PNG: {}", e),
+                                    }
+                                }
+                                Err(e) => {
+                                    log::error!("Failed to render image: {}", e);
+                                }
+                            }
+                        } else {
+                            log::warn!("Renderer not initialized; cannot render image.");
+                        }
+                    } else {
+                        log::info!("Image save canceled by user");
+                    }
                     ui.close();
                 }
                 if ui.button("Render Animation").clicked() {
                     // Save current state for undo
                     self.save_state_for_undo();
                     
-                    // Render animation sequence
-                    log::info!("Rendering animation");
-                    // TODO: Implement animation rendering
+                    // Render animation sequence to video using ffmpeg via VideoRecorder
+                    let file = FileDialog::new()
+                        .add_filter("Video Files", &["mp4", "mov", "avi", "webm"])
+                        .set_title("Save Rendered Animation")
+                        .save_file();
+                    if let Some(path) = file {
+                        let [w, h] = self.last_viewport_resolution;
+                        let frame_rate = self.recording_frame_rate;
+                        let codec = match path.extension().and_then(|e| e.to_str()).map(|s| s.to_lowercase()) {
+                            Some(ext) if ext == "mp4" => VideoCodec::H264,
+                            Some(ext) if ext == "mov" => VideoCodec::ProRes,
+                            Some(ext) if ext == "avi" => VideoCodec::H264,
+                            Some(ext) if ext == "webm" => VideoCodec::VP9,
+                            _ => VideoCodec::H264,
+                        };
+                        let quality = if self.current_workspace == WorkspaceView::Rendering { VideoQuality::High } else { VideoQuality::Medium };
+
+                        if let Some(renderer) = &mut self.fractal_renderer {
+                            match VideoRecorder::start(w.max(1), h.max(1), frame_rate.max(1), codec, quality, &path) {
+                                Ok(mut recorder) => {
+                                    // Determine duration from project's simple animation timeline, fallback to 5s
+                                    let duration = self.current_project.animation_controller.timeline().duration();
+                                    let total_frames = (duration * frame_rate as f32) as u32;
+
+                                    for frame_idx in 0..total_frames {
+                                        let t = frame_idx as f32 / frame_rate as f32;
+                                        self.time = t;
+                                        self.current_project.animation_controller.set_time(t);
+                                        match renderer.render_image_readback(t, (w, h)) {
+                                            Ok((pixels, rw, rh)) => {
+                                                if rw == w && rh == h {
+                                                    if let Err(e) = recorder.send_frame(&pixels) {
+                                                        log::error!("Failed to send frame {}: {}", frame_idx, e);
+                                                        break;
+                                                    }
+                                                } else {
+                                                    log::warn!("Frame size mismatch: got {}x{}, expected {}x{}", rw, rh, w, h);
+                                                }
+                                            }
+                                            Err(e) => {
+                                                log::error!("Failed to render frame {}: {}", frame_idx, e);
+                                                break;
+                                            }
+                                        }
+                                    }
+
+                                    if let Err(e) = recorder.stop() {
+                                        log::error!("Failed to finalize video: {}", e);
+                                    } else {
+                                        log::info!("Saved animation to {:?}", path);
+                                    }
+                                }
+                                Err(e) => {
+                                    log::error!("Failed to start video recorder: {}", e);
+                                }
+                            }
+                        } else {
+                            log::warn!("Renderer not initialized; cannot render animation.");
+                        }
+                    } else {
+                        log::info!("Animation save canceled by user");
+                    }
                     ui.close();
                 }
                 ui.separator();
@@ -837,10 +1298,77 @@ impl FractalStudioApp {
                     // Save current state for undo
                     self.save_state_for_undo();
                     
-                    // Render current viewport
+                    // Render current viewport once using GPU renderer if available
                     log::info!("Rendering viewport");
-                    // TODO: Implement viewport rendering
+                    if let Some(renderer) = self.fractal_renderer.as_mut() {
+                        // Use the current rect size tracked in last_viewport_resolution
+                        let [w, h] = self.last_viewport_resolution;
+                        let width = w.max(1);
+                        let height = h.max(1);
+                        if let Err(e) = renderer.render_frame(self.time, (width, height)) {
+                            log::error!("Failed to render viewport: {}", e);
+                        } else {
+                            log::info!("Rendered viewport at {}x{}", width, height);
+                        }
+                    } else {
+                        log::warn!("Renderer not initialized; cannot render viewport.");
+                    }
                     ui.close();
+                }
+                ui.separator();
+                // Recording controls
+                ui.label("Recording:");
+                if !self.is_recording {
+                    if ui.button("Start Recording").clicked() {
+                        self.save_state_for_undo();
+                        let default_dims = self.last_viewport_resolution;
+                        let file = FileDialog::new()
+                            .add_filter("Video", &["mp4", "mkv"])
+                            .set_title("Save Recording")
+                            .save_file();
+                        if let Some(mut path) = file {
+                            if path.extension().is_none() {
+                                path.set_extension("mp4");
+                            }
+                            if let Some(renderer) = &self.fractal_renderer {
+                                let [w, h] = default_dims;
+                                match VideoRecorder::start(
+                                    w,
+                                    h,
+                                    self.recording_frame_rate,
+                                    VideoCodec::H264,
+                                    VideoQuality::Medium,
+                                    &path,
+                                ) {
+                                    Ok(rec) => {
+                                        self.video_recorder = Some(rec);
+                                        self.is_recording = true;
+                                        log::info!("Started recording to {:?} ({}x{}, {} fps)", path, w, h, self.recording_frame_rate);
+                                    }
+                                    Err(e) => {
+                                        log::error!("Failed to start recorder: {:?}", e);
+                                    }
+                                }
+                            } else {
+                                log::warn!("Renderer not initialized; cannot start recording.");
+                            }
+                        } else {
+                            log::info!("Recording save canceled by user");
+                        }
+                        ui.close();
+                    }
+                } else {
+                    if ui.button("Stop Recording").clicked() {
+                        self.save_state_for_undo();
+                        if let Some(mut rec) = self.video_recorder.take() {
+                            match rec.stop() {
+                                Ok(_) => log::info!("Stopped recording and finalized file"),
+                                Err(e) => log::error!("Failed to finalize recording: {:?}", e),
+                            }
+                        }
+                        self.is_recording = false;
+                        ui.close();
+                    }
                 }
                 ui.separator();
                 
@@ -850,18 +1378,28 @@ impl FractalStudioApp {
                     // Save current state for undo
                     self.save_state_for_undo();
                     
-                    // Set preview quality
+                    // Set preview quality preset using current viewport as base resolution
                     log::info!("Setting preview quality");
-                    // TODO: Implement quality settings
+                    if let Some(renderer) = &mut self.fractal_renderer {
+                        // Map UI 'Preview' to Medium preset for interactive performance
+                        renderer.apply_quality_preset(QualityPreset::Medium, Some(self.last_viewport_resolution));
+                    } else {
+                        log::warn!("Renderer not initialized; cannot apply Preview preset.");
+                    }
                     ui.close();
                 }
                 if ui.button("Production").clicked() {
                     // Save current state for undo
                     self.save_state_for_undo();
                     
-                    // Set production quality
+                    // Set production quality preset using current viewport as base resolution
                     log::info!("Setting production quality");
-                    // TODO: Implement quality settings
+                    if let Some(renderer) = &mut self.fractal_renderer {
+                        // Map UI 'Production' to Ultra preset for maximum quality
+                        renderer.apply_quality_preset(QualityPreset::Ultra, Some(self.last_viewport_resolution));
+                    } else {
+                        log::warn!("Renderer not initialized; cannot apply Production preset.");
+                    }
                     ui.close();
                 }
                 if ui.button("Custom").clicked() {
@@ -1070,6 +1608,13 @@ impl FractalStudioApp {
                 }
             });
 
+            ui.menu_button("Settings", |ui| {
+                if ui.button("GPU Settings").clicked() {
+                    self.show_gpu_settings_window = true;
+                    ui.close();
+                }
+            });
+
             ui.menu_button("Help", |ui| {
                 if ui.button("Documentation").clicked() {
                     // Save current state for undo
@@ -1147,8 +1692,9 @@ impl FractalStudioApp {
             let animation = ui.selectable_value(&mut self.current_workspace, WorkspaceView::Animation, "Animation");
             let rendering = ui.selectable_value(&mut self.current_workspace, WorkspaceView::Rendering, "Rendering");
             let node_editor = ui.selectable_value(&mut self.current_workspace, WorkspaceView::NodeEditor, "Node Editor");
+            let shader_loader = ui.selectable_value(&mut self.current_workspace, WorkspaceView::ShaderLoader, "Shader Loader");
 
-            if modeling.clicked() || animation.clicked() || rendering.clicked() || node_editor.clicked() {
+            if modeling.clicked() || animation.clicked() || rendering.clicked() || node_editor.clicked() || shader_loader.clicked() {
                 self.save_state_for_undo();
             }
 
@@ -1214,6 +1760,7 @@ impl FractalStudioApp {
                 }
                 
                 if new_selection != self.selected_fractal {
+                    // Directly select by index; set defaults for the chosen preset
                     self.selected_fractal = new_selection;
                     self.reset_parameters_for_fractal_type(new_selection);
                 }
@@ -1231,14 +1778,39 @@ impl FractalStudioApp {
                         params.position = nalgebra::Vector3::new(self.position[0], self.position[1], self.position[2]);
                         params.rotation = nalgebra::Vector3::new(self.rotation[0], self.rotation[1], self.rotation[2]);
                         params.color_saturation = self.color_saturation;
-                        params.formula = match self.selected_fractal {
-                            0 => crate::fractal::FractalFormula::Mandelbrot { center: [-0.5, 0.0], zoom: 1.0 },
-                            1 => crate::fractal::FractalFormula::Mandelbulb { power: self.power },
-                            2 => crate::fractal::FractalFormula::Mandelbox { scale: self.scale },
-                            3 => crate::fractal::FractalFormula::Julia { c: [-0.7, 0.27015], max_iterations: self.max_iterations },
-                            _ => crate::fractal::FractalFormula::Mandelbulb { power: self.power },
+                        // Apply selected preset to renderer parameters and combiner
+                        let mut q_c = [self.rotation[0], self.rotation[1], self.rotation[2], 0.0];
+                        let mut mandelbulb_power: f32 = self.power;
+                        let (base_formula_id, comb_active, comb_formulas, comb_mode, comb_blend, comb_k) = match self.selected_fractal {
+                            // Single-formula presets
+                            0 => { mandelbulb_power = 8.0; (1, false, [0, 0, 0], crate::fractal::types::BlendMode::Union, 0.0, 0.0) }
+                            1 => { mandelbulb_power = 10.0; (1, false, [0, 0, 0], crate::fractal::types::BlendMode::Union, 0.0, 0.0) }
+                            2 => { mandelbulb_power = 6.0; (1, false, [0, 0, 0], crate::fractal::types::BlendMode::Union, 0.0, 0.0) }
+                            3 => { params.scale = 2.0; (2, false, [0, 0, 0], crate::fractal::types::BlendMode::Union, 0.0, 0.0) }
+                            4 => { params.scale = 1.8; (2, false, [0, 0, 0], crate::fractal::types::BlendMode::Union, 0.0, 0.0) }
+                            5 => { params.scale = 2.2; (2, false, [0, 0, 0], crate::fractal::types::BlendMode::Union, 0.0, 0.0) }
+                            6 => { q_c = [0.3, 0.5, 0.4, 0.0]; (4, false, [0, 0, 0], crate::fractal::types::BlendMode::Union, 0.0, 0.0) }
+                            7 => { q_c = [0.6, 0.2, 0.3, 0.0]; (4, false, [0, 0, 0], crate::fractal::types::BlendMode::Union, 0.0, 0.0) }
+                            // Combiner presets (use formula IDs: 1 Bulb, 2 Box, 4 QJulia)
+                            8 => (1, true, [1, 2, 0], crate::fractal::types::BlendMode::Union, 0.0, 0.0),
+                            9 => (2, true, [1, 2, 0], crate::fractal::types::BlendMode::Intersection, 0.0, 0.0),
+                            10 => (1, true, [1, 2, 0], crate::fractal::types::BlendMode::Subtraction, 0.0, 0.0),
+                            11 => (1, true, [1, 2, 0], crate::fractal::types::BlendMode::SmoothUnion(0.3), 0.5, 0.3),
+                            12 => { q_c = [0.3, 0.5, 0.4, 0.0]; (2, true, [2, 4, 0], crate::fractal::types::BlendMode::SmoothIntersection(0.25), 0.6, 0.25) }
+                            13 => { q_c = [0.6, 0.2, 0.3, 0.0]; (1, true, [1, 4, 0], crate::fractal::types::BlendMode::SmoothSubtraction(0.25), 0.5, 0.25) }
+                            14 => { q_c = [0.4, 0.4, 0.2, 0.0]; (1, true, [1, 2, 4], crate::fractal::types::BlendMode::SmoothUnion(0.35), 0.7, 0.35) }
+                            15 => { q_c = [0.35, 0.45, 0.25, 0.0]; (2, true, [2, 4, 0], crate::fractal::types::BlendMode::Intersection, 0.0, 0.0) }
+                            _ => (1, false, [0, 0, 0], crate::fractal::types::BlendMode::Union, 0.0, 0.0),
+                        };
+
+                        params.formula = match base_formula_id {
+                            1 => crate::fractal::FractalFormula::Mandelbulb { power: mandelbulb_power },
+                            2 => crate::fractal::FractalFormula::Mandelbox { scale: params.scale },
+                            4 => crate::fractal::FractalFormula::QuaternionJulia { c: q_c, max_iterations: self.max_iterations },
+                            _ => crate::fractal::FractalFormula::Mandelbulb { power: mandelbulb_power },
                         };
                         renderer.update_parameters(&params);
+                        renderer.set_combiner(comb_active, comb_formulas, comb_mode, comb_blend, comb_k);
 
                         let preview_size = egui::vec2(220.0, 150.0);
                         let w = preview_size.x.max(1.0).round() as u32;
@@ -1246,7 +1818,8 @@ impl FractalStudioApp {
                         match renderer.render_frame_to_texture(self.time, (w, h), ui.ctx()) {
                             Ok(tex_id) => {
                                 ui.add(egui::Image::new((tex_id, preview_size)));
-                                ui.label(format!("{} • {}×{}", self.fractal_types[self.selected_fractal], w, h));
+                                let name = match self.selected_fractal { 1 => "Mandelbulb", 2 => "Mandelbox", 4 => "Quaternion Julia", _ => "Mandelbulb" };
+                                ui.label(format!("{} • {}×{}", name, w, h));
                                 if self.current_workspace == WorkspaceView::NodeEditor {
                                     ui.label("Switch to Modeling/Rendering for the full viewport.");
                                 }
@@ -1316,18 +1889,54 @@ impl FractalStudioApp {
 
             // Lighting (like Mandelbulb3D)
             ui.collapsing("Lighting", |ui| {
-                ui.label("Lighting setup (TODO)");
-                if ui.button("Add Light").clicked() {
-                    // Save current state for undo
+                ui.label("Directional Light");
+                let mut dir = self.light_direction;
+                ui.horizontal(|ui| {
+                    ui.label("X");
+                    ui.add(egui::DragValue::new(&mut dir[0]).speed(0.05));
+                    ui.label("Y");
+                    ui.add(egui::DragValue::new(&mut dir[1]).speed(0.05));
+                    ui.label("Z");
+                    ui.add(egui::DragValue::new(&mut dir[2]).speed(0.05));
+                });
+                if dir != self.light_direction {
                     self.save_state_for_undo();
-                    
-                    // TODO: Add light
+                    self.light_direction = dir;
+                    if let Some(r) = &mut self.fractal_renderer {
+                        r.set_light_direction(self.light_direction);
+                    }
                 }
-                if ui.button("Reset Lighting").clicked() {
-                    // Save current state for undo
+
+                ui.separator();
+                ui.label("Light Color");
+                let mut color = self.light_color;
+                if ui.color_edit_button_rgb(&mut color).changed() {
                     self.save_state_for_undo();
-                    
-                    // TODO: Reset lighting
+                    self.light_color = color;
+                    if let Some(r) = &mut self.fractal_renderer {
+                        r.set_light_color(self.light_color);
+                    }
+                }
+
+                ui.add(egui::Slider::new(&mut self.light_intensity, 0.0..=10.0).text("Intensity"));
+                if ui.button("Apply Lighting").clicked() {
+                    if let Some(r) = &mut self.fractal_renderer {
+                        r.set_light_intensity(self.light_intensity);
+                        r.set_light_direction(self.light_direction);
+                        r.set_light_color(self.light_color);
+                    }
+                }
+
+                if ui.button("Reset Lighting").clicked() {
+                    self.save_state_for_undo();
+                    self.light_direction = [0.6, 0.8, 0.3];
+                    self.light_color = [1.0, 1.0, 1.0];
+                    self.light_intensity = 1.0;
+                    if let Some(r) = &mut self.fractal_renderer {
+                        r.set_light_direction(self.light_direction);
+                        r.set_light_color(self.light_color);
+                        r.set_light_intensity(self.light_intensity);
+                    }
                 }
             });
 
@@ -1335,18 +1944,24 @@ impl FractalStudioApp {
 
             // Materials (like Mandelbulb3D)
             ui.collapsing("Materials", |ui| {
-                ui.label("Material editor (TODO)");
-                if ui.button("New Material").clicked() {
-                    // Save current state for undo
-                    self.save_state_for_undo();
-                    
-                    // TODO: Create material
+                ui.add(egui::Slider::new(&mut self.material_metallic, 0.0..=1.0).text("Metallic"));
+                ui.add(egui::Slider::new(&mut self.material_roughness, 0.0..=1.0).text("Roughness"));
+
+                if ui.button("Apply Material").clicked() {
+                    if let Some(r) = &mut self.fractal_renderer {
+                        r.set_material_metallic(self.material_metallic);
+                        r.set_material_roughness(self.material_roughness);
+                    }
                 }
+
                 if ui.button("Reset Materials").clicked() {
-                    // Save current state for undo
                     self.save_state_for_undo();
-                    
-                    // TODO: Reset materials
+                    self.material_metallic = 0.05;
+                    self.material_roughness = 0.85;
+                    if let Some(r) = &mut self.fractal_renderer {
+                        r.set_material_metallic(self.material_metallic);
+                        r.set_material_roughness(self.material_roughness);
+                    }
                 }
             });
             
@@ -1369,6 +1984,58 @@ impl FractalStudioApp {
                 self.code_editor.show(ui);
             });
         });
+
+        // Status line
+        if let Some(msg) = &self.status_message {
+            ui.horizontal(|ui| {
+                ui.label(msg);
+            });
+        }
+    }
+
+    // Compact scene overview tree used across workspaces
+    fn show_scene_overview(&mut self, ui: &mut egui::Ui) {
+        ui.collapsing("Fractal", |ui| {
+            ui.label(format!(
+                "Type: {}",
+                self.selected_fractal_name()
+            ));
+            ui.label(format!(
+                "Iterations: {} | Power: {:.2} | Bailout: {:.2}",
+                self.max_iterations, self.power, self.bailout
+            ));
+            ui.label(format!(
+                "Position: ({:.2}, {:.2}, {:.2}) | Scale: {:.2}",
+                self.position[0], self.position[1], self.position[2], self.scale
+            ));
+        });
+
+        ui.collapsing("Camera", |ui| {
+            ui.label(format!("FOV: {:.1}°", self.camera_fov));
+            ui.label(format!(
+                "Target: ({:.2}, {:.2}, {:.2})",
+                self.camera_target[0], self.camera_target[1], self.camera_target[2]
+            ));
+        });
+
+        ui.collapsing("Lighting", |ui| {
+            ui.label(format!(
+                "Direction: ({:.2}, {:.2}, {:.2})",
+                self.light_direction[0], self.light_direction[1], self.light_direction[2]
+            ));
+            ui.label(format!(
+                "Color: ({:.2}, {:.2}, {:.2}) | Intensity: {:.2}",
+                self.light_color[0], self.light_color[1], self.light_color[2], self.light_intensity
+            ));
+        });
+
+        ui.collapsing("Materials", |ui| {
+            ui.label(format!(
+                "Metallic: {:.2} | Roughness: {:.2}",
+                self.material_metallic, self.material_roughness
+            ));
+            ui.label(format!("Color Saturation: {:.2}", self.color_saturation));
+        });
     }
 
     /// Show node editor panel
@@ -1386,6 +2053,12 @@ impl FractalStudioApp {
     /// Show fractal viewport
     fn show_fractal_viewport(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         let (rect, _response) = ui.allocate_exact_size(ui.max_rect().size(), egui::Sense::hover());
+        // Precompute selected name to avoid borrowing `self` during renderer mutable borrow
+        let selected_name = if self.selected_fractal < self.fractal_types.len() {
+            self.fractal_types[self.selected_fractal]
+        } else {
+            "Mandelbulb (Power 8)"
+        };
         
         // Try to get WGPU render state for GPU rendering
         if self.has_wgpu_support {
@@ -1400,12 +2073,15 @@ impl FractalStudioApp {
                 params.rotation = nalgebra::Vector3::new(self.rotation[0], self.rotation[1], self.rotation[2]);
                 params.color_saturation = self.color_saturation;
                 
-                // Set the fractal formula based on selection
+                // Set the fractal formula based on selection (aligns with fractal_types indices)
                 params.formula = match self.selected_fractal {
-                    0 => crate::fractal::FractalFormula::Mandelbrot { center: [-0.5, 0.0], zoom: 1.0 },
-                    1 => crate::fractal::FractalFormula::Mandelbulb { power: self.power },
-                    2 => crate::fractal::FractalFormula::Mandelbox { scale: self.scale },
-                    3 => crate::fractal::FractalFormula::Julia { c: [-0.7, 0.27015], max_iterations: self.max_iterations },
+                    // Mandelbulb variants
+                    0 | 1 | 2 => crate::fractal::FractalFormula::Mandelbulb { power: self.power },
+                    // Mandelbox variants
+                    3 | 4 | 5 => crate::fractal::FractalFormula::Mandelbox { scale: self.scale },
+                    // Quaternion Julia variants
+                    6 | 7 => crate::fractal::FractalFormula::QuaternionJulia { c: [0.3, 0.5, 0.4, 0.2], max_iterations: self.max_iterations },
+                    // Combiner presets and others default to single Mandelbulb for viewport
                     _ => crate::fractal::FractalFormula::Mandelbulb { power: self.power },
                 };
                 
@@ -1416,18 +2092,34 @@ impl FractalStudioApp {
                 let size = rect.size();
                 let width = size.x.max(1.0).round() as u32;
                 let height = size.y.max(1.0).round() as u32;
+                let scaled_w = ((width as f32) * self.render_scale).clamp(1.0, 8192.0).round() as u32;
+                let scaled_h = ((height as f32) * self.render_scale).clamp(1.0, 8192.0).round() as u32;
+                // Track the last viewport resolution for export actions
+                self.last_viewport_resolution = [scaled_w, scaled_h];
                 
-                // Render a frame and get the texture
-                match renderer.render_frame_to_texture(self.time, (width, height), ctx) {
-                    Ok(texture_id) => {
-                        // Display the texture
+                // Render a frame directly to persistent GPU texture
+                match renderer.render_frame_to_view(self.time, (scaled_w, scaled_h)) {
+                    Ok(()) => {
+                        // Display via registered Bevy Image texture if available; otherwise fallback later
                         let painter = ui.painter();
-                        painter.image(
-                            texture_id,
-                            rect,
-                            egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
-                            egui::Color32::WHITE,
-                        );
+                        if let Some(texture_id) = self.viewport_texture {
+                            painter.image(
+                                texture_id,
+                                rect,
+                                egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+                                egui::Color32::WHITE,
+                            );
+                        } else {
+                            // Ensure a visible placeholder when textures are not ready
+                            painter.rect_filled(rect, 0.0, egui::Color32::from_gray(28));
+                            painter.text(
+                                egui::pos2(rect.center().x, rect.top()) + egui::vec2(0.0, 12.0),
+                                egui::Align2::CENTER_TOP,
+                                "GPU viewport texture not registered yet",
+                                egui::FontId::proportional(14.0),
+                                egui::Color32::from_rgb(200, 200, 200),
+                            );
+                        }
                         
                         // Show overlay information
                         let align_left = egui::Align2::LEFT_TOP;
@@ -1439,13 +2131,67 @@ impl FractalStudioApp {
                             egui::Color32::from_rgb(255, 255, 255),
                         );
                         
+                        // Avoid borrow conflicts by computing name without borrowing `self` here
+                        let name = selected_name;
                         painter.text(
                             rect.min + egui::vec2(10.0, 30.0),
                             align_left,
-                            format!("Time: {:.1}s | Fractal: {}", self.time, self.fractal_types[self.selected_fractal]),
+                            format!("Time: {:.1}s | Fractal: {}", self.time, name),
                             egui::FontId::proportional(14.0),
                             egui::Color32::from_rgb(255, 255, 255),
                         );
+                        // GPU diagnostics HUD
+                        let stats = renderer.stats();
+    let backend = std::env::var("WGPU_BACKEND").unwrap_or_else(|_| "vulkan,dx12,gl".to_string());
+                        let power = std::env::var("WGPU_POWER_PREF").unwrap_or_else(|_| "HighPerformance".to_string());
+    let dx12_comp = std::env::var("WGPU_DX12_COMPILER").unwrap_or_else(|_| "fxc".to_string());
+                        painter.text(
+                            rect.min + egui::vec2(10.0, 50.0),
+                            align_left,
+                            format!(
+                                "Frames: {} | Preview: {}x{} | Workgroups: {}x{}",
+                                stats.frame_count,
+                                stats.last_preview_size.0,
+                                stats.last_preview_size.1,
+                                stats.last_workgroups.0,
+                                stats.last_workgroups.1
+                            ),
+                            egui::FontId::proportional(14.0),
+                            egui::Color32::from_rgb(200, 255, 200),
+                        );
+                        painter.text(
+                            rect.min + egui::vec2(10.0, 70.0),
+                            align_left,
+                            format!(
+                                "Map time: {:.1} ms | Backend: {} | Power: {} | DX12: {}",
+                                stats.last_map_time_ms,
+                                backend,
+                                power,
+                                dx12_comp
+                            ),
+                            egui::FontId::proportional(14.0),
+                            egui::Color32::from_rgb(200, 220, 255),
+                        );
+
+                        // If recording is active, pipe the current frame via CPU readback (export path unchanged)
+                        if self.is_recording {
+                            if let Some(recorder) = self.video_recorder.as_mut() {
+                                match renderer.render_image_readback(self.time, (width, height)) {
+                                    Ok((pixels, rw, rh)) => {
+                                        if rw == width && rh == height {
+                                            if let Err(e) = recorder.send_frame(&pixels) {
+                                                log::error!("Failed to write video frame: {:?}", e);
+                                            }
+                                        } else {
+                                            log::warn!("Recorded frame size mismatch: {}x{} vs {}x{}", rw, rh, width, height);
+                                        }
+                                    }
+                                    Err(e) => {
+                                        log::error!("Failed to render frame for recording: {}", e);
+                                    }
+                                }
+                            }
+                        }
                     }
                     Err(e) => {
                         // Renderer error
@@ -1614,7 +2360,7 @@ impl FractalStudioApp {
             painter.text(
                 rect.min + egui::vec2(10.0, 10.0),
                 align_left,
-                format!("Time: {:.1}s | Fractal: {}", self.time, self.fractal_types[self.selected_fractal]),
+                format!("Time: {:.1}s | Fractal: {}", self.time, self.selected_fractal_name()),
                 egui::FontId::proportional(14.0),
                 egui::Color32::from_rgb(255, 255, 255),
             );
@@ -1631,61 +2377,70 @@ impl FractalStudioApp {
             if ui.button("⏮").clicked() {
                 self.time = 0.0;
             }
-            if ui.button("⏯").clicked() {
-                // TODO: Implement play/pause
+            if ui.button(if self.is_playing { "⏸" } else { "⏯" }).clicked() {
+                self.is_playing = !self.is_playing;
+                if self.is_playing {
+                    self.last_update_instant = Some(Instant::now());
+                } else {
+                    self.last_update_instant = None;
+                }
             }
             if ui.button("⏹").clicked() {
-                // TODO: Implement stop
+                self.is_playing = false;
+                self.time = 0.0;
             }
             if ui.button("⏭").clicked() {
-                self.time += 1.0;
+                self.time = (self.time + 1.0).min(self.timeline_duration);
             }
             ui.label(format!("Time: {:.2}s", self.time));
             
+            ui.separator();
+            ui.add(egui::Slider::new(&mut self.playback_speed, 0.1..=4.0).text("Speed"));
+            ui.add(egui::Slider::new(&mut self.timeline_duration, 1.0..=600.0).text("Duration"));
+
             // Add a slider for time control
-            ui.add(egui::Slider::new(&mut self.time, 0.0..=100.0).text("Time"));
+            ui.add(egui::Slider::new(&mut self.time, 0.0..=self.timeline_duration).text("Time"));
         });
 
         // Simple timeline visualization
-        let timeline_rect = ui.max_rect();
+        let timeline_rect_all = ui.max_rect();
         let timeline_height = 100.0;
         let timeline_rect = egui::Rect::from_min_size(
-            timeline_rect.min,
-            egui::Vec2::new(timeline_rect.width(), timeline_height)
+            timeline_rect_all.min,
+            egui::Vec2::new(timeline_rect_all.width(), timeline_height)
         );
-        
-        ui.allocate_ui_at_rect(timeline_rect, |ui| {
-            let painter = ui.painter();
-            
-            // Draw timeline background
-            painter.rect_filled(
-                timeline_rect,
-                4.0,
-                egui::Color32::from_rgb(30, 30, 40),
+        // Reserve the space and draw into that rect
+        let _resp = ui.allocate_rect(timeline_rect, egui::Sense::hover());
+        let painter = ui.painter_at(timeline_rect);
+
+        // Draw timeline background
+        painter.rect_filled(
+            timeline_rect,
+            4.0,
+            egui::Color32::from_rgb(30, 30, 40),
+        );
+
+        // Draw time marker
+        let marker_x = timeline_rect.min.x + (self.time / self.timeline_duration.max(1.0)) * timeline_rect.width();
+        let marker_pos = egui::Pos2::new(marker_x, timeline_rect.center().y);
+        painter.circle_filled(
+            marker_pos,
+            8.0,
+            egui::Color32::from_rgb(100, 200, 255),
+        );
+
+        // Draw time labels
+        for i in 0..=10 {
+            let x = timeline_rect.min.x + (i as f32 / 10.0) * timeline_rect.width();
+            let y = timeline_rect.max.y - 20.0;
+            painter.text(
+                egui::Pos2::new(x, y),
+                egui::Align2::CENTER_CENTER,
+                format!("{:.0}s", (i as f32 / 10.0) * self.timeline_duration),
+                egui::FontId::proportional(12.0),
+                egui::Color32::from_rgb(200, 200, 200),
             );
-            
-            // Draw time marker
-            let marker_x = timeline_rect.min.x + (self.time / 100.0) * timeline_rect.width();
-            let marker_pos = egui::Pos2::new(marker_x, timeline_rect.center().y);
-            painter.circle_filled(
-                marker_pos,
-                8.0,
-                egui::Color32::from_rgb(100, 200, 255),
-            );
-            
-            // Draw time labels
-            for i in 0..=10 {
-                let x = timeline_rect.min.x + (i as f32 / 10.0) * timeline_rect.width();
-                let y = timeline_rect.max.y - 20.0;
-                painter.text(
-                    egui::Pos2::new(x, y),
-                    egui::Align2::CENTER_CENTER,
-                    format!("{}s", i * 10),
-                    egui::FontId::proportional(12.0),
-                    egui::Color32::from_rgb(200, 200, 200),
-                );
-            }
-        });
+        }
     }
 
     /// Show audio visualization panel
@@ -1736,79 +2491,75 @@ impl FractalStudioApp {
 
         // Show spectrum visualization
         ui.label("Frequency Spectrum:");
-        let spectrum_rect = ui.max_rect();
+        let spectrum_rect_all = ui.max_rect();
         let spectrum_height = 100.0;
         let spectrum_rect = egui::Rect::from_min_size(
-            spectrum_rect.min,
-            egui::Vec2::new(spectrum_rect.width(), spectrum_height)
+            spectrum_rect_all.min,
+            egui::Vec2::new(spectrum_rect_all.width(), spectrum_height)
         );
-        
-        ui.allocate_ui_at_rect(spectrum_rect, |ui| {
-            let painter = ui.painter();
-            
-            // Draw spectrum background
-            painter.rect_filled(
-                spectrum_rect,
-                4.0,
-                egui::Color32::from_rgb(25, 25, 35),
+        let _resp = ui.allocate_rect(spectrum_rect, egui::Sense::hover());
+        let painter = ui.painter_at(spectrum_rect);
+
+        // Draw spectrum background
+        painter.rect_filled(
+            spectrum_rect,
+            4.0,
+            egui::Color32::from_rgb(25, 25, 35),
+        );
+
+        // Draw spectrum bars
+        let bar_width = spectrum_rect.width() / audio_data.spectrum.len() as f32;
+        for (i, &value) in audio_data.spectrum.iter().enumerate() {
+            let x = spectrum_rect.min.x + i as f32 * bar_width;
+            let bar_height = value * spectrum_rect.height();
+            let bar_rect = egui::Rect::from_min_size(
+                egui::Pos2::new(x, spectrum_rect.max.y - bar_height),
+                egui::Vec2::new(bar_width - 1.0, bar_height)
             );
             
-            // Draw spectrum bars
-            let bar_width = spectrum_rect.width() / audio_data.spectrum.len() as f32;
-            for (i, &value) in audio_data.spectrum.iter().enumerate() {
-                let x = spectrum_rect.min.x + i as f32 * bar_width;
-                let bar_height = value * spectrum_rect.height();
-                let bar_rect = egui::Rect::from_min_size(
-                    egui::Pos2::new(x, spectrum_rect.max.y - bar_height),
-                    egui::Vec2::new(bar_width - 1.0, bar_height)
-                );
-                
-                // Color based on frequency
-                let color_value = (i as f32 / audio_data.spectrum.len() as f32 * 255.0) as u8;
-                let bar_color = egui::Color32::from_rgb(color_value, 200, 255 - color_value);
-                
-                painter.rect_filled(bar_rect, 1.0, bar_color);
-            }
-        });
+            // Color based on frequency
+            let color_value = (i as f32 / audio_data.spectrum.len() as f32 * 255.0) as u8;
+            let bar_color = egui::Color32::from_rgb(color_value, 200, 255 - color_value);
+            
+            painter.rect_filled(bar_rect, 1.0, bar_color);
+        }
 
         ui.separator();
 
         // Show waveform visualization
         ui.label("Waveform:");
-        let waveform_rect = ui.max_rect();
+        let waveform_rect_all = ui.max_rect();
         let waveform_height = 80.0;
         let waveform_rect = egui::Rect::from_min_size(
-            waveform_rect.min,
-            egui::Vec2::new(waveform_rect.width(), waveform_height)
+            waveform_rect_all.min,
+            egui::Vec2::new(waveform_rect_all.width(), waveform_height)
         );
-        
-        ui.allocate_ui_at_rect(waveform_rect, |ui| {
-            let painter = ui.painter();
+        let _resp = ui.allocate_rect(waveform_rect, egui::Sense::hover());
+        let painter = ui.painter_at(waveform_rect);
+
+        // Draw waveform background
+        painter.rect_filled(
+            waveform_rect,
+            4.0,
+            egui::Color32::from_rgb(30, 30, 40),
+        );
+
+        // Draw waveform line
+        if !audio_data.waveform.is_empty() {
+            let mut points = Vec::new();
+            let step = waveform_rect.width() / audio_data.waveform.len() as f32;
             
-            // Draw waveform background
-            painter.rect_filled(
-                waveform_rect,
-                4.0,
-                egui::Color32::from_rgb(30, 30, 40),
-            );
-            
-            // Draw waveform line
-            if !audio_data.waveform.is_empty() {
-                let mut points = Vec::new();
-                let step = waveform_rect.width() / audio_data.waveform.len() as f32;
-                
-                for (i, &value) in audio_data.waveform.iter().enumerate() {
-                    let x = waveform_rect.min.x + i as f32 * step;
-                    let y = waveform_rect.center().y - value * waveform_rect.height() / 2.0;
-                    points.push(egui::Pos2::new(x, y));
-                }
-                
-                painter.add(egui::Shape::line(
-                    points,
-                    egui::Stroke::new(2.0, egui::Color32::from_rgb(100, 200, 255))
-                ));
+            for (i, &value) in audio_data.waveform.iter().enumerate() {
+                let x = waveform_rect.min.x + i as f32 * step;
+                let y = waveform_rect.center().y - value * waveform_rect.height() / 2.0;
+                points.push(egui::Pos2::new(x, y));
             }
-        });
+            
+            painter.add(egui::Shape::line(
+                points,
+                egui::Stroke::new(2.0, egui::Color32::from_rgb(100, 200, 255))
+            ));
+        }
     }
 
     /// Create a snapshot of the current application state
@@ -1823,6 +2574,13 @@ impl FractalStudioApp {
             position: self.position,
             rotation: self.rotation,
             color_saturation: self.color_saturation,
+            camera_fov: self.camera_fov,
+            camera_target: self.camera_target,
+            light_direction: self.light_direction,
+            light_color: self.light_color,
+            light_intensity: self.light_intensity,
+            material_metallic: self.material_metallic,
+            material_roughness: self.material_roughness,
             current_workspace: self.current_workspace,
         }
     }
@@ -1838,7 +2596,24 @@ impl FractalStudioApp {
         self.position = snapshot.position;
         self.rotation = snapshot.rotation;
         self.color_saturation = snapshot.color_saturation;
+        self.camera_fov = snapshot.camera_fov;
+        self.camera_target = snapshot.camera_target;
+        self.light_direction = snapshot.light_direction;
+        self.light_color = snapshot.light_color;
+        self.light_intensity = snapshot.light_intensity;
+        self.material_metallic = snapshot.material_metallic;
+        self.material_roughness = snapshot.material_roughness;
         self.current_workspace = snapshot.current_workspace;
+
+        if let Some(r) = &mut self.fractal_renderer {
+            r.set_camera_fov(self.camera_fov);
+            r.set_camera_target(self.camera_target);
+            r.set_light_direction(self.light_direction);
+            r.set_light_color(self.light_color);
+            r.set_light_intensity(self.light_intensity);
+            r.set_material_metallic(self.material_metallic);
+            r.set_material_roughness(self.material_roughness);
+        }
     }
 
     /// Save current state to undo stack
@@ -1875,6 +2650,157 @@ impl FractalStudioApp {
 
     /// Reset parameters based on fractal type
     fn reset_parameters_for_fractal_type(&mut self, fractal_type: usize) {
+        // First, handle presets by name to keep behavior aligned with the selection menu
+        if fractal_type < self.fractal_types.len() {
+            let name = self.fractal_types[fractal_type];
+            match name {
+                // Mandelbulb presets
+                "Mandelbulb (Power 8)" => {
+                    self.max_iterations = 60;
+                    self.power = 8.0;
+                    self.bailout = 4.0;
+                    self.scale = 1.0;
+                    self.position = [0.0, 0.0, 0.0];
+                    self.rotation = [0.0, 0.0, 0.0];
+                    return;
+                }
+                "Mandelbulb (Power 10)" => {
+                    self.max_iterations = 65;
+                    self.power = 10.0;
+                    self.bailout = 4.0;
+                    self.scale = 1.0;
+                    self.position = [0.0, 0.0, 0.0];
+                    self.rotation = [0.0, 0.0, 0.0];
+                    return;
+                }
+                "Mandelbulb (Power 6)" => {
+                    self.max_iterations = 55;
+                    self.power = 6.0;
+                    self.bailout = 4.0;
+                    self.scale = 1.0;
+                    self.position = [0.0, 0.0, 0.0];
+                    self.rotation = [0.0, 0.0, 0.0];
+                    return;
+                }
+
+                // Mandelbox presets
+                "Mandelbox (Scale 2.0)" => {
+                    self.max_iterations = 24;
+                    self.scale = 2.0;
+                    self.power = 2.0;
+                    self.bailout = 4.0;
+                    self.position = [0.0, 0.0, 0.0];
+                    self.rotation = [0.0, 0.0, 0.0];
+                    return;
+                }
+                "Mandelbox (Scale 1.8)" => {
+                    self.max_iterations = 22;
+                    self.scale = 1.8;
+                    self.power = 2.0;
+                    self.bailout = 4.0;
+                    self.position = [0.0, 0.0, 0.0];
+                    self.rotation = [0.0, 0.0, 0.0];
+                    return;
+                }
+                "Mandelbox (Scale 2.2)" => {
+                    self.max_iterations = 26;
+                    self.scale = 2.2;
+                    self.power = 2.0;
+                    self.bailout = 4.0;
+                    self.position = [0.0, 0.0, 0.0];
+                    self.rotation = [0.0, 0.0, 0.0];
+                    return;
+                }
+
+                // Quaternion Julia presets
+                "Quaternion Julia (Classic)" => {
+                    self.max_iterations = 90;
+                    self.power = 2.0;
+                    self.scale = 1.0;
+                    self.bailout = 4.0;
+                    self.rotation = [0.3, 0.5, 0.4];
+                    self.position = [0.0, 0.0, 0.0];
+                    return;
+                }
+                "Quaternion Julia (Variant)" => {
+                    self.max_iterations = 90;
+                    self.power = 2.0;
+                    self.scale = 1.0;
+                    self.bailout = 4.0;
+                    self.rotation = [0.6, 0.2, 0.3];
+                    self.position = [0.0, 0.0, 0.0];
+                    return;
+                }
+
+                // Combiner presets – provide sensible defaults for color and iteration
+                "Bulb ∪ Box (Union)" => {
+                    self.max_iterations = 60;
+                    self.power = 8.0; // base bulb detail
+                    self.scale = 2.0; // box scale
+                    self.bailout = 6.0;
+                    self.color_saturation = 0.9;
+                    return;
+                }
+                "Bulb ∩ Box (Intersection)" => {
+                    self.max_iterations = 60;
+                    self.power = 8.0;
+                    self.scale = 2.0;
+                    self.bailout = 6.0;
+                    self.color_saturation = 0.85;
+                    return;
+                }
+                "Bulb − Box (Subtraction)" => {
+                    self.max_iterations = 60;
+                    self.power = 8.0;
+                    self.scale = 2.0;
+                    self.bailout = 6.0;
+                    self.color_saturation = 0.85;
+                    return;
+                }
+                "Smooth Union (Bulb, Box)" => {
+                    self.max_iterations = 70;
+                    self.power = 8.0;
+                    self.scale = 2.0;
+                    self.bailout = 6.0;
+                    self.color_saturation = 0.95;
+                    return;
+                }
+                "Smooth Intersect (Box, QJulia)" => {
+                    self.max_iterations = 85;
+                    self.scale = 2.0;
+                    self.rotation = [0.3, 0.5, 0.4];
+                    self.bailout = 6.0;
+                    self.color_saturation = 0.9;
+                    return;
+                }
+                "Smooth Subtract (Bulb, QJulia)" => {
+                    self.max_iterations = 85;
+                    self.power = 8.0;
+                    self.rotation = [0.6, 0.2, 0.3];
+                    self.bailout = 6.0;
+                    self.color_saturation = 0.9;
+                    return;
+                }
+                "Triplet Smooth Union (Bulb+Box+QJulia)" => {
+                    self.max_iterations = 90;
+                    self.power = 8.0;
+                    self.scale = 2.0;
+                    self.rotation = [0.4, 0.4, 0.2];
+                    self.bailout = 6.0;
+                    self.color_saturation = 0.95;
+                    return;
+                }
+                "Box ∩ QJulia (Intersection)" => {
+                    self.max_iterations = 85;
+                    self.scale = 2.0;
+                    self.rotation = [0.35, 0.45, 0.25];
+                    self.bailout = 6.0;
+                    self.color_saturation = 0.9;
+                    return;
+                }
+                _ => {}
+            }
+        }
         match fractal_type {
             0 => { // Mandelbrot
                 self.max_iterations = 100;
@@ -1904,12 +2830,12 @@ impl FractalStudioApp {
                 self.bailout = 4.0;
                 self.position = [0.0, 0.0, 0.0];
             }
-            4 => { // Burning Ship
+            4 => { // Quaternion Julia (3D)
                 self.max_iterations = 100;
                 self.scale = 1.0;
                 self.power = 2.0;
                 self.bailout = 4.0;
-                self.position = [-0.5, -0.5, 0.0];
+                self.position = [0.0, 0.0, 0.0];
             }
             5 => { // Nova
                 self.max_iterations = 100;
@@ -2021,7 +2947,7 @@ impl FractalStudioApp {
     }
     
     /// Show MIDI controls panel
-    fn show_midi_controls(&mut self, ui: &mut egui::Ui, midi_controller: &crate::audio::MidiController) {
+    fn show_midi_controls(&mut self, ui: &mut egui::Ui, midi_controller: &mut crate::audio::MidiController) {
         ui.heading("MIDI Controls");
         ui.separator();
 
@@ -2062,17 +2988,52 @@ impl FractalStudioApp {
 
         ui.separator();
 
-        // Add mapping controls
+        // Add mapping info (no unsafe state)
         ui.collapsing("Add MIDI Mapping", |ui| {
-            ui.label("Create new MIDI parameter mappings:");
-            
-            // TODO: Implement MIDI mapping creation UI
-            ui.label("MIDI mapping creation would go here");
+            ui.label("Create a new mapping:");
+            ui.horizontal(|ui| {
+                ui.label("Parameter:");
+                ui.text_edit_singleline(&mut self.midi_param_name);
+            });
+            ui.horizontal(|ui| {
+                ui.label("Channel:");
+                let mut ch = self.midi_channel as i32;
+                if ui.add(egui::DragValue::new(&mut ch).clamp_range(1..=16)).changed() {
+                    self.midi_channel = ch as u8;
+                }
+                ui.label("CC:");
+                let mut cc = self.midi_controller_cc as i32;
+                if ui.add(egui::DragValue::new(&mut cc).clamp_range(0..=127)).changed() {
+                    self.midi_controller_cc = cc as u8;
+                }
+            });
+            ui.horizontal(|ui| {
+                ui.label("Min:");
+                ui.add(egui::DragValue::new(&mut self.midi_min_value).speed(0.01));
+                ui.label("Max:");
+                ui.add(egui::DragValue::new(&mut self.midi_max_value).speed(0.01));
+            });
+            ui.horizontal(|ui| {
+                ui.label("Sensitivity:");
+                ui.add(egui::DragValue::new(&mut self.midi_sensitivity).speed(0.01));
+                ui.checkbox(&mut self.midi_invert, "Invert");
+            });
+            if ui.button("Create Mapping").clicked() {
+                let mapping = crate::audio::MidiMapping {
+                    channel: self.midi_channel,
+                    controller: self.midi_controller_cc,
+                    parameter_name: self.midi_param_name.clone(),
+                    min_value: self.midi_min_value,
+                    max_value: self.midi_max_value,
+                };
+                midi_controller.add_mapping(mapping);
+                self.status_message = Some("MIDI mapping added".to_string());
+            }
         });
     }
 
     /// Show OSC controls panel
-    fn show_osc_controls(&mut self, ui: &mut egui::Ui, osc_controller: &crate::osc::OscController) {
+    fn show_osc_controls(&mut self, ui: &mut egui::Ui, osc_controller: &mut crate::osc::OscController) {
         ui.heading("OSC Controls");
         ui.separator();
 
@@ -2081,7 +3042,8 @@ impl FractalStudioApp {
             ui.label(egui::RichText::new("OSC Server:").strong());
             ui.label("Running on port 8000");
             if ui.button("Stop Server").clicked() {
-                // TODO: Implement OSC server stop
+                osc_controller.stop_server();
+                self.status_message = Some("OSC server stopped".to_string());
             }
         });
 
@@ -2124,17 +3086,45 @@ impl FractalStudioApp {
 
         ui.separator();
 
-        // Add mapping controls
+        // Add mapping info (no unsafe state)
         ui.collapsing("Add OSC Mapping", |ui| {
-            ui.label("Create new OSC parameter mappings:");
-            
-            // TODO: Implement OSC mapping creation UI
-            ui.label("OSC mapping creation would go here");
+            ui.label("Create a new OSC mapping:");
+            ui.horizontal(|ui| {
+                ui.label("Address:");
+                ui.text_edit_singleline(&mut self.osc_address);
+            });
+            ui.horizontal(|ui| {
+                ui.label("Parameter:");
+                ui.text_edit_singleline(&mut self.osc_param_name);
+            });
+            ui.horizontal(|ui| {
+                ui.label("Min:");
+                ui.add(egui::DragValue::new(&mut self.osc_min_value).speed(0.01));
+                ui.label("Max:");
+                ui.add(egui::DragValue::new(&mut self.osc_max_value).speed(0.01));
+            });
+            ui.horizontal(|ui| {
+                ui.label("Sensitivity:");
+                ui.add(egui::DragValue::new(&mut self.osc_sensitivity).speed(0.01));
+                ui.checkbox(&mut self.osc_invert, "Invert");
+            });
+            if ui.button("Create Mapping").clicked() {
+                let mapping = crate::osc::OscMapping {
+                    osc_address: self.osc_address.clone(),
+                    parameter_name: self.osc_param_name.clone(),
+                    min_value: self.osc_min_value,
+                    max_value: self.osc_max_value,
+                    sensitivity: self.osc_sensitivity,
+                    invert: self.osc_invert,
+                };
+                osc_controller.add_mapping(mapping);
+                self.status_message = Some("OSC mapping added".to_string());
+            }
         });
     }
 
     /// Show gesture controls panel
-    fn show_gesture_controls(&mut self, ui: &mut egui::Ui, gesture_controller: &crate::gesture::GestureController) {
+    fn show_gesture_controls(&mut self, ui: &mut egui::Ui, gesture_controller: &mut crate::gesture::GestureController) {
         ui.heading("Gesture Controls");
         ui.separator();
 
@@ -2181,49 +3171,167 @@ impl FractalStudioApp {
         // Show current active gestures
         ui.label(egui::RichText::new("Active Gestures:").strong());
         
-        // Get current gesture data
-        let gesture_data = gesture_controller.gesture_data.lock().unwrap();
-        
-        egui::ScrollArea::vertical().max_height(150.0).show(ui, |ui| {
-            for (gesture_name, value) in &gesture_data.active_gestures {
-                ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new(gesture_name).monospace());
-                    ui.add(egui::ProgressBar::new(*value).animate(true));
-                    ui.label(format!("{:.2}", value));
+        {
+            // Limit the lifetime of the lock guard to this block and avoid panics on poisoned mutex
+            if let Ok(gesture_data) = gesture_controller.gesture_data.lock() {
+                egui::ScrollArea::vertical().max_height(150.0).show(ui, |ui| {
+                    for (gesture_name, value) in &gesture_data.active_gestures {
+                        ui.horizontal(|ui| {
+                            ui.label(egui::RichText::new(gesture_name).monospace());
+                            ui.add(egui::ProgressBar::new(*value).animate(true));
+                            ui.label(format!("{:.2}", value));
+                        });
+                    }
+
+                    // Show hand positions if available
+                    if !gesture_data.hand_positions.is_empty() {
+                        ui.separator();
+                        ui.label(egui::RichText::new("Hand Positions:").strong());
+                        for (i, hand) in gesture_data.hand_positions.iter().enumerate() {
+                            ui.label(format!("Hand {}: ({:.2}, {:.2}, {:.2})", i, hand.palm_position[0], hand.palm_position[1], hand.palm_position[2]));
+                        }
+                    }
                 });
+            } else {
+                ui.label(egui::RichText::new("Gesture data unavailable").color(egui::Color32::RED));
             }
-            
-            // Show hand positions if available
-            if !gesture_data.hand_positions.is_empty() {
-                ui.separator();
-                ui.label(egui::RichText::new("Hand Positions:").strong());
-                for (i, hand) in gesture_data.hand_positions.iter().enumerate() {
-                    ui.label(format!("Hand {}: ({:.2}, {:.2}, {:.2})", i, hand.palm_position[0], hand.palm_position[1], hand.palm_position[2]));
-                }
-            }
-        });
+        }
 
         ui.separator();
 
-        // Add mapping controls
+        // Add mapping info (no unsafe state)
         ui.collapsing("Add Gesture Mapping", |ui| {
-            ui.label("Create new gesture parameter mappings:");
-            
-            // TODO: Implement gesture mapping creation UI
-            ui.label("Gesture mapping creation would go here");
+            ui.label("Create a new gesture mapping:");
+            ui.horizontal(|ui| {
+                ui.label("Gesture:");
+                ui.text_edit_singleline(&mut self.gesture_name);
+            });
+            ui.horizontal(|ui| {
+                ui.label("Parameter:");
+                ui.text_edit_singleline(&mut self.gesture_param_name);
+            });
+            ui.horizontal(|ui| {
+                ui.label("Min:");
+                ui.add(egui::DragValue::new(&mut self.gesture_min_value).speed(0.01));
+                ui.label("Max:");
+                ui.add(egui::DragValue::new(&mut self.gesture_max_value).speed(0.01));
+            });
+            ui.horizontal(|ui| {
+                ui.label("Sensitivity:");
+                ui.add(egui::DragValue::new(&mut self.gesture_sensitivity).speed(0.01));
+                ui.checkbox(&mut self.gesture_invert, "Invert");
+            });
+            if ui.button("Create Mapping").clicked() {
+                let mapping = crate::gesture::GestureMapping {
+                    gesture_name: self.gesture_name.clone(),
+                    parameter_name: self.gesture_param_name.clone(),
+                    min_value: self.gesture_min_value,
+                    max_value: self.gesture_max_value,
+                    sensitivity: self.gesture_sensitivity,
+                    invert: self.gesture_invert,
+                };
+                gesture_controller.add_mapping(mapping);
+                self.status_message = Some("Gesture mapping added".to_string());
+            }
         });
     }
 }
 
 impl FractalStudioApp {
-    pub fn update(&mut self, ctx: &egui::Context, audio_data: Option<&crate::audio::AudioData>, midi_controller: Option<&crate::audio::MidiController>, osc_controller: Option<&crate::osc::OscController>, gesture_controller: Option<&crate::gesture::GestureController>) {
+    pub fn update(&mut self, ctx: &egui::Context, audio_data: Option<&crate::audio::AudioData>, midi_controller: Option<&mut crate::audio::MidiController>, osc_controller: Option<&mut crate::osc::OscController>, gesture_controller: Option<&mut crate::gesture::GestureController>) {
         log::debug!("Update started");
         
-        // Update time for animations
-        // Note: Avoid reading input delta directly here to prevent egui context panics
-        // when the context has not begun a frame yet in some integrations.
-        // Time progression is handled externally or by renderer updates.
+        // Playback time progression using wall-clock delta
+        if self.is_playing {
+            let now = Instant::now();
+            if let Some(prev) = self.last_update_instant {
+                let dt = (now - prev).as_secs_f32();
+                self.time = (self.time + dt * self.playback_speed).min(self.timeline_duration);
+                if self.time >= self.timeline_duration {
+                    self.is_playing = false;
+                }
+            }
+            self.last_update_instant = Some(now);
+        } else {
+            self.last_update_instant = None;
+        }
         
+        // Apply controller-mapped values
+        if let Some(midi) = midi_controller.as_deref() {
+            let speed = midi.get_parameter("speed");
+            if speed > 0.0 { self.playback_speed = speed.clamp(0.1, 4.0); }
+            let zoom = midi.get_parameter("zoom");
+            if zoom > 0.0 { self.scale = zoom; }
+            let iters = midi.get_parameter("iterations");
+            if iters > 0.0 { self.max_iterations = iters as u32; }
+            let sat = midi.get_parameter("saturation");
+            if sat > 0.0 { self.color_saturation = sat.clamp(0.0, 2.0); }
+        }
+
+        // WGSL shader hot-reload polling (debounced)
+        if self.shader_hot_reload_enabled {
+            let now = Instant::now();
+            let can_poll = match self.last_hot_reload_poll {
+                Some(prev) => (now - prev).as_millis() > 250,
+                None => true,
+            };
+            if can_poll {
+                self.last_hot_reload_poll = Some(now);
+                if let Some(path) = &self.current_shader_path {
+                    if let Ok(md) = std::fs::metadata(path) {
+                        if let Ok(modified) = md.modified() {
+                            let should_reload = match self.shader_last_modified {
+                                Some(prev) => modified > prev,
+                                None => true,
+                            };
+                            if should_reload {
+                                match std::fs::read_to_string(path) {
+                                    Ok(contents) => {
+                                        if let Some(renderer) = &mut self.fractal_renderer {
+                                            match renderer.load_fragment_wgsl(&contents) {
+                                                Ok(()) => {
+                                                    renderer.set_fragment_pseudo3d(true);
+                                                    self.use_fragment_pseudo3d = true;
+                                                    self.shader_last_modified = Some(modified);
+                                                    self.status_message = Some(format!("Hot reloaded shader: {}", path.display()));
+                                                }
+                                                Err(e) => {
+                                                    self.status_message = Some(format!("Hot reload failed: {}", e));
+                                                }
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        log::error!("Failed to read shader for hot reload: {}", e);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if let Some(osc) = osc_controller.as_deref() {
+            let speed = osc.get_parameter("speed");
+            if speed > 0.0 { self.playback_speed = speed.clamp(0.1, 4.0); }
+            let zoom = osc.get_parameter("zoom");
+            if zoom > 0.0 { self.scale = zoom; }
+            let iters = osc.get_parameter("iterations");
+            if iters > 0.0 { self.max_iterations = iters as u32; }
+            let sat = osc.get_parameter("saturation");
+            if sat > 0.0 { self.color_saturation = sat.clamp(0.0, 2.0); }
+        }
+        if let Some(gesture) = gesture_controller.as_deref() {
+            let speed = gesture.get_parameter("speed");
+            if speed > 0.0 { self.playback_speed = speed.clamp(0.1, 4.0); }
+            let zoom = gesture.get_parameter("zoom");
+            if zoom > 0.0 { self.scale = zoom; }
+            let iters = gesture.get_parameter("iterations");
+            if iters > 0.0 { self.max_iterations = iters as u32; }
+            let sat = gesture.get_parameter("saturation");
+            if sat > 0.0 { self.color_saturation = sat.clamp(0.0, 2.0); }
+        }
+
         // Update fractal renderer if available
         if let Some(renderer) = &mut self.fractal_renderer {
             // Update renderer parameters before rendering
@@ -2238,44 +3346,107 @@ impl FractalStudioApp {
             
             // Set the fractal formula based on selection
             params.formula = match self.selected_fractal {
-                0 => crate::fractal::FractalFormula::Mandelbrot { center: [-0.5, 0.0], zoom: 1.0 },
                 1 => crate::fractal::FractalFormula::Mandelbulb { power: self.power },
                 2 => crate::fractal::FractalFormula::Mandelbox { scale: self.scale },
-                3 => crate::fractal::FractalFormula::Julia { c: [-0.7, 0.27015], max_iterations: self.max_iterations },
+                4 => crate::fractal::FractalFormula::QuaternionJulia { c: [0.3, 0.5, 0.4, 0.2], max_iterations: self.max_iterations },
                 _ => crate::fractal::FractalFormula::Mandelbulb { power: self.power },
             };
             
-            // Update renderer with current parameters
+            // Update renderer with current parameters (timed)
+            let t0 = Instant::now();
             renderer.update_parameters(&params);
+            let t1 = Instant::now();
+            self.metrics.mark_renderer_update(t1.duration_since(t0));
         }
 
         // Main UI layout
+        let t_top_0 = Instant::now();
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             self.show_top_panel(ui);
         });
+        let t_top_1 = Instant::now();
+        self.metrics.mark_ui_top(t_top_1.duration_since(t_top_0));
+
+        // GPU Settings window (GUI-only)
+        egui::Window::new("GPU Settings")
+            .open(&mut self.show_gpu_settings_window)
+            .resizable(false)
+            .show(ctx, |ui| {
+                ui.label("Select GPU backend:");
+                for backend in ["AUTO", "Vulkan", "DX12", "Metal", "GL"].iter() {
+                    ui.radio_value(&mut self.gpu_backend, backend.to_string(), *backend);
+                }
+
+                ui.separator();
+                ui.label("Power preference:");
+                for pref in ["LowPower", "HighPerformance"].iter() {
+                    ui.radio_value(&mut self.gpu_power_pref, pref.to_string(), *pref);
+                }
+
+                // DX12 compiler option (Windows only relevant)
+                ui.separator();
+                ui.label("DX12 compiler:");
+                for comp in ["fxc", "dxcompiler"].iter() {
+                    ui.radio_value(&mut self.gpu_dx12_compiler, comp.to_string(), *comp);
+                }
+
+                ui.separator();
+                if ui.button("Apply Settings").clicked() {
+                    // Apply environment variables so future GPU init uses them
+                    std::env::set_var("WGPU_BACKEND", &self.gpu_backend);
+                    std::env::set_var("WGPU_POWER_PREF", &self.gpu_power_pref);
+                    std::env::set_var("WGPU_DX12_COMPILER", &self.gpu_dx12_compiler);
+                    self.status_message = Some("GPU settings applied. Backend changes require restart.".to_string());
+                }
+                if ui.button("Apply & Restart").clicked() {
+                    // Apply env and attempt a self-restart so new backend takes effect
+                    std::env::set_var("WGPU_BACKEND", &self.gpu_backend);
+                    std::env::set_var("WGPU_POWER_PREF", &self.gpu_power_pref);
+                    std::env::set_var("WGPU_DX12_COMPILER", &self.gpu_dx12_compiler);
+                    if let Ok(exe) = std::env::current_exe() {
+                        let args: Vec<String> = std::env::args().skip(1).collect();
+                        let mut cmd = std::process::Command::new(exe);
+                        for (k, v) in [
+                            ("WGPU_BACKEND", self.gpu_backend.clone()),
+                            ("WGPU_POWER_PREF", self.gpu_power_pref.clone()),
+                            ("WGPU_DX12_COMPILER", self.gpu_dx12_compiler.clone()),
+                        ] {
+                            cmd.env(k, v);
+                        }
+                        let _ = cmd.args(&args).spawn();
+                        // Exit current process to allow the new instance to take over
+                        std::process::exit(0);
+                    } else {
+                        self.status_message = Some("Failed to restart application. Please restart manually.".to_string());
+                    }
+                }
+            });
 
         // Show workspace-specific panels
         match self.current_workspace {
             WorkspaceView::Modeling => {
                 // Left panel for scene hierarchy and fractal controls
                 if self.show_left_panel {
+                    let t_left_0 = Instant::now();
                     egui::SidePanel::left("left_panel")
                         .default_width(250.0)
                         .show(ctx, |ui| {
                             ui.heading("Scene Hierarchy");
                             ui.separator();
-                            // TODO: Show scene hierarchy
-                            ui.label("Scene objects would go here");
+                            self.show_scene_overview(ui);
                             
                             ui.separator();
                             ui.heading("Fractal Controls");
                             ui.separator();
                             self.show_fractal_controls(ui);
                         });
+                    let t_left_1 = Instant::now();
+                    self.metrics.mark_ui_left(t_left_1.duration_since(t_left_0));
                 }
 
                 // Right panel for properties and tools
                 if self.show_right_panel {
+                    let t_right_0 = Instant::now();
                     egui::SidePanel::right("right_panel")
                         .min_width(250.0)
                         .max_width(250.0)
@@ -2283,13 +3454,38 @@ impl FractalStudioApp {
                         .show(ctx, |ui| {
                             ui.heading("Properties");
                             ui.separator();
-                            // TODO: Show selected object properties
-                            ui.label("Object properties would go here");
+                            // Compact object properties overview
+                            ui.label(format!(
+                                "Fractal: {} | Iter: {} | Power: {:.2}",
+                                self.selected_fractal_name(), self.max_iterations, self.power
+                            ));
+                            ui.label(format!(
+                                "Camera FOV: {:.1}° | Target: ({:.1}, {:.1}, {:.1})",
+                                self.camera_fov,
+                                self.camera_target[0], self.camera_target[1], self.camera_target[2]
+                            ));
+                            ui.label(format!(
+                                "Light dir: ({:.1}, {:.1}, {:.1}) | Intensity: {:.2}",
+                                self.light_direction[0], self.light_direction[1], self.light_direction[2],
+                                self.light_intensity
+                            ));
                             
                             ui.separator();
                             ui.heading("Tools");
                             ui.separator();
-                            ui.label("Modeling tools would go here");
+                            ui.label("Quality Presets:");
+                            ui.horizontal(|ui| {
+                                if ui.button("Medium").clicked() {
+                                    if let Some(renderer) = &mut self.fractal_renderer {
+                                        renderer.apply_quality_preset(crate::fractal::types::QualityPreset::Medium, Some(self.last_viewport_resolution));
+                                    }
+                                }
+                                if ui.button("Ultra").clicked() {
+                                    if let Some(renderer) = &mut self.fractal_renderer {
+                                        renderer.apply_quality_preset(crate::fractal::types::QualityPreset::Ultra, Some(self.last_viewport_resolution));
+                                    }
+                                }
+                            });
                             
                             // Show audio visualization if audio data is available
                             if let Some(audio) = audio_data {
@@ -2303,21 +3499,29 @@ impl FractalStudioApp {
                                 self.show_midi_controls(ui, midi);
                             }
                         });
+                    let t_right_1 = Instant::now();
+                    self.metrics.mark_ui_right(t_right_1.duration_since(t_right_0));
                 }
 
                 // Bottom panel for timeline
                 if self.show_bottom_panel {
+                    let t_bottom_0 = Instant::now();
                     egui::TopBottomPanel::bottom("bottom_panel")
                         .default_height(100.0)
                         .show(ctx, |ui| {
                             self.show_timeline_panel(ui);
                         });
+                    let t_bottom_1 = Instant::now();
+                    self.metrics.mark_ui_bottom(t_bottom_1.duration_since(t_bottom_0));
                 }
 
                 // Central panel for 3D viewport
+                let t_viewport_0 = Instant::now();
                 egui::CentralPanel::default().show(ctx, |ui| {
                     self.show_fractal_viewport(ui, ctx);
                 });
+                let t_viewport_1 = Instant::now();
+                self.metrics.mark_viewport(t_viewport_1.duration_since(t_viewport_0));
             }
             
             WorkspaceView::Animation => {
@@ -2328,13 +3532,13 @@ impl FractalStudioApp {
                         .show(ctx, |ui| {
                             ui.heading("Scene Hierarchy");
                             ui.separator();
-                            // TODO: Show scene hierarchy
-                            ui.label("Scene objects would go here");
+                            self.show_scene_overview(ui);
                             
                             ui.separator();
                             ui.heading("Animation Controls");
                             ui.separator();
-                            ui.label("Animation controls would go here");
+                            // Use existing timeline controls for functional content
+                            self.show_timeline_panel(ui);
                         });
                 }
 
@@ -2391,9 +3595,12 @@ impl FractalStudioApp {
                 }
 
                 // Central panel for 3D viewport with animation preview
+                let t_viewport_0 = Instant::now();
                 egui::CentralPanel::default().show(ctx, |ui| {
                     self.show_fractal_viewport(ui, ctx);
                 });
+                let t_viewport_1 = Instant::now();
+                self.metrics.mark_viewport(t_viewport_1.duration_since(t_viewport_0));
             }
             
             WorkspaceView::Rendering => {
@@ -2404,13 +3611,139 @@ impl FractalStudioApp {
                         .show(ctx, |ui| {
                             ui.heading("Scene Hierarchy");
                             ui.separator();
-                            // TODO: Show scene hierarchy
-                            ui.label("Scene objects would go here");
+                            self.show_scene_overview(ui);
                             
                             ui.separator();
                             ui.heading("Render Settings");
                             ui.separator();
-                            ui.label("Render settings would go here");
+                            // Render scale control (supersampling). Scales internal render resolution.
+                            let mut rs = self.render_scale;
+                            if ui.add(egui::Slider::new(&mut rs, 0.5..=2.0).text("Render Scale")).changed() {
+                                self.render_scale = rs;
+                            }
+                            ui.label("Higher values supersample for crisper edges.");
+                            
+                            // Fragment shader pseudo‑3D mode toggle (ShadPlay/ShaderToy style)
+                            let mut toggled = self.use_fragment_pseudo3d;
+                            if ui.checkbox(&mut toggled, "Fragment Pseudo‑3D Mode").changed() {
+                                self.use_fragment_pseudo3d = toggled;
+                                if let Some(renderer) = &mut self.fractal_renderer {
+                                    renderer.set_fragment_pseudo3d(toggled);
+                                }
+                            }
+                            ui.label("Uses a fragment raymarcher for fast iteration.");
+
+                            // FXAA toggle (UI stub; renderer integration pending)
+                            let mut fxaa = self.fxaa_enabled;
+                            if ui.checkbox(&mut fxaa, "FXAA (anti‑aliasing)").changed() {
+                                self.fxaa_enabled = fxaa;
+                                // Future: wire to renderer post-process when available
+                            }
+
+                            ui.separator();
+                            ui.collapsing("GPU Status", |ui| {
+                                ui.label(format!("Backend: {}", self.gpu_backend));
+                                ui.label(format!("WGPU support: {}", if self.has_wgpu_support { "Yes" } else { "No" }));
+                                if let Some(renderer) = &self.fractal_renderer {
+                                    let stats = renderer.stats();
+                                    ui.label(format!("Last preview: {}x{}", stats.last_preview_size.0, stats.last_preview_size.1));
+                                    ui.label(format!("Workgroups: {}x{}", stats.last_workgroups.0, stats.last_workgroups.1));
+                                } else {
+                                    ui.label("Renderer: Not initialized");
+                                }
+                                ui.label(format!("Viewport texture: {}", if self.viewport_texture.is_some() { "Ready" } else { "Not registered" }));
+                            });
+
+                            ui.separator();
+                            ui.heading("Camera");
+                            // Camera FOV slider (degrees)
+                            let mut fov_val = self.camera_fov;
+                            if ui.add(egui::Slider::new(&mut fov_val, 10.0..=120.0).text("FOV (degrees)"))
+                                .changed()
+                            {
+                                self.camera_fov = fov_val;
+                                if let Some(renderer) = &mut self.fractal_renderer {
+                                    renderer.set_camera_fov(self.camera_fov);
+                                }
+                            }
+
+                            // Camera Target controls (X, Y, Z)
+                            let mut cam_target = self.camera_target;
+                            ui.label("Camera Target");
+                            ui.horizontal(|ui| {
+                                ui.label("X");
+                                ui.add(egui::DragValue::new(&mut cam_target[0]).speed(0.1));
+                                ui.label("Y");
+                                ui.add(egui::DragValue::new(&mut cam_target[1]).speed(0.1));
+                                ui.label("Z");
+                                ui.add(egui::DragValue::new(&mut cam_target[2]).speed(0.1));
+                            });
+                            if cam_target != self.camera_target {
+                                self.camera_target = cam_target;
+                                if let Some(renderer) = &mut self.fractal_renderer {
+                                    renderer.set_camera_target(self.camera_target);
+                                }
+                            }
+
+                            ui.separator();
+                            ui.heading("Fractal Parameters");
+                            // Scale (affects Mandelbox/Mandelbulb depending on selection)
+                            let mut scale_val = self.scale;
+                            if ui.add(egui::Slider::new(&mut scale_val, 0.25..=4.0).text("Scale")).changed() {
+                                self.scale = scale_val;
+                            }
+                            // Bailout radius
+                            let mut bailout_val = self.bailout;
+                            if ui.add(egui::Slider::new(&mut bailout_val, 0.5..=16.0).text("Bailout")).changed() {
+                                self.bailout = bailout_val;
+                            }
+                            // Max iterations
+                            let mut iter_val = self.max_iterations;
+                            if ui.add(egui::Slider::new(&mut iter_val, 1..=400).text("Max Iterations")).changed() {
+                                self.max_iterations = iter_val;
+                            }
+
+                            ui.separator();
+                            ui.heading("Lighting");
+                            // Directional light vector
+                            let mut dir = self.light_direction;
+                            ui.label("Directional Light");
+                            ui.horizontal(|ui| {
+                                ui.label("X");
+                                ui.add(egui::DragValue::new(&mut dir[0]).speed(0.05));
+                                ui.label("Y");
+                                ui.add(egui::DragValue::new(&mut dir[1]).speed(0.05));
+                                ui.label("Z");
+                                ui.add(egui::DragValue::new(&mut dir[2]).speed(0.05));
+                            });
+                            if dir != self.light_direction {
+                                self.save_state_for_undo();
+                                self.light_direction = dir;
+                                if let Some(renderer) = &mut self.fractal_renderer {
+                                    renderer.set_light_direction(self.light_direction);
+                                }
+                            }
+
+                            // Light color picker
+                            ui.label("Light Color");
+                            let mut color = self.light_color;
+                            if ui.color_edit_button_rgb(&mut color).changed() {
+                                self.save_state_for_undo();
+                                self.light_color = color;
+                                if let Some(renderer) = &mut self.fractal_renderer {
+                                    renderer.set_light_color(self.light_color);
+                                }
+                            }
+
+                            // Light intensity
+                            let mut intensity = self.light_intensity;
+                            if ui.add(egui::Slider::new(&mut intensity, 0.0..=10.0).text("Intensity")).changed() {
+                                self.save_state_for_undo();
+                                self.light_intensity = intensity;
+                                if let Some(renderer) = &mut self.fractal_renderer {
+                                    renderer.set_light_intensity(self.light_intensity);
+                                }
+                            }
                         });
                 }
 
@@ -2423,8 +3756,32 @@ impl FractalStudioApp {
                         .show(ctx, |ui| {
                             ui.heading("Material Editor");
                             ui.separator();
-                            // TODO: Show material editor
-                            ui.label("Material editor would go here");
+                            // Materials controls
+                            let mut metallic = self.material_metallic;
+                            if ui.add(egui::Slider::new(&mut metallic, 0.0..=1.0).text("Metallic")).changed() {
+                                self.save_state_for_undo();
+                                self.material_metallic = metallic;
+                                if let Some(renderer) = &mut self.fractal_renderer {
+                                    renderer.set_material_metallic(self.material_metallic);
+                                }
+                            }
+
+                            let mut roughness = self.material_roughness;
+                            if ui.add(egui::Slider::new(&mut roughness, 0.0..=1.0).text("Roughness")).changed() {
+                                self.save_state_for_undo();
+                                self.material_roughness = roughness;
+                                if let Some(renderer) = &mut self.fractal_renderer {
+                                    renderer.set_material_roughness(self.material_roughness);
+                                }
+                            }
+
+                            // Color tuning
+                            let mut sat = self.color_saturation;
+                            if ui.add(egui::Slider::new(&mut sat, 0.0..=2.0).text("Color Saturation")).changed() {
+                                self.save_state_for_undo();
+                                self.color_saturation = sat;
+                                // color_saturation influences shader params during frame update
+                            }
                             
                             ui.separator();
                             ui.heading("Render Output");
@@ -2469,9 +3826,258 @@ impl FractalStudioApp {
                 }
 
                 // Central panel for render viewport
+                let t_viewport_0 = Instant::now();
                 egui::CentralPanel::default().show(ctx, |ui| {
                     self.show_fractal_viewport(ui, ctx);
                 });
+                let t_viewport_1 = Instant::now();
+                self.metrics.mark_viewport(t_viewport_1.duration_since(t_viewport_0));
+            }
+            
+            WorkspaceView::ShaderLoader => {
+                // Left panel for shader loading and controls
+                if self.show_left_panel {
+                    egui::SidePanel::left("left_panel")
+                        .default_width(260.0)
+                        .show(ctx, |ui| {
+                            ui.heading("Shader Loader");
+                            ui.separator();
+
+                            // Hot-reload toggle and library refresh
+                            ui.horizontal(|ui| {
+                                ui.checkbox(&mut self.shader_hot_reload_enabled, "Hot Reload WGSL");
+                                if ui.button("Refresh Library").clicked() {
+                                    self.refresh_shader_library();
+                                }
+                            });
+                            ui.separator();
+
+                            // Library listing from assets/shaders with search filter
+                            ui.collapsing("Available Shaders (assets/shaders)", |ui| {
+                                ui.horizontal(|ui| {
+                                    ui.label("Filter:");
+                                    ui.text_edit_singleline(&mut self.shader_filter_text);
+                                });
+                                if self.shader_library.is_empty() {
+                                    ui.label("No WGSL shaders found.");
+                                } else {
+                                    let filter = self.shader_filter_text.to_lowercase();
+                                    for p in &self.shader_library {
+                                        let name = p.file_name().and_then(|s| s.to_str()).unwrap_or("<unnamed>");
+                                        let path_str = p.to_string_lossy().to_lowercase();
+                                        if !filter.is_empty() && !name.to_lowercase().contains(&filter) && !path_str.contains(&filter) {
+                                            continue;
+                                        }
+                                        if ui.button(name).clicked() {
+                                            match std::fs::read_to_string(p) {
+                                                Ok(contents) => {
+                                                    if let Some(renderer) = &mut self.fractal_renderer {
+                                                        match renderer.load_fragment_wgsl(&contents) {
+                                                            Ok(()) => {
+                                                                self.use_fragment_pseudo3d = true;
+                                                                renderer.set_fragment_pseudo3d(true);
+                                                                self.current_shader_path = Some(p.clone());
+                                                                self.shader_last_modified = std::fs::metadata(p).and_then(|m| m.modified()).ok();
+                                                                self.status_message = Some(format!("Loaded shader: {}", name));
+                                                            }
+                                                            Err(e) => {
+                                                                self.status_message = Some(format!("Failed to load WGSL: {}", e));
+                                                            }
+                                                        }
+                                                    } else {
+                                                        self.status_message = Some("Renderer not initialized".to_string());
+                                                    }
+                                                }
+                                                Err(err) => {
+                                                    self.status_message = Some(format!("Failed to read shader: {}", err));
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+
+                            if ui.button("Load WGSL Shader…").clicked() {
+                                if let Some(path) = rfd::FileDialog::new()
+                                    .add_filter("WGSL Shader", &["wgsl"])
+                                    .set_directory(std::path::Path::new("assets/shaders"))
+                                    .pick_file()
+                                {
+                                    match std::fs::read_to_string(&path) {
+                                        Ok(contents) => {
+                                            if let Some(renderer) = &mut self.fractal_renderer {
+                                                match renderer.load_fragment_wgsl(&contents) {
+                                                    Ok(()) => {
+                                                        self.use_fragment_pseudo3d = true;
+                                                        renderer.set_fragment_pseudo3d(true);
+                                                        self.current_shader_path = Some(path);
+                                                        // Record last modified for hot-reload
+                                                        if let Some(p) = &self.current_shader_path {
+                                                            self.shader_last_modified = std::fs::metadata(p).and_then(|m| m.modified()).ok();
+                                                        }
+                                                        self.status_message = Some("Shader loaded and applied to fragment pipeline".to_string());
+                                                    }
+                                                    Err(e) => {
+                                                        self.status_message = Some(format!("Failed to load WGSL: {}", e));
+                                                    }
+                                                }
+                                            } else {
+                                                self.status_message = Some("Renderer not initialized".to_string());
+                                            }
+                                        }
+                                        Err(err) => {
+                                            self.status_message = Some(format!("Failed to read file: {}", err));
+                                        }
+                                    }
+                                }
+                            }
+
+                            ui.separator();
+                            ui.label("Examples");
+                            ui.horizontal_wrapped(|ui| {
+                                if ui.button("Load Basic Pseudo3D").clicked() {
+                                    let path = std::path::PathBuf::from("assets/shaders/pseudo3d_basic.wgsl");
+                                    match std::fs::read_to_string(&path) {
+                                        Ok(contents) => {
+                                            if let Some(renderer) = &mut self.fractal_renderer {
+                                                match renderer.load_fragment_wgsl(&contents) {
+                                                    Ok(()) => {
+                                                        self.use_fragment_pseudo3d = true;
+                                                        renderer.set_fragment_pseudo3d(true);
+                                                        self.current_shader_path = Some(path);
+                                                        self.shader_last_modified = std::fs::metadata(&self.current_shader_path.as_ref().unwrap()).and_then(|m| m.modified()).ok();
+                                                        self.status_message = Some("Loaded example: Basic Pseudo3D".to_string());
+                                                    }
+                                                    Err(e) => {
+                                                        self.status_message = Some(format!("Error loading example shader: {}", e));
+                                                    }
+                                                }
+                                            } else {
+                                                self.status_message = Some("Renderer not initialized".to_string());
+                                            }
+                                        }
+                                        Err(err) => {
+                                            self.status_message = Some(format!("Failed to read example shader: {}", err));
+                                        }
+                                    }
+                                }
+
+                                if ui.button("Load Mandelbox Pseudo3D").clicked() {
+                                    let path = std::path::PathBuf::from("assets/shaders/pseudo3d_mandelbox.wgsl");
+                                    match std::fs::read_to_string(&path) {
+                                        Ok(contents) => {
+                                            if let Some(renderer) = &mut self.fractal_renderer {
+                                                match renderer.load_fragment_wgsl(&contents) {
+                                                    Ok(()) => {
+                                                        self.use_fragment_pseudo3d = true;
+                                                        renderer.set_fragment_pseudo3d(true);
+                                                        self.current_shader_path = Some(path);
+                                                        self.shader_last_modified = std::fs::metadata(&self.current_shader_path.as_ref().unwrap()).and_then(|m| m.modified()).ok();
+                                                        self.status_message = Some("Loaded example: Mandelbox Pseudo3D".to_string());
+                                                    }
+                                                    Err(e) => {
+                                                        self.status_message = Some(format!("Error loading example shader: {}", e));
+                                                    }
+                                                }
+                                            } else {
+                                                self.status_message = Some("Renderer not initialized".to_string());
+                                            }
+                                        }
+                                        Err(err) => {
+                                            self.status_message = Some(format!("Failed to read example shader: {}", err));
+                                        }
+                                    }
+                                }
+                            });
+
+                            ui.separator();
+                            ui.heading("Fragment Pseudo‑3D");
+                            let mut toggled = self.use_fragment_pseudo3d;
+                            if ui.checkbox(&mut toggled, "Enable fragment raymarching").changed() {
+                                self.use_fragment_pseudo3d = toggled;
+                                if let Some(renderer) = &mut self.fractal_renderer {
+                                    renderer.set_fragment_pseudo3d(toggled);
+                                }
+                            }
+                            ui.label("Uses a fragment raymarcher for fast iteration.");
+
+                            ui.separator();
+                            ui.heading("Camera");
+                            let mut fov_val = self.camera_fov;
+                            if ui.add(egui::Slider::new(&mut fov_val, 10.0..=120.0).text("FOV (degrees)")).changed() {
+                                self.camera_fov = fov_val;
+                                if let Some(renderer) = &mut self.fractal_renderer {
+                                    renderer.set_camera_fov(self.camera_fov);
+                                }
+                            }
+
+                            // Camera Target controls (X, Y, Z)
+                            let mut cam_target = self.camera_target;
+                            ui.label("Camera Target");
+                            ui.horizontal(|ui| {
+                                ui.label("X");
+                                ui.add(egui::DragValue::new(&mut cam_target[0]).speed(0.1));
+                                ui.label("Y");
+                                ui.add(egui::DragValue::new(&mut cam_target[1]).speed(0.1));
+                                ui.label("Z");
+                                ui.add(egui::DragValue::new(&mut cam_target[2]).speed(0.1));
+                            });
+                            if cam_target != self.camera_target {
+                                self.camera_target = cam_target;
+                                if let Some(renderer) = &mut self.fractal_renderer {
+                                    renderer.set_camera_target(self.camera_target);
+                                }
+                            }
+
+                            ui.separator();
+                            ui.heading("Fractal Parameters");
+                            let mut scale_val = self.scale;
+                            if ui.add(egui::Slider::new(&mut scale_val, 0.25..=4.0).text("Scale")).changed() {
+                                self.scale = scale_val;
+                            }
+                            let mut bailout_val = self.bailout;
+                            if ui.add(egui::Slider::new(&mut bailout_val, 0.5..=16.0).text("Bailout")).changed() {
+                                self.bailout = bailout_val;
+                            }
+                            let mut iter_val = self.max_iterations;
+                            if ui.add(egui::Slider::new(&mut iter_val, 1..=400).text("Max Iterations")).changed() {
+                                self.max_iterations = iter_val;
+                            }
+                        });
+                }
+
+                // Right panel shows status and metadata
+                if self.show_right_panel {
+                    egui::SidePanel::right("right_panel")
+                        .min_width(250.0)
+                        .max_width(250.0)
+                        .resizable(false)
+                        .show(ctx, |ui| {
+                            ui.heading("Shader Info");
+                            ui.separator();
+                            if let Some(path) = &self.current_shader_path {
+                                ui.label(format!("Loaded: {}", path.display()));
+                            } else {
+                                ui.label("No shader loaded");
+                            }
+
+                            ui.separator();
+                            ui.heading("Status");
+                            if let Some(msg) = &self.status_message {
+                                ui.label(msg);
+                            } else {
+                                ui.label("Ready");
+                            }
+                        });
+                }
+
+                // Central panel for viewport
+                let t_viewport_0 = Instant::now();
+                egui::CentralPanel::default().show(ctx, |ui| {
+                    self.show_fractal_viewport(ui, ctx);
+                });
+                let t_viewport_1 = Instant::now();
+                self.metrics.mark_viewport(t_viewport_1.duration_since(t_viewport_0));
             }
             
             WorkspaceView::NodeEditor => {
@@ -2532,13 +4138,49 @@ impl FractalStudioApp {
                 // No bottom panel in node editor (or minimal status bar)
 
                 // Central panel for node editor canvas
+                let t_viewport_0 = Instant::now();
                 egui::CentralPanel::default().show(ctx, |ui| {
                     self.show_node_editor(ui);
                 });
+                let t_viewport_1 = Instant::now();
+                self.metrics.mark_viewport(t_viewport_1.duration_since(t_viewport_0));
             }
         }
 
         log::debug!("Update completed");
+    }
+}
+
+impl FractalStudioApp {
+    pub fn selected_fractal_name(&self) -> &'static str {
+        if self.selected_fractal < self.fractal_types.len() {
+            self.fractal_types[self.selected_fractal]
+        } else {
+            "Mandelbulb (Power 8)"
+        }
+    }
+
+    pub fn fractal_name_for(selected_fractal: usize) -> &'static str {
+        // Static fallback list aligned with default presets
+        const PRESETS: [&'static str; 16] = [
+            "Mandelbulb (Power 8)",
+            "Mandelbulb (Power 10)",
+            "Mandelbulb (Power 6)",
+            "Mandelbox (Scale 2.0)",
+            "Mandelbox (Scale 1.8)",
+            "Mandelbox (Scale 2.2)",
+            "Quaternion Julia (Classic)",
+            "Quaternion Julia (Variant)",
+            "Bulb ∪ Box (Union)",
+            "Bulb ∩ Box (Intersection)",
+            "Bulb − Box (Subtraction)",
+            "Smooth Union (Bulb, Box)",
+            "Smooth Intersect (Box, QJulia)",
+            "Smooth Subtract (Bulb, QJulia)",
+            "Triplet Smooth Union (Bulb+Box+QJulia)",
+            "Box ∩ QJulia (Intersection)",
+        ];
+        if selected_fractal < PRESETS.len() { PRESETS[selected_fractal] } else { PRESETS[0] }
     }
 }
 

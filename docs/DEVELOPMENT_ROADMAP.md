@@ -9,10 +9,13 @@
 ## Immediate Priorities (Next 2-4 weeks)
 
 ### 1. 3D Rendering Engine Integration
+- [x] Enable fragment pseudo‑3D raymarcher viewport preview (experimental)
 - [ ] Connect GPU-accelerated fractal renderer to UI viewport
 - [ ] Implement real-time 3D camera navigation
 - [ ] Add lighting and material controls
 - [ ] Support for volumetric rendering effects
+- [ ] Align with `REALTIME_3D_ENGINE_PLAN.md` for loop, parameters, and performance targets
+ - [ ] Track progress against `GAP_ASSESSMENT.md` and close ❌/⚠️ items
 
 ### 2. Node-Based Visual Programming
 - [ ] Visual node editor with drag-and-drop interface
@@ -101,6 +104,8 @@
 - Node-based visual programming interface
 - Basic animation timeline
 - Multiple export formats
+- Real-time renderer meets 60 FPS @ 720p (see `REALTIME_3D_ENGINE_PLAN.md`)
+ - Minimum viable panels and workspace management (see `ADVANCED_SUITE_REQUIREMENTS.md`)
 
 ### Milestone 2: "Live Performance" (12 weeks)
 - Real-time performance with VJ controls
@@ -133,3 +138,9 @@
 - egui for desktop UI
 - WebGPU for web deployment
 - Various ISF shader libraries
+## Milestone: VR/Interaction Foundations
+- OpenXR per-eye rendering at target refresh (≥72 Hz).
+- Desktop stereo preview (SBS/OU) and validation.
+- Enable `XR_EXT_hand_tracking` where supported; fallback to controllers.
+- Integrate GestureService with MediaPipe and Leap Motion backends.
+- Reference: `VR_XR_INTEGRATION_PLAN.md`, `GESTURE_INPUT_PLAN.md`.

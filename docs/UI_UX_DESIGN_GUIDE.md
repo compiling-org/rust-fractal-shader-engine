@@ -250,6 +250,23 @@ pie_menu.add_item(PieMenuItem::new(
    - Center: Rendered output
    - Top: Performance monitor
 
+#### Rendering: Fragment Pseudo‑3D Mode Toggle
+- Location: Left `Render Settings` panel within the `Rendering` workspace
+- Control: Checkbox labeled `Fragment Pseudo‑3D Mode` (experimental)
+- Behavior:
+  - When enabled, the viewport renders via a fullscreen fragment shader raymarcher
+  - When disabled, rendering uses the compute + post‑process path
+- Parameters surfaced:
+  - `FOV` (camera field of view)
+  - `scale`, `bailout`, `max_iterations` (Mandelbox SDF)
+  - `time` and `resolution` are always bound from the app state
+- Interaction affordances:
+  - Real‑time parameter changes reflect immediately in the fragment preview
+  - Future: orbit/pan camera gestures; shader hot‑reload for rapid iteration
+- Visual feedback:
+  - Display `FOV`, current resolution, and FPS in the viewport HUD
+  - Show an “Experimental” badge near the toggle to set expectations
+
 #### Custom Layouts
 - Drag panels to resize/dock
 - Save custom workspace configurations
