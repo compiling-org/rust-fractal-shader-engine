@@ -44,10 +44,7 @@
 - [ ] Real-time performance monitoring
 
 ### 6. Web Deployment
-- [ ] WASM compilation for web browsers
-- [ ] WebGPU acceleration
-- [ ] Online gallery and sharing
-- [ ] Cloud rendering capabilities
+Out-of-scope for this repository; web/WASM tracked externally (see `PLATFORM_SPLIT.md`).
 
 ## Long-term Vision (3-6 months)
 
@@ -64,10 +61,7 @@
 - [ ] Multi-user collaborative editing
 
 ### 9. Blockchain & NFT Features
-- [ ] Direct minting to Filecoin and NEAR
-- [ ] Provenance tracking and royalties
-- [ ] Generative art collection tools
-- [ ] Marketplace integration
+Out-of-scope for this repository; may be tracked externally.
 
 ## Technical Debt & Improvements
 

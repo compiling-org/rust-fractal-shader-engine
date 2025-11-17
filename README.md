@@ -1,43 +1,83 @@
-# Modular Fractal Shader - Professional Fractal Generator
+# Modular Fractal Shader — Current State (November 2025)
 
-A comprehensive, modular fractal generator built with Rust and Bevy. Features advanced GPU-accelerated fractal rendering, real-time audio/MIDI control, and a visual node-based composition interface.
+A modular fractal generator built with Rust and Bevy. This README reflects the actual implementation status and serves as a living document that evolves with the code.
 
-## 🚀 **Latest Update - November 2025**
+## 🚀 Status Overview
 
-### **Architecture Migration Complete**
-- ✅ **GUI Framework**: Migrated from eframe to Bevy 0.17 + bevy_egui
-- ✅ **Rendering Engine**: Integrated WGPU renderer with Bevy's render pipeline
-- ✅ **Performance**: Optimized GPU resource management and rendering pipeline
-- ✅ **Compatibility**: Resolved dependency conflicts and compilation issues
+- ✅ Bevy 0.17 + bevy_egui integration for desktop GUI
+- ✅ Core fractal engine with CPU-based distance estimation (Mandelbrot, Julia, Mandelbulb, Mandelbox, more)
+- ✅ Basic viewport and parameter panels
+- 🚧 GPU renderer integration (WGSL compute/render) in progress
+- 🚧 Node system: data model implemented; editor UI not implemented yet
+- 🚧 Export: placeholder mesh/image exporters (non-fractal meshes)
+- 🚧 Animation: keyframe/timeline structures present; no timeline UI yet
+- ❌ Advanced features (GI, volumes, VR/AR, gesture, NFT) not implemented
 
-### **Current Status & Recent Updates**
+## 📚 What’s Implemented vs Planned
 
-#### ✅ **Completed Features (v1.0.0)**
-- **GPU Acceleration**: WebGPU/Vulkan/Metal/DX12 rendering with real-time performance
-- **Node-Based Editor**: Visual composition interface with drag-and-drop functionality
-- **Shader Generation**: Advanced fractal algorithms with distance estimation
-- **3D Scene Environment**: Full 3D environment with fractal objects
-- **Animation System**: Keyframe animation for camera, lighting, and parameters
-- **Export System**: 3D mesh export (OBJ, STL) and image formats
-- **Professional UI**: Modern dark theme with glassmorphism design
-- **Cross-Platform**: Windows, macOS, Linux support
-- **Web Deployment**: WASM/WebGPU support for browser-based editing
+### Implemented
+- Fractal mathematics and distance estimation in `src/fractal/engine.rs`
+- Bevy-based GUI scaffolding in `src/gui.rs` with viewport texture binding
+- Basic parameter handling, color palettes, and metrics
 
-#### 🔄 **In Development**
-- **Advanced Features**: Global illumination, volumetric effects, VR/AR support
-- **Animation Enhancements**: Timeline editor, audio reactivity, MIDI control
-- **Export Improvements**: Animation sequences, voxel formats, NFT integration
-- **Node Editor**: Advanced node composition and preset management
+### Partial
+- GPU/WGPU setup with backend preflight and logging
+- Viewport image binding for Camera3d → egui texture
+- Exporters stubbed (OBJ/STL/PLY ASCII basics)
 
-#### 🚧 **Known Issues**
-- **Performance**: Memory optimization for complex scenes
-- **Feature Completeness**: Some advanced animation features pending
+### Planned
+- Visual node editor (drag-and-drop, connectors, groups)
+- GPU compute path for fractal evaluation and shading
+- Timeline editor, audio/MIDI integration
+- Proper mesh extraction from DE fields and voxel formats
 
-#### 📈 **Next Development Phase**
-1. **Animation System**: Complete timeline editor and keyframe animation
-2. **Audio Integration**: Real-time audio analysis and MIDI control
-3. **Advanced Rendering**: Global illumination and volumetric effects
-4. **Export Features**: Animation sequences and additional formats
+## 🧭 Architecture (High Level)
+
+```mermaid
+flowchart LR
+    A[GUI (Bevy + bevy_egui)] --> B[FractalStudioApp]
+    B --> C[Fractal Engine (CPU)]
+    B --> D[Renderer (GPU/WGPU) ~ in progress]
+    B --> E[Node System (data model)]
+    B --> F[Animation (structures)]
+    B --> G[Export (placeholders)]
+    C -->|DE results| D
+    E -->|Graphs/Params| C
+    F -->|Param drives| C
+    G -->|Images/Meshes| H[Disk]
+```
+
+## ✨ Features (Honest Snapshot)
+
+### Fractal Generation
+- ✅ 2D: Mandelbrot, Julia, Burning Ship, Tricorn
+- ✅ 3D: Mandelbulb, Mandelbox; distance estimators on CPU
+- 🚧 Quaternion Julia, Kaleidoscopic IFS: basic math present
+
+### Controls
+- ✅ Real-time parameter updates (iterations, bailout, palette, etc.)
+- 🚧 Camera controls and lighting: minimal; PBR pipeline not wired
+
+### Node-Based System
+- ✅ Data model: `Node`, `NodeGraph`, `NodeConnection`, `DataType`
+- ✅ Generators/Math/Color/Transform/Output enums
+- 🚧 Execution logic is simplified; editor UI missing
+- ➜ See `docs/NODE_SYSTEM.md` for details and roadmap
+
+### Rendering & Performance
+- ✅ Ray-marching math and DE routines on CPU
+- 🚧 WGSL shaders and GPU path wiring
+- 🚧 Adaptive quality and performance presets
+
+### Export
+- 🚧 ASCII OBJ/STL/PLY basics; placeholder cube export
+- 🚧 Snapshot PNG pipeline (alpha)
+
+### Platform
+- ✅ Desktop (Windows/macOS/Linux)
+- ℹ️ Web/WASM lives elsewhere; see `docs/PLATFORM_SPLIT.md`
+
+## 📦 Installation
 
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange)](https://www.rust-lang.org/)
 [![Bevy](https://img.shields.io/badge/bevy-0.17-blue)](https://bevyengine.org/)
@@ -68,7 +108,7 @@ A comprehensive, modular fractal generator built with Rust and Bevy. Features ad
 ### 🚀 **Performance & Compatibility**
 - **GPU Acceleration**: WebGPU/Vulkan/Metal/DX12 support
 - **Real-time Rendering**: 60+ FPS on modern GPUs
-- **Cross-Platform**: Windows, macOS, Linux, Web (WASM)
+ - **Cross-Platform**: Windows, macOS, Linux (desktop-only)
 - **Memory Efficient**: Optimized resource management
 
 ### 🎬 **Animation & Motion**
@@ -111,24 +151,23 @@ cargo build --release
 ```
 
 ## Documentation Suite
-- `docs/DEVELOPMENT_PLAN.md` — Living product plan with phases and multi-goal tasks.
-- `docs/EVOLUTION_TRACKER.md` — Chronicle of growth across sprints/releases.
-- `docs/RELEASE_PLAN.md` — Versioning, criteria, and release checklist.
-- `docs/TESTING_QUALITY_PLAN.md` — Snapshot testing, performance, and quality gates.
-- `docs/DOCS_MAINTENANCE.md` — How and when to update documents.
-- See also: `docs/PROJECT_GOALS.md`, `docs/FEATURES_STATUS.md`, `docs/DEVELOPMENT_ROADMAP.md`, `docs/UI_UX_DESIGN_GUIDE.md`.
+- `docs/FEATURES_STATUS.md` — Implemented vs partial vs planned (living)
+- `docs/NODE_SYSTEM.md` — Node system design, status, diagrams
+- `docs/DEVELOPMENT_PLAN.md` — Phases, goals, acceptance criteria
+- `docs/DEVELOPMENT_ROADMAP.md` — Milestones and priorities
+- `docs/DOCS_MAINTENANCE.md` — Update cadence and protocols
 
-All documents are living and must be updated at each sprint and release.
+Documents are living and updated alongside code changes.
 
-## ⚠️ GPU-Only Policy (Non-Negotiable)
+## ⚠️ GPU Policy
 
-- This application must never run without a real GPU device. There is no CPU fallback for the GUI path.
-- Startup enforces a fail-fast watchdog: if `RenderDevice` is not available shortly after launch, the app aborts with a clear error.
-- Mandatory environment configuration before running:
-  - Windows: set `WGPU_BACKEND=vulkan,dx12`, `WGPU_POWER_PREF=high`, `WGPU_DX12_COMPILER=fxc`
-  - macOS: set `WGPU_BACKEND=metal`, `WGPU_POWER_PREF=high`
-  - Linux: set `WGPU_BACKEND=vulkan`, `WGPU_POWER_PREF=high`
-- Development and CI must use machines with a discrete GPU and up-to-date drivers. Do not attempt to run or validate GUI features on CPU-only hosts.
+- Prefer discrete GPU; logs diagnostics and continues if unavailable
+- Backend preflight sets `WGPU_BACKEND` and compiler hints on Windows
+- Recommended environment configuration before running:
+  - Windows: `WGPU_BACKEND=vulkan,dx12`, `WGPU_POWER_PREF=high`, `WGPU_DX12_COMPILER=fxc`
+  - macOS: `WGPU_BACKEND=metal`, `WGPU_POWER_PREF=high`
+  - Linux: `WGPU_BACKEND=vulkan`, `WGPU_POWER_PREF=high`
+- See `gpu_startup.log` after launch for adapter diagnostics
 
 ### Required Run Commands
 
@@ -161,19 +200,11 @@ cargo run --features gui
 
 If the app exits with a message about “GPU device not available — GPU-only policy enforced,” verify drivers and backend selection.
 
-### Docs-First Workflow (Required)
+### Docs-First Workflow
 
-- Every code change must update relevant docs in the same PR.
-- CI blocks PRs if required docs are missing or outdated.
-- Use the PR template to link to updated docs and explain rationale.
-- Install local Git hooks (Windows) from `scripts/` to preflight commit messages and basic checks.
-
-Required documentation updates per change:
-- `docs/CHANGELOG.md` — summarize changes with links
-- `docs/DEVELOPMENT_PLAN.md` — update scope/acceptance if features shift
-- `docs/ARCHITECTURE.md` — reflect any design changes
-- `docs/USAGE_GUIDE.md` — update behavior/UX if user flows change
-- `docs/ISSUES_TRACKER.md` — add/update tracked issues when discovering or fixing problems
+- Update relevant docs in the same PR as code changes
+- Use status tags: Implemented / Partial / Planned
+- Keep `docs/FEATURES_STATUS.md` and `docs/NODE_SYSTEM.md` current
 
 Track Current Issues:
 - Known problems and planned fixes live in `docs/ISSUES_TRACKER.md`.
@@ -192,27 +223,14 @@ cargo run -- benchmark
 
 # Run compatibility tests
 cargo run -- test
-
-# Build for web deployment
-cargo run --features web
 ```
 
 ### Fragment Pseudo‑3D Mode (Experimental)
-The fragment pipeline enables ShaderToy/ShadPlay‑style iteration using a fullscreen fragment shader that raymarches a Mandelbox‑style SDF. It’s great for fast iteration and pseudo‑3D decorative geometries.
+The fragment path is exploratory and not wired to production UI. Expect limited functionality.
 
-- Switch to the `Rendering` workspace.
-- In the left `Render Settings` panel, enable `Fragment Pseudo‑3D Mode`.
-- The viewport will render via the fragment raymarcher. Toggle off to return to the compute + post‑process path.
-
-Key parameters affecting fragment visuals:
-- `scale` (Mandelbox scale)
-- `bailout` (ray exit distance)
-- `max_iterations` (distance estimator iterations)
-- `FOV` (camera field of view; default 60°)
-
-Notes:
-- The fragment renderer prioritizes interactive iteration; for more structured multi‑stage pipelines, use the default compute path.
-- Future updates will add orbit/pitch camera controls and shader hot‑reload.
+### DE→Color Mapping (Alpha)
+- Modes: off, grayscale by depth, multiply base
+- Parameters exist; UI and shader wiring are evolving
 
 ### Node Editor Demo
 ```bash
@@ -229,75 +247,83 @@ cargo run --example fractal_demo
 # Export a placeholder OBJ mesh (cube) to exports/mesh.obj
 cargo run --bin mesh_export -- --output exports/mesh.obj --width 32 --height 32 --depth 32
 ```
-- Current behavior exports a placeholder cube via the simplified marching cubes path.
+- Current behavior exports a placeholder cube (non-fractal)
 - Intended roadmap: load a `.fract` project, evaluate scene objects, and export meshes per object parameters.
 - Flags: `--output <path>`, `--width <w>`, `--height <h>`, `--depth <d>` (defaults: `exports/mesh.obj`, `32`, `32`, `32`).
 
-### Web Deployment
-```javascript
-import init, { WebFractalStudio } from './pkg/modular_fractal_shader.js';
+### CLI Snapshot (alpha)
+Render a single PNG using the CPU path; WGSL integration is in progress.
 
-async function run() {
-    await init();
-    const studio = WebFractalStudio.new('canvas');
-    // Start rendering loop
-    function render() {
-        studio.render_frame(performance.now());
-        requestAnimationFrame(render);
-    }
-    render();
-}
+```bash
+# Default snapshot (1024x768, Mandelbulb)
+cargo run --bin fractal-snapshot
+
+# Snapshot with camera, lighting, DE→color, and tonemapping controls
+cargo run --bin fractal-snapshot -- '{
+  "width": 1024,
+  "height": 768,
+  "formula": "mandelbulb",
+  "camera_fov": 60.0,
+  "light_direction": [0.4, 0.7, -0.2],
+  "light_color": [0.8, 0.9, 1.0],
+  "light_intensity": 1.0,
+  "material_metallic": 0.0,
+  "material_roughness": 0.5,
+  "de_color_mode": 1,
+  "de_color_scale": 0.2,
+  "tonemap": "reinhard",
+  "exposure": 1.2,
+  "output": "snapshot.png"
+}'
 ```
 
-## 🏗️ Architecture
+- DE→color: `de_color_mode` (`0` off, `1` grayscale by depth, `2` multiply base), `de_color_scale` (depth scale).
+- Tonemapping: `tonemap` (`none` | `reinhard`), `exposure` (positive float).
+- Camera & lighting: `camera_fov` (degrees), `light_direction` (xyz), `light_color` (rgb), `light_intensity`, `material_metallic`, `material_roughness`.
 
-### Core Components
-- **`FractalEngine`** - Main fractal computation engine
-- **`FractalRenderer`** - GPU-accelerated rendering system
-- **`NodeEditor`** - Visual node composition system
-- **`AnimationSystem`** - Timeline and keyframe animation
-- **`SceneSystem`** - 3D scene management
-- **`ExportSystem`** - Mesh and image export
-- **`UISystem`** - Bevy + bevy_egui interface
+### Platform Split
+Desktop-only in this repository. Web/WASM builds live in NUWE; see `docs/PLATFORM_SPLIT.md`.
 
-### Rendering Pipeline
-1. **Fractal Computation** - Distance estimation on GPU
-2. **Ray Marching** - Real-time rendering of distance fields
-3. **Lighting** - Physically-based lighting calculations
-4. **Post-Processing** - Color grading and effects
-5. **Viewport Display** - Interactive 3D viewport
+### Web Deployment
+- The browser/WASM edition lives in the NUWE blockchain project.
+- This repo focuses on native desktop builds; web API/UI code is relocated.
+- For details and links to the web codebase, see `docs/PLATFORM_SPLIT.md`.
 
-## 🎨 Node Types
+## 🏗️ Modules
 
-### Generators
-- **Fractals**: Mandelbrot, Julia, Burning Ship, Mandelbulb, Mandelbox, IFS
-- **Noise**: Perlin, Simplex, Voronoi, Flow noise
-- **Mathematical**: L-Systems, Cellular Automata, Strange Attractors
-- **Geometric**: Spheres, Boxes, Torus, Custom shapes
+- `FractalEngine` — CPU DE math and coloring
+- `Renderer` — WGSL shaders and GPU wiring (in progress)
+- `Nodes` — Data model and execution stubs
+- `Animation` — Keyframe/timeline structures
+- `Scene` — Cameras and basic 3D setup
+- `Export` — ASCII mesh/image placeholders
+```mermaid
+classDiagram
+    class FractalEngine {
+      +compute_distance(vec3) DistanceResult
+      +parameters : FractalParameters
+    }
+    class Renderer {
+      +initialize_wgpu(device, queue)
+      +fractal_compute.wgsl
+    }
+    class NodeGraph {
+      +nodes : HashMap
+      +connections : Vec
+      +execute(context) NodeResult
+    }
+    FractalEngine <.. Renderer
+    NodeGraph --> FractalEngine
+```
+## 🎨 Node Types (Implemented)
 
-### Transforms
-- **Spatial**: Translate, Rotate, Scale
-- **Deformations**: Warp, Twist, Bend, Taper
-- **Combinations**: Union, Intersect, Subtract, Smooth operations
-- **Replication**: Array, Mirror, Circular patterns
+- Generators: Mandelbrot, Julia, Mandelbulb, Mandelbox, IFS (data model)
+- Math: Add, Multiply, Sine, Cosine, Absolute, etc.
+- Color: Invert, Brightness (basic)
+- Transform: Scale (basic)
+- Output: Pass-through
 
-### Effects
-- **Color**: Brightness, Contrast, Saturation, Hue, Curves
-- **Geometry**: Displace, Noise, Fractal perturbation
-- **Filter**: Blur, Sharpen, Edge Detect, Posterize
-- **Distortion**: Wave, Ripple, Fisheye, Swirl
-
-### Animation
-- **Timeline**: Keyframe animation with interpolation
-- **Procedural**: LFO, Noise, Attractors
-- **Logic**: If/Then/Else, Switches, Math operations
-- **Control**: Parameter drivers and expressions
-
-### Rendering
-- **Materials**: PBR properties, textures, normal maps
-- **Lighting**: Point, directional, spot lights
-- **Camera**: Position, rotation, field of view
-- **Post-Processing**: Bloom, DOF, color grading
+See `docs/NODE_SYSTEM.md` for full details and planned nodes.
 
 ## 🔧 Development
 
@@ -352,31 +378,11 @@ examples/                # Example applications
 assets/                  # Shaders and resources
 ```
 
-## 🎯 Roadmap
+## 🎯 Roadmap (Condensed)
 
-### ✅ Completed
-- [x] Fractal engine with distance estimation
-- [x] GPU-accelerated rendering with WGPU
-- [x] Node-based visual composition
-- [x] Professional UI with Bevy + bevy_egui
-- [x] 3D scene management
-- [x] Basic animation system
-- [x] Mesh and image export
-- [x] Cross-platform support
-- [x] Web deployment (WASM/WebGPU)
-- [x] Migration from eframe to Bevy
-
-### 🚧 In Progress
-- [x] Advanced animation timeline
-- [ ] Audio/MIDI integration
-- [ ] Global illumination
-- [ ] Volumetric effects
-
-### 🔮 Future
-- [ ] Plugin system for custom nodes
-- [ ] Networked multi-user collaboration
-- [ ] VR/AR fractal environments
-- [ ] AI-assisted fractal generation
+- Foundation: GPU renderer, node editor UI, mesh export from DE
+- Core: timeline editor, audio/MIDI, camera+lighting controls
+- Advanced: volumes, GI, VR/AR, collaboration, plugins
 
 ## 🤝 Contributing
 
@@ -428,3 +434,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Made with ❤️ and lots of fractals**
+## Desktop UI Theme Controls
+
+- The project is desktop-focused; no server or web preview is required.
+- See `docs/THEME_CONTROLS.md` for usage and implementation details.

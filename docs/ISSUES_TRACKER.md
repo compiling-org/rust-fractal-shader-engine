@@ -193,9 +193,11 @@ Maintainers: update this file when discovering, fixing, or re-scoping issues. Fo
   - Profiling confirms no GPU→CPU round-trip in interactive rendering.
 
 ## EXP-002 – 3D mesh export not fully wired/validated
-- Status: open
+- Status: partially_addressed
 - Area: `src/export/mod.rs`, `src/export/mesh.rs`, `src/export/formats.rs`, `src/ui/fractal_ui.rs::FractalExportDialog`
 - Description: Mesh exporters and generators exist (OBJ/STL scaffolding), but the Export dialog does not consistently trigger mesh generation, and acceptance criteria (normals/topology/scale) are not validated against DCC tools.
+  Update (2025-11-11): Basic ASCII STL export implemented; reliability still depends on mesh generation quality and UI wiring.
+  Update (2025-11-11, later): ASCII PLY export implemented in `src/export/mesh.rs`. Supports vertices, optional normals/UVs, and triangle faces. UI wiring remains pending; mesh quality still depends on generator/topology.
 - Repro:
   1) Open Export dialog; choose OBJ/STL.
   2) Attempt export; files may be missing, incomplete, or fail to load cleanly in Blender.
@@ -241,6 +243,18 @@ Maintainers: update this file when discovering, fixing, or re-scoping issues. Fo
 - Acceptance criteria:
   - Resizing/focus changes recover gracefully; logs show handled reconfigure.
 
+## SHD-001 – Vignette function incomplete in render shader
+- Status: fixed
+- Area: `src/fractal/shaders/fractal_render.wgsl`
+- Description: `apply_vignette` had incomplete logic leading to negligible vignette effect.
+- Repro:
+  1) Render any scene and adjust vignette amount.
+  2) Observe minimal or no vignette darkening at edges.
+- Suspected cause: Missing final application/return of vignette factor.
+- Impact: Post-process look lacked expected vignette shaping.
+- Fix plan: Implement proper vignette factor computation and apply to color; add lightweight Reinhard tonemapping step in color grading.
+- Acceptance criteria: Vignette amount parameter visibly darkens frame edges consistently; overall exposure is saner under bright highlights.
+- Verification: Built successfully on Windows; visual validation pending in GUI preview.
 ---
 
 ## Triage Log

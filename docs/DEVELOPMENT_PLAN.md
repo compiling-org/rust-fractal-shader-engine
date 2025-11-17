@@ -103,13 +103,7 @@ Linkage: This task’s acceptance criteria align with the WGSL parameter packing
 - CLI export mode for headless rendering.
 
 ### Task J — Web Build & Delivery
-- WebGPU build; Canvas2D fallback for limited platforms.
-- Reduced UI for web with essential panels.
-- Performance mode defaults for mobile.
-- WASM bindings for shader parameter updates.
-- Asset loading strategy for web.
-- Web demo page and minimal deploy pipeline.
-- Cross-browser compatibility testing.
+Out-of-scope for this repository. Web/WASM work is tracked externally; see `PLATFORM_SPLIT.md`.
 
 ### Task K — Shader Converter (ISF/GLSL→WGSL)
 - Parse ISF metadata; map uniforms and UI params.

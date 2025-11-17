@@ -17,6 +17,7 @@ Purpose: Keep all documents accurate and reflective of the app’s evolution.
 - Use concise headings and lists.
 - Keep templates at top of each doc where applicable.
 - Cross-link related docs for context.
+ - Use Mermaid diagrams where they add clarity (architecture, flows, timelines).
 
 ## Templates
 - Evolution entry, release checklist, snapshot test baselines.
@@ -33,5 +34,6 @@ Purpose: Keep all documents accurate and reflective of the app’s evolution.
 - Required updates on code change:
   - At least one of: `DEVELOPMENT_PLAN.md`, `DEVELOPMENT_ROADMAP.md`, `GAP_ASSESSMENT.md`, relevant module plans.
   - Acceptance criteria and validation steps recorded in PR.
+  - Update status tags in `FEATURES_STATUS.md` and `NODE_SYSTEM.md` when feature state changes.
 - Exemptions:
   - Typos/infra-only changes: add `Doc-Exempt` in commit message and PR notes.

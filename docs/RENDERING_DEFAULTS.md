@@ -46,3 +46,17 @@ The viewport formula selection aligns with `fractal_types` indices:
 - Renderer initialization applies `Medium` quality and disables pseudo‑3D.
 - Viewport formula mapping fixed to match preset indices.
 - Default `max_iterations` increased from 50 → 100.
+
+## DE→Color Mapping Defaults
+
+- Param indices: `params[50] = de_color_mode`, `params[51] = de_color_scale`.
+- Modes: `0` off, `1` grayscale by depth, `2` multiply base color.
+- Default on init: `de_color_mode = 0`, `de_color_scale = 0.0`.
+- Quick Controls provide one-click toggles and an inline scale slider.
+
+## Tonemapping Defaults
+
+- Param indices: `params[52] = tonemap_mode`, `params[53] = tonemap_exposure`.
+- Modes: `0` off, `1` Reinhard (applied before gamma).
+- Defaults on init: `tonemap_mode = 0` (disabled), `tonemap_exposure = 1.0`.
+- Recommended: enable `tonemap_mode = 1` and tune exposure (`0.8–1.5`).

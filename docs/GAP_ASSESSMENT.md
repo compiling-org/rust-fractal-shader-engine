@@ -16,6 +16,8 @@ Purpose: Maintain a living checklist of implemented vs missing features with cod
   - Ref: `src/benchmark.rs`, GUI metrics overlay (planned)
 - Parameter packing documented & stable: ✅ Present
   - Ref: `src/fractal/renderer.rs`, `src/fractal/shaders/fractal_compute.wgsl`
+ - Post-process tone mapping & vignette: ⚠️ Partial
+   - Ref: `src/fractal/shaders/fractal_render.wgsl`
 
 ### UI/UX
 - Main menu and panels framework: ⚠️ Partial
@@ -34,7 +36,7 @@ Purpose: Maintain a living checklist of implemented vs missing features with cod
 ### File I/O & Export
 - Project save/load: ⚠️ Partial
   - Ref: `src/project/mod.rs`
-- Export formats (PNG/JPEG, sequences, MP4, OBJ/STL, VOX): ⚠️ Partial
+- Export formats (PNG/JPEG, sequences, MP4, OBJ/STL/PLY, VOX): ⚠️ Partial
   - Ref: `src/export/*`
 - Headless export parity: ⚠️ Partial
   - Ref: `src/bin/fractal_snapshot.rs`
@@ -65,8 +67,7 @@ Purpose: Maintain a living checklist of implemented vs missing features with cod
 - VJ module API: ❌ Missing
 
 ### Web/WebGPU
-- WASM/WebGPU demo build: ⚠️ Partial
-  - Ref: `build_web.sh`, `src/web/*`, `web/index.html`
+- Out-of-scope in this repository; see `docs/PLATFORM_SPLIT.md` for web locations.
 
 ### Testing & Quality
 - Metrics overlay & performance targets validated: ❌ Missing
@@ -87,3 +88,38 @@ Purpose: Maintain a living checklist of implemented vs missing features with cod
 - Leap Motion (`leaprs`) backend: Missing
 - OpenXR hand tracking integration: Missing
 - Unified gesture schema + modulation mapping: Missing
+# Gap Assessment
+
+This document tracks the gaps between current implementation and requested capabilities.
+
+## Status Update — 2025-11-11
+
+- Advanced 3D features: no lighting, no physically based materials, no shadowing.
+- Camera system: lacks multi-camera rigs, depth-of-field, cinematic controls.
+- Fractal formulas: limited; comprehensive catalog missing (e.g., mandelbulb variants, hybrids).
+- Shaders: minimal WGSL; advanced shading, SDF composition, and ray-march optimizations missing.
+- Views: Rendering and Modeling share similar viewport; Modeling should become Render View; a dedicated Modeling View for 3D creation/export controls is not yet implemented.
+- Export system: OBJ supported; basic ASCII STL and PLY exports added.
+- Mesh generation: marching cubes/normal generation still basic; reliability and quality need work.
+
+## Recent Progress
+
+- Fixed `MeshFormat` equality for UI radio controls by deriving `PartialEq`.
+- Corrected mesh generation indexing (`usize` vs `u32`) to resolve compile errors.
+- Implemented basic ASCII STL exporter (triangulated facets with computed face normals).
+ - Implemented basic ASCII PLY exporter (vertices, optional normals/UVs, triangle faces).
+ - Shader post-process: fixed vignette application; added minimal Reinhard tone mapping in color grading.
+
+## Next Steps (Short Term)
+
+- Separate Modeling vs Rendering views: wire dedicated modeling controls for mesh generation and export.
+- Add lighting controls to render pipeline (directional light, ambient term).
+- Expand camera controls: focal length, aperture, focus distance, motion paths.
+- Catalog fractal formulas and shader modules; scaffold loaders and presets.
+- Improve mesh generation quality: robust normals, manifold handling, and decimation options.
+
+## Risks / Blockers
+
+- Missing shader architecture for modular fractal formula injection.
+- Lack of render feature toggles (lighting, tone mapping) hampers visual parity with target tools.
+- Export reliability dependent on mesh generation correctness and post-processing.

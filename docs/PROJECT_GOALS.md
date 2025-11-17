@@ -1,19 +1,19 @@
 # Modular Fractal Shader - Project Goals & Progress Tracking
 
 ## Vision Statement
-Create the world's most powerful and intuitive fractal generation studio, combining the creative flexibility of TouchDesigner with the mathematical precision of Mandelbulb3D, all powered by modern GPU acceleration and professional 3D rendering techniques.
+Build a powerful and approachable fractal studio focused on desktop, with clear evolution from CPU-based fractal math to a GPU‑accelerated pipeline, and an honest, incremental roadmap.
 
 ## Core Objectives
 
 ### 1. Professional 3D Fractal Generation
 **Goal**: Enable artists and mathematicians to create, explore, and render complex 3D fractals in real-time with professional quality.
 
-**Progress**: ✅ 70% Complete
-- ✅ Basic 2D fractal rendering (Mandelbrot, Julia)
-- ✅ Advanced 3D fractal rendering (Mandelbulb, Mandelbox)
-- ✅ GPU-accelerated distance estimation with WGPU
-- ✅ Advanced 3D camera navigation
-- ✅ Professional lighting and materials system
+**Progress**: ⚠️ 40% Complete
+- ✅ 2D fractal rendering (Mandelbrot, Julia)
+- ✅ 3D fractal math (Mandelbulb, Mandelbox) on CPU
+- 🚧 GPU integration (WGSL/WGPU) in progress
+- 🚧 Basic 3D camera setup; minimal controls
+- ❌ Lighting and materials not implemented
  
 ## Cross-References
 - See `docs/ADVANCED_SUITE_REQUIREMENTS.md` for module-by-module acceptance criteria.
@@ -23,39 +23,34 @@ Create the world's most powerful and intuitive fractal generation studio, combin
 ### 2. Node-Based Visual Programming
 **Goal**: Provide an intuitive node-based interface for composing complex fractal systems, similar to Houdini or TouchDesigner.
 
-**Progress**: ⚠️ 45% Complete
-- ✅ Visual node editor interface with Bevy + egui
-- ✅ Drag-and-drop node placement
-- ✅ Connection system between nodes
-- ⏳ Library of fractal generator nodes
-- ❌ Advanced node composition features
+**Progress**: ⚠️ 20% Complete
+- ✅ Node data model and execution stubs
+- ❌ Visual editor UI (drag/connect/group) not implemented
+- ⏳ Generator/effect/transform nodes planned
 
 ### 3. Real-time Performance & Output
 **Goal**: Deliver butter-smooth real-time rendering with professional output options for live visuals, installations, and broadcast.
 
-**Progress**: ⚠️ 55% Complete
+**Progress**: ⚠️ 30% Complete
 - ✅ Basic UI responsiveness optimizations
-- ✅ GPU compute shader integration with WGPU
-- ⏳ Multi-display output support
-- ❌ Syphon/Spout/NDI integration
+- 🚧 GPU wiring in progress
+- ❌ Multi-display output and Syphon/Spout/NDI not implemented
 
 ### 4. Advanced Animation & Timeline
 **Goal**: Offer sophisticated animation tools with keyframe editing, procedural generators, and audio-reactive capabilities.
 
-**Progress**: ⚠️ 35% Complete
-- ⏳ Timeline editor with keyframes
-- ✅ Procedural animation nodes
-- ⏳ Audio/MIDI parameter modulation
-- ⏳ Morphing between fractal types
+**Progress**: ⚠️ 15% Complete
+- 🚧 Timeline/keyframe structures exist
+- ❌ Timeline UI and playback not implemented
+- ⏳ Audio/MIDI modulation planned
 
 ### 5. Professional Export & Sharing
 **Goal**: Support industry-standard export formats and blockchain integration for NFT creation and marketplace sharing.
 
-**Progress**: ⚠️ 40% Complete
-- ✅ Basic image export capabilities
-- ✅ 3D mesh export (OBJ, STL)
-- ⏳ Animation sequence export
-- ⏳ NFT minting integration
+**Progress**: ⚠️ 25% Complete
+- 🚧 Basic image export (snapshot alpha)
+- 🚧 Mesh export placeholders (OBJ/STL/PLY; cube)
+- ❌ Animation sequences, NFT integration not implemented
 
 #### 5.a 3D Fractal File Export (Explicit Goal)
 **Goal**: Export fractals as 3D files suitable for DCC pipelines and 3D printing.
@@ -81,21 +76,19 @@ Create the world's most powerful and intuitive fractal generation studio, combin
 
 ### Rendering Engine
 - [x] 2D Fractal Algorithms (Mandelbrot, Julia)
-- [x] 3D Fractal Algorithms (Mandelbulb, Mandelbox)
-- [x] GPU Compute Shaders (WGPU/WebGPU)
-- [x] Real-time Ray Marching
+- [x] 3D Fractal Math (Mandelbulb, Mandelbox)
+- [ ] GPU Compute Shaders (wiring in progress)
+- [ ] Real-time Ray Marching on GPU
 - [ ] Global Illumination
 - [ ] Volumetric Effects
-- [x] Adaptive Quality Scaling
+- [ ] Adaptive Quality Scaling
 
 ### User Interface
-- [x] Professional egui Implementation with Bevy integration
-- [x] Parameter Control Panels
-- [x] Professional 3D Viewport
-- [x] Node Editor Canvas
+- [x] bevy_egui integration and basic panels
+- [x] Viewport texture binding to Camera3d
+- [ ] Node Editor Canvas (UI)
 - [ ] Animation Timeline
 - [ ] Material Editor
-- [ ] External Code Editor Integration
 
 ### File I/O & Export
 - [x] Image Export (PNG, JPEG)
@@ -114,26 +107,19 @@ Create the world's most powerful and intuitive fractal generation studio, combin
 - [ ] Gesture Control
 
 ### Web & Distribution
-- [x] WASM/WebGPU Deployment
-- [ ] Online Gallery
-- [ ] Cloud Rendering
-- [ ] Collaborative Editing
-- [ ] Plugin Architecture
+- ℹ️ Web/WASM is maintained externally (NUWE). Desktop scope only here.
+- [ ] Collaborative Editing (future)
+- [ ] Plugin Architecture (future)
 
 ### Blockchain & NFT
-- [ ] Filecoin Integration
-- [ ] NEAR Protocol Integration
-- [ ] IPFS Storage
-- [ ] Smart Contract Deployment
-- [ ] Marketplace Integration
+- Out-of-scope for this repository; may be tracked externally.
 
 ## Success Metrics
 
 ### Technical Performance
-- 60+ FPS rendering at 1080p resolution ✅
-- < 50ms response time for parameter changes ⚠️
-- Support for 4K+ export resolutions ⚠️
-- Multi-GPU scaling capabilities ❌
+- Target: 60 FPS at 720p once GPU path lands
+- Parameter updates responsive in GUI (basic)
+- Headless export pipeline under development
 
 ### User Experience
 - Intuitive interface for non-programmers ⚠️
@@ -149,23 +135,19 @@ Create the world's most powerful and intuitive fractal generation studio, combin
 
 ## Quarterly Targets
 
-### Q4 2025: Core Completion
-- Complete professional node editor
-- Implement animation timeline
-- Add advanced materials and lighting
-- Release first public beta
+### Q4 2025: Core Foundations
+- Wire GPU renderer into viewport
+- Minimal node editor UI
+- Basic export reliability
 
-### Q1 2026: Professional Features
-- Add multi-display output support
-- Implement audio/MIDI integration
-- Add animation sequence export
-- Release commercial version
+### Q1 2026: Core Features
+- Audio/MIDI integration
+- Timeline editor and playback
+- Mesh/voxel export improvements
 
 ### Q2 2026: Ecosystem
-- Launch online community platform
-- Add plugin architecture
-- Implement NFT minting features
-- Release mobile companion app
+- Plugin architecture exploration
+- Collaboration roadmap definition
 
 ### Q3 2026: Innovation
 - Add AI-assisted fractal generation
@@ -176,9 +158,9 @@ Create the world's most powerful and intuitive fractal generation studio, combin
 ## Risk Mitigation
 
 ### Technical Risks
-- **GPU Compatibility**: Maintain support for Vulkan, Metal, and DX12
-- **Performance Scaling**: Implement adaptive quality based on hardware
-- **Web Deployment**: Ensure consistent performance across browsers
+- **GPU Compatibility**: Vulkan/DX12/GL fallback diagnostics and selection
+- **Performance Scaling**: Quality presets and adaptive iteration budgets
+- **Desktop Scope**: Web deployment tracked externally; avoid cross‑scope drift
 
 ### Market Risks
 - **Competition**: Differentiate through unique node-based approach
@@ -220,11 +202,8 @@ Create the world's most powerful and intuitive fractal generation studio, combin
 - ✅ Improved GPU resource management
 - ✅ Enhanced fractal rendering performance
 - ✅ Fixed compilation warnings and errors
-## GPU-Only Principle (Non-Negotiable)
+## GPU Policy
 
-- The GUI application must never run without a real GPU device.
-- No CPU fallback is permitted for the GUI; startup aborts early when WGPU adapter/device is unavailable.
-- Backend configuration is mandatory: enforce `WGPU_BACKEND` and `WGPU_POWER_PREF` per platform; use `WGPU_DX12_COMPILER=fxc` on Windows.
-- Logs must surface adapter/backend selection and device features at startup.
-
-Rationale: This product is fundamentally a GPU/3D application. Allowing non-GPU execution creates false positives, wastes time, and breaks user trust.
+- Prefer discrete GPU; continue with fallbacks when needed and log diagnostics.
+- Configure `WGPU_BACKEND`, `WGPU_POWER_PREF`, `WGPU_DX12_COMPILER` on Windows.
+- See startup logs (`gpu_startup.log`) for adapter/backend details.
